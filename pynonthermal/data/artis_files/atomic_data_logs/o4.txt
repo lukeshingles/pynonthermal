@@ -1,0 +1,20 @@
+
+===========> O IV input:
+Reading atomic-data-hillier/atomic/OXY/IV/19nov07/fin_osc
+File specifies 324 levels
+File specifies 7599 transitions
+Read 324 levels
+Read 7599 transitions
+Found at least one transition specifying level name with no J value
+Reading atomic-data-hillier/atomic/OXY/IV/19nov07/col_oiv
+Temperatures available for effective collision strengths (units of 1.0e+04 K):
+0.09, 0.18, 0.27, 0.36, 0.45, 0.54, 0.72, 0.90, 1.35, 1.80, 2.25, 2.700, 3.15, 3.6, 4.5, 5.40, 6.30, 7.2, 8.2, 9.00, 10.8, 12.6, 14.4, 16.2, 18.0, 20.7, 23.4, 27.0, 31.0, 36.0, 40.5, 45.0
+Selecting 5400.000 K
+Read 105 effective collision strengths 
+Output 105 effective collision strengths 
+
+===========> O IV output:
+Adding in 72 extra transitions with only upsilon values
+Writing to 'adata.txt'
+Writing to 'transitiondata.txt'
+Output 7671 transitions of which 949 are forbidden and 105 have collision strengths

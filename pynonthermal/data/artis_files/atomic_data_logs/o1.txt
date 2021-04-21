@@ -1,0 +1,33 @@
+
+===========> O I input:
+Reading atomic-data-hillier/atomic/OXY/I/20sep11/oi_osc_mchf
+File specifies 199 levels
+File specifies 4193 transitions
+Read 199 levels
+Read 4193 transitions
+Found at least one transition specifying level name with no J value
+Reading atomic-data-hillier/atomic/OXY/I/20sep11/oi_col
+Temperatures available for effective collision strengths (units of 1.0e+04 K):
+0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.80, 1.00, 1.20, 1.40, 1.60, 2.00, 2.50, 3.00, 3.50, 4.00, 5.00, 6.00
+Selecting 6000.000 K
+Read 38 effective collision strengths 
+Output 243 effective collision strengths 
+Reading atomic-data-hillier/atomic/OXY/I/20sep11/phot_nosm_A
+Photoionisation target: 2s2_2p3_4So/2p^3_4So
+20 levels with cross-section type 2: Hydrogenic split l (z states, n > 11) [n, l_start, l_end]
+18 levels with cross-section type 3: Hydrogenic pure n level (all l, n >= 13) [scale, n]
+69 levels with cross-section type 20: Opacity Project: smoothed [number of data points]
+Reading atomic-data-hillier/atomic/OXY/I/20sep11/phot_nosm_B
+Photoionisation target: 2s2_2p3_2Do
+102 levels with cross-section type 1: Seaton formula fit [sigma_o, alpha, beta]
+20 levels with cross-section type 2: Hydrogenic split l (z states, n > 11) [n, l_start, l_end]
+18 levels with cross-section type 3: Hydrogenic pure n level (all l, n >= 13) [scale, n]
+69 levels with cross-section type 20: Opacity Project: smoothed [number of data points]
+
+===========> O I output:
+Adding in 190 extra transitions with only upsilon values
+Writing to 'adata.txt'
+Writing to 'transitiondata.txt'
+Output 4383 transitions of which 1258 are forbidden and 186 have collision strengths
+Writing to 'phixsdata2.txt'
+Downsampling cross sections assuming T=6000 Kelvin, nphixspoints=100, phixsnuincrement=0.03

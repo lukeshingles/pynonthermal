@@ -1,0 +1,26 @@
+
+===========> Fe I input:
+Reading atomic-data-hillier/atomic/FE/I/07sep16/fei_osc
+File specifies 1579 levels
+File specifies 141928 transitions
+Read 1579 levels
+Read 141928 transitions
+Reading atomic-data-hillier/atomic/FE/I/07sep16/col_data_ljs
+Temperatures available for effective collision strengths (units of 1.0e+04 K):
+0.0100, 0.02512, 0.0631, 0.1584, 0.3981
+Selecting 3981.000 K
+Read 45 effective collision strengths 
+Output 45 effective collision strengths 
+Reading atomic-data-hillier/atomic/FE/I/07sep16/phot_smooth_3000
+Photoionisation target: 3d6(5D)4sa6De
+208 levels with cross-section type 1: Seaton formula fit [sigma_o, alpha, beta]
+159 levels with cross-section type 7: Modified Seaton formula fit (cross section zero until offset edge)
+200 levels with cross-section type 20: Opacity Project: smoothed [number of data points]
+
+===========> Fe I output:
+Adding in 34 extra transitions with only upsilon values
+Writing to 'adata.txt'
+Writing to 'transitiondata.txt'
+Output 141962 transitions of which 141 are forbidden and 45 have collision strengths
+Writing to 'phixsdata2.txt'
+Downsampling cross sections assuming T=6000 Kelvin, nphixspoints=100, phixsnuincrement=0.03

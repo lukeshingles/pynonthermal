@@ -1,0 +1,252 @@
+
+===========> Fe III input:
+Reading atomic-data-hillier/atomic/FE/III/30oct12/FeIII_OSC
+File specifies 1500 levels
+File specifies 136060 transitions
+Can't find LS term in Hillier level name '3d5(4D)4po[3]'
+Can't find LS term in Hillier level name '3d5(4P)4po[2]'
+Can't find LS term in Hillier level name '3d5(4P)4po[1]'
+Can't find LS term in Hillier level name '3d5(a2D)4po[2]'
+Can't find LS term in Hillier level name '3d5(a2D)4po[3]'
+Can't find LS term in Hillier level name '3d5(b2F)4po[4]'
+Read 1500 levels
+Read 136060 transitions
+Reading atomic-data-hillier/atomic/FE/III/30oct12/col_data.dat
+Temperatures available for effective collision strengths (units of 1.0e+04 K):
+0.100, 0.300, 0.500, 0.700, 1.000, 1.200, 1.500, 1.700, 2.000, 2.500, 3.000, 3.500, 4.000, 4.500, 5.000, 6.000, 7.000, 8.000, 9.000, 10.000
+Selecting 5000.000 K
+WARNING: Swapping transition levels 3d6_3P2e[1] [10] -> 3d6_3He[6] [7].
+WARNING: Swapping transition levels 3d6_3P2e[0] [11] -> 3d6_3He[6] [7].
+WARNING: Swapping transition levels 3d6_3P2e[1] [10] -> 3d6_3He[5] [8].
+WARNING: Swapping transition levels 3d6_3P2e[0] [11] -> 3d6_3He[5] [8].
+WARNING: Swapping transition levels 3d6_3P2e[1] [10] -> 3d6_3He[4] [9].
+WARNING: Swapping transition levels 3d6_3P2e[0] [11] -> 3d6_3He[4] [9].
+WARNING: Swapping transition levels 3d6_3De[3] [22] -> 3d6_3De[2] [20].
+WARNING: Swapping transition levels 3d6_3De[3] [22] -> 3d6_3De[1] [21].
+WARNING: Swapping transition levels 3d6_3P1e[2] [33] -> 3d6_3P1e[1] [29].
+WARNING: Swapping transition levels 3d6_3P1e[2] [33] -> 3d6_3P1e[0] [28].
+WARNING: Swapping transition levels 3d6_3P1e[1] [29] -> 3d6_3P1e[0] [28].
+WARNING: Swapping transition levels 3d6_3P1e[2] [33] -> 3d6_3F1e[4] [31].
+WARNING: Swapping transition levels 3d6_3P1e[2] [33] -> 3d6_3F1e[3] [32].
+WARNING: Swapping transition levels 3d6_3P1e[2] [33] -> 3d6_3F1e[2] [30].
+WARNING: Swapping transition levels 3d6_3F1e[4] [31] -> 3d6_3F1e[2] [30].
+WARNING: Swapping transition levels 3d6_3F1e[3] [32] -> 3d6_3F1e[2] [30].
+WARNING: Swapping transition levels 3d5(4D)4s_5De[3] [46] -> 3d5(4D)4s_5De[1] [45].
+WARNING: Swapping transition levels 3d5(4D)4s_5De[2] [47] -> 3d5(4D)4s_5De[1] [45].
+WARNING: Swapping transition levels 3d5(4D)4s_5De[3] [46] -> 3d5(4D)4s_5De[0] [44].
+WARNING: Swapping transition levels 3d5(4D)4s_5De[2] [47] -> 3d5(4D)4s_5De[0] [44].
+WARNING: Swapping transition levels 3d5(4D)4s_5De[1] [45] -> 3d5(4D)4s_5De[0] [44].
+WARNING: Swapping transition levels 3d5(4G)4s_3Ge[4] [50] -> 3d5(4G)4s_3Ge[3] [49].
+WARNING: Swapping transition levels 3d5(4D)4s_3De[2] [57] -> 3d5(4D)4s_3De[1] [56].
+WARNING: Swapping transition levels 3d5(6S)4p_7Po[4] [66] -> 3d5(6S)4p_7Po[3] [62].
+WARNING: Swapping transition levels 3d5(6S)4p_7Po[4] [66] -> 3d5(6S)4p_7Po[2] [61].
+WARNING: Swapping transition levels 3d5(6S)4p_7Po[3] [62] -> 3d5(6S)4p_7Po[2] [61].
+WARNING: Swapping transition levels 3d5(4D)4s_3De[3] [55] -> 3d6_1De[2] [54].
+WARNING: Swapping transition levels 3d5(4D)4s_3De[2] [57] -> 3d6_1De[2] [54].
+WARNING: Swapping transition levels 3d5(4D)4s_3De[1] [56] -> 3d6_1De[2] [54].
+WARNING: Swapping transition levels 3d5(2I)4s_3Ie[7] [58] -> 3d6_1De[2] [54].
+WARNING: Swapping transition levels 3d5(2I)4s_3Ie[6] [59] -> 3d6_1De[2] [54].
+WARNING: Swapping transition levels 3d5(2I)4s_3Ie[5] [60] -> 3d6_1De[2] [54].
+WARNING: Swapping transition levels 3d5(6S)4p_7Po[4] [66] -> 3d5(2D3)4s_3De[3] [63].
+WARNING: Swapping transition levels 3d5(6S)4p_7Po[4] [66] -> 3d5(2D3)4s_3De[2] [64].
+WARNING: Swapping transition levels 3d5(6S)4p_7Po[4] [66] -> 3d5(2D3)4s_3De[1] [65].
+WARNING: Swapping transition levels 3d5(4F)4s_5Fe[1] [72] -> 3d5(2I)4s_1Ie[6] [71].
+WARNING: Swapping transition levels 3d5(2F2)4s_3Fe[3] [75] -> 3d5(2F2)4s_3Fe[2] [74].
+WARNING: Swapping transition levels 3d5(2H)4s_3He[6] [80] -> 3d5(2H)4s_3He[5] [79].
+WARNING: Swapping transition levels 3d5(2H)4s_3He[6] [80] -> 3d5(2H)4s_3He[4] [78].
+WARNING: Swapping transition levels 3d5(2H)4s_3He[5] [79] -> 3d5(2H)4s_3He[4] [78].
+WARNING: Swapping transition levels 3d5(2G2)4s_3Ge[5] [86] -> 3d5(2G2)4s_3Ge[4] [85].
+WARNING: Swapping transition levels 3d5(2G2)4s_3Ge[5] [86] -> 3d5(2G2)4s_3Ge[3] [84].
+WARNING: Swapping transition levels 3d5(2G2)4s_3Ge[4] [85] -> 3d5(2G2)4s_3Ge[3] [84].
+WARNING: Swapping transition levels 3d5(4F)4s_3Fe[4] [88] -> 3d5(4F)4s_3Fe[2] [87].
+WARNING: Swapping transition levels 3d5(4F)4s_3Fe[3] [89] -> 3d5(4F)4s_3Fe[2] [87].
+WARNING: Swapping transition levels 3d5(2S)4s_1Se[0] [98] -> 3d5(2S)4s_3Se[1] [97].
+WARNING: Swapping transition levels 3d5(2D2)4s_3De[3] [101] -> 3d5(2D2)4s_3De[2] [100].
+WARNING: Swapping transition levels 3d5(2D2)4s_3De[3] [101] -> 3d5(2D2)4s_3De[1] [99].
+WARNING: Swapping transition levels 3d5(2D2)4s_3De[2] [100] -> 3d5(2D2)4s_3De[1] [99].
+WARNING: Swapping transition levels 3d5(4G)4p_5Go[6] [107] -> 3d5(4G)4p_5Go[5] [106].
+WARNING: Swapping transition levels 3d5(4G)4p_5Go[6] [107] -> 3d5(4G)4p_5Go[4] [105].
+WARNING: Swapping transition levels 3d5(4G)4p_5Go[5] [106] -> 3d5(4G)4p_5Go[4] [105].
+WARNING: Swapping transition levels 3d5(4G)4p_5Go[6] [107] -> 3d5(4G)4p_5Go[3] [104].
+WARNING: Swapping transition levels 3d5(4G)4p_5Go[5] [106] -> 3d5(4G)4p_5Go[3] [104].
+WARNING: Swapping transition levels 3d5(4G)4p_5Go[4] [105] -> 3d5(4G)4p_5Go[3] [104].
+WARNING: Swapping transition levels 3d5(4G)4p_5Go[6] [107] -> 3d5(4G)4p_5Go[2] [103].
+WARNING: Swapping transition levels 3d5(4G)4p_5Go[5] [106] -> 3d5(4G)4p_5Go[2] [103].
+WARNING: Swapping transition levels 3d5(4G)4p_5Go[4] [105] -> 3d5(4G)4p_5Go[2] [103].
+WARNING: Swapping transition levels 3d5(4G)4p_5Go[3] [104] -> 3d5(4G)4p_5Go[2] [103].
+WARNING: Swapping transition levels 3d5(2S)4s_1Se[0] [98] -> 3d6_1Se[0] [96].
+WARNING: Swapping transition levels 3d5(2S)4s_3Se[1] [97] -> 3d6_1Se[0] [96].
+WARNING: Swapping transition levels 3d5(2D2)4s_3De[3] [101] -> 3d6_1Se[0] [96].
+WARNING: Swapping transition levels 3d5(2D2)4s_3De[2] [100] -> 3d6_1Se[0] [96].
+WARNING: Swapping transition levels 3d5(2D2)4s_3De[1] [99] -> 3d6_1Se[0] [96].
+WARNING: Swapping transition levels 3d5(2D2)4s_1De[2] [102] -> 3d6_1Se[0] [96].
+WARNING: Swapping transition levels 3d5(4G)4p_5Ho[7] [115] -> 3d5(4G)4p_5Ho[6] [114].
+WARNING: Swapping transition levels 3d5(4G)4p_5Ho[7] [115] -> 3d5(4G)4p_5Ho[5] [113].
+WARNING: Swapping transition levels 3d5(4G)4p_5Ho[6] [114] -> 3d5(4G)4p_5Ho[5] [113].
+WARNING: Swapping transition levels 3d5(4G)4p_5Ho[7] [115] -> 3d5(4G)4p_5Ho[4] [112].
+WARNING: Swapping transition levels 3d5(4G)4p_5Ho[6] [114] -> 3d5(4G)4p_5Ho[4] [112].
+WARNING: Swapping transition levels 3d5(4G)4p_5Ho[5] [113] -> 3d5(4G)4p_5Ho[4] [112].
+WARNING: Swapping transition levels 3d5(4G)4p_5Ho[7] [115] -> 3d5(4G)4p_5Ho[3] [111].
+WARNING: Swapping transition levels 3d5(4G)4p_5Ho[6] [114] -> 3d5(4G)4p_5Ho[3] [111].
+WARNING: Swapping transition levels 3d5(4G)4p_5Ho[5] [113] -> 3d5(4G)4p_5Ho[3] [111].
+WARNING: Swapping transition levels 3d5(4G)4p_5Ho[4] [112] -> 3d5(4G)4p_5Ho[3] [111].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[2] [124] -> 3d5(4G)4p_5Fo[1] [123].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[2] [124] -> 3d5(4P)4p_5So[2] [122].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[1] [123] -> 3d5(4P)4p_5So[2] [122].
+WARNING: Swapping transition levels 3d5(4P)4p_5Do[4] [126] -> 3d5(4P)4p_5Do[3] [125].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[4] [120] -> 3d5(4P)4p_5Do[2] [119].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[3] [121] -> 3d5(4P)4p_5Do[2] [119].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[2] [124] -> 3d5(4P)4p_5Do[2] [119].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[1] [123] -> 3d5(4P)4p_5Do[2] [119].
+WARNING: Swapping transition levels 3d5(4P)4p_5So[2] [122] -> 3d5(4P)4p_5Do[2] [119].
+WARNING: Swapping transition levels 3d5(4P)4p_5Do[4] [126] -> 3d5(4P)4p_5Do[2] [119].
+WARNING: Swapping transition levels 3d5(4P)4p_5Do[3] [125] -> 3d5(4P)4p_5Do[2] [119].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[4] [120] -> 3d5(4P)4p_5Do[1] [118].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[3] [121] -> 3d5(4P)4p_5Do[1] [118].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[2] [124] -> 3d5(4P)4p_5Do[1] [118].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[1] [123] -> 3d5(4P)4p_5Do[1] [118].
+WARNING: Swapping transition levels 3d5(4P)4p_5So[2] [122] -> 3d5(4P)4p_5Do[1] [118].
+WARNING: Swapping transition levels 3d5(4P)4p_5Do[4] [126] -> 3d5(4P)4p_5Do[1] [118].
+WARNING: Swapping transition levels 3d5(4P)4p_5Do[3] [125] -> 3d5(4P)4p_5Do[1] [118].
+WARNING: Swapping transition levels 3d5(4P)4p_5Do[2] [119] -> 3d5(4P)4p_5Do[1] [118].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[4] [120] -> 3d5(4P)4p_5Do[0] [117].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[3] [121] -> 3d5(4P)4p_5Do[0] [117].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[2] [124] -> 3d5(4P)4p_5Do[0] [117].
+WARNING: Swapping transition levels 3d5(4G)4p_5Fo[1] [123] -> 3d5(4P)4p_5Do[0] [117].
+WARNING: Swapping transition levels 3d5(4P)4p_5So[2] [122] -> 3d5(4P)4p_5Do[0] [117].
+WARNING: Swapping transition levels 3d5(4P)4p_5Do[4] [126] -> 3d5(4P)4p_5Do[0] [117].
+WARNING: Swapping transition levels 3d5(4P)4p_5Do[3] [125] -> 3d5(4P)4p_5Do[0] [117].
+WARNING: Swapping transition levels 3d5(4P)4p_5Do[2] [119] -> 3d5(4P)4p_5Do[0] [117].
+WARNING: Swapping transition levels 3d5(4P)4p_5Do[1] [118] -> 3d5(4P)4p_5Do[0] [117].
+WARNING: Swapping transition levels 3d5(4G)4p_3Fo[4] [130] -> 3d5(4G)4p_3Fo[3] [129].
+WARNING: Swapping transition levels 3d5(4G)4p_3Fo[4] [130] -> 3d5(4G)4p_3Fo[2] [128].
+WARNING: Swapping transition levels 3d5(4G)4p_3Fo[3] [129] -> 3d5(4G)4p_3Fo[2] [128].
+WARNING: Swapping transition levels 3d5(4G)4p_3Ho[5] [133] -> 3d5(4P)4p_5Po[3] [132].
+WARNING: Swapping transition levels 3d5(4G)4p_3Ho[4] [134] -> 3d5(4P)4p_5Po[3] [132].
+WARNING: Swapping transition levels 3d5(4D)4p_5Fo[5] [144] -> 3d5(4D)4p_5Fo[4] [143].
+WARNING: Swapping transition levels 3d5(4D)4p_5Fo[5] [144] -> 3d5(4D)4p_5Fo[3] [142].
+WARNING: Swapping transition levels 3d5(4D)4p_5Fo[4] [143] -> 3d5(4D)4p_5Fo[3] [142].
+WARNING: Swapping transition levels 3d5(4D)4p_5Fo[5] [144] -> 3d5(4D)4p_5Fo[2] [141].
+WARNING: Swapping transition levels 3d5(4D)4p_5Fo[4] [143] -> 3d5(4D)4p_5Fo[2] [141].
+WARNING: Swapping transition levels 3d5(4D)4p_5Fo[3] [142] -> 3d5(4D)4p_5Fo[2] [141].
+WARNING: Swapping transition levels 3d5(4D)4p_5Fo[5] [144] -> 3d5(4D)4p_5Fo[1] [140].
+WARNING: Swapping transition levels 3d5(4D)4p_5Fo[4] [143] -> 3d5(4D)4p_5Fo[1] [140].
+WARNING: Swapping transition levels 3d5(4D)4p_5Fo[3] [142] -> 3d5(4D)4p_5Fo[1] [140].
+WARNING: Swapping transition levels 3d5(4D)4p_5Fo[2] [141] -> 3d5(4D)4p_5Fo[1] [140].
+WARNING: Swapping transition levels 3d5(4G)4p_3Go[5] [147] -> 3d5(4G)4p_3Go[4] [146].
+WARNING: Swapping transition levels 3d5(4G)4p_3Go[5] [147] -> 3d5(4G)4p_3Go[3] [145].
+WARNING: Swapping transition levels 3d5(4G)4p_3Go[4] [146] -> 3d5(4G)4p_3Go[3] [145].
+WARNING: Swapping transition levels 3d5(4P)4p_3Do[1] [151] -> 3d5(4D)4po[3] [150].
+WARNING: Swapping transition levels 3d5(4D)4p_5Do[4] [154] -> 3d5(4D)4po[3] [150].
+WARNING: Swapping transition levels 3d5(4D)4p_5Do[4] [154] -> 3d5(4P)4po[2] [152].
+WARNING: Swapping transition levels 3d5(4D)4p_5Do[4] [154] -> 3d5(4P)4po[1] [153].
+WARNING: Swapping transition levels 3d5(4D)4p_5Po[3] [158] -> 3d5(4D)4p_5Po[2] [157].
+WARNING: Swapping transition levels 3d5(4D)4p_5Po[3] [158] -> 3d5(4D)4p_5Po[1] [156].
+WARNING: Swapping transition levels 3d5(4D)4p_5Po[2] [157] -> 3d5(4D)4p_5Po[1] [156].
+WARNING: Swapping transition levels 3d5(4D)4p_3Po[2] [168] -> 3d5(4D)4p_3Po[1] [167].
+WARNING: Swapping transition levels 3d5(4D)4p_3Po[2] [168] -> 3d5(4D)4p_3Po[0] [166].
+WARNING: Swapping transition levels 3d5(4D)4p_3Po[1] [167] -> 3d5(4D)4p_3Po[0] [166].
+WARNING: Swapping transition levels 3d5(2I)4p_3Ko[8] [176] -> 3d5(2I)4p_3Ko[7] [170].
+WARNING: Swapping transition levels 3d5(2I)4p_3Ko[8] [176] -> 3d5(2I)4p_3Ko[6] [169].
+WARNING: Swapping transition levels 3d5(2I)4p_3Ko[7] [170] -> 3d5(2I)4p_3Ko[6] [169].
+WARNING: Swapping transition levels 3d5(2I)4p_3Ko[8] [176] -> 3d5(2I)4p_3Io[6] [173].
+WARNING: Swapping transition levels 3d5(2I)4p_3Io[7] [177] -> 3d5(2I)4p_3Io[6] [173].
+WARNING: Swapping transition levels 3d5(2I)4p_3Ko[8] [176] -> 3d5(2I)4p_3Io[5] [171].
+WARNING: Swapping transition levels 3d5(2I)4p_3Io[7] [177] -> 3d5(2I)4p_3Io[5] [171].
+WARNING: Swapping transition levels 3d5(2I)4p_3Io[6] [173] -> 3d5(2I)4p_3Io[5] [171].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Fo[4] [186] -> 3d5(a2D)4p_3Fo[3] [181].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Fo[4] [186] -> 3d5(a2D)4p_3Fo[2] [182].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Fo[4] [186] -> 3d5(2I)4p_3Ho[6] [183].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Fo[4] [186] -> 3d5(2I)4p_3Ho[5] [184].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Fo[4] [186] -> 3d5(2I)4p_3Ho[4] [185].
+WARNING: Swapping transition levels 3d5(2I)4p_1Ho[5] [179] -> 3d5(a2D)4po[2] [178].
+WARNING: Swapping transition levels 3d5(2I)4p_1Ko[7] [180] -> 3d5(a2D)4po[2] [178].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Fo[4] [186] -> 3d5(a2D)4po[2] [178].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Fo[3] [181] -> 3d5(a2D)4po[2] [178].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Fo[2] [182] -> 3d5(a2D)4po[2] [178].
+WARNING: Swapping transition levels 3d5(2I)4p_3Ho[6] [183] -> 3d5(a2D)4po[2] [178].
+WARNING: Swapping transition levels 3d5(2I)4p_3Ho[5] [184] -> 3d5(a2D)4po[2] [178].
+WARNING: Swapping transition levels 3d5(2I)4p_3Ho[4] [185] -> 3d5(a2D)4po[2] [178].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Po[1] [191] -> 3d5(a2F)4p_1Go[4] [189].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Po[0] [194] -> 3d5(a2F)4p_1Go[4] [189].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Po[1] [191] -> 3d5(a2F)4p_3Go[3] [190].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Po[0] [194] -> 3d5(a2F)4p_3Go[3] [190].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[5] [199] -> 3d5(a2F)4p_3Go[3] [190].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[4] [200] -> 3d5(a2F)4p_3Go[3] [190].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[5] [199] -> 3d5(4F)4p_5Go[4] [197].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[4] [200] -> 3d5(4F)4p_5Go[4] [197].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[6] [201] -> 3d5(4F)4p_5Go[4] [197].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[5] [203] -> 3d5(4F)4p_5Go[4] [197].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[5] [199] -> 3d5(4F)4p_5Go[3] [195].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[4] [200] -> 3d5(4F)4p_5Go[3] [195].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[6] [201] -> 3d5(4F)4p_5Go[3] [195].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[5] [203] -> 3d5(4F)4p_5Go[3] [195].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[4] [197] -> 3d5(4F)4p_5Go[3] [195].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Po[0] [194] -> 3d5(4F)4p_5Go[2] [192].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[5] [199] -> 3d5(4F)4p_5Go[2] [192].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[4] [200] -> 3d5(4F)4p_5Go[2] [192].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[6] [201] -> 3d5(4F)4p_5Go[2] [192].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[5] [203] -> 3d5(4F)4p_5Go[2] [192].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[4] [197] -> 3d5(4F)4p_5Go[2] [192].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[3] [195] -> 3d5(4F)4p_5Go[2] [192].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Po[0] [194] -> 3d5(a2D)4p_3Do[3] [193].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[5] [199] -> 3d5(a2D)4p_3Do[3] [193].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[4] [200] -> 3d5(a2D)4p_3Do[3] [193].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[6] [201] -> 3d5(a2D)4p_3Do[3] [193].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[5] [203] -> 3d5(a2D)4p_3Do[3] [193].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[4] [197] -> 3d5(a2D)4p_3Do[3] [193].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[3] [195] -> 3d5(a2D)4p_3Do[3] [193].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[5] [199] -> 3d5(a2D)4p_3Do[2] [198].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[4] [200] -> 3d5(a2D)4p_3Do[2] [198].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[6] [201] -> 3d5(a2D)4p_3Do[2] [198].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[5] [203] -> 3d5(a2D)4p_3Do[2] [198].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[5] [199] -> 3d5(a2D)4p_3Do[1] [196].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Go[4] [200] -> 3d5(a2D)4p_3Do[1] [196].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[6] [201] -> 3d5(a2D)4p_3Do[1] [196].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[5] [203] -> 3d5(a2D)4p_3Do[1] [196].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[4] [197] -> 3d5(a2D)4p_3Do[1] [196].
+WARNING: Swapping transition levels 3d5(a2D)4p_3Do[2] [198] -> 3d5(a2D)4p_3Do[1] [196].
+WARNING: Swapping transition levels 3d5(4F)4p_5Go[5] [203] -> 3d5(a2F)4p_3Do[3] [202].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[2] [214] -> 3d5(a2F)4p_3Do[1] [211].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[2] [214] -> 3d5(2I)4p_1Io[6] [204].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[1] [211] -> 3d5(2I)4p_1Io[6] [204].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[2] [214] -> 3d5(a2D)4po[3] [209].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[1] [211] -> 3d5(a2D)4po[3] [209].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[2] [214] -> 3d5(4F)4p_5Fo[5] [208].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[1] [211] -> 3d5(4F)4p_5Fo[5] [208].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[2] [214] -> 3d5(4F)4p_5Fo[4] [205].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[1] [211] -> 3d5(4F)4p_5Fo[4] [205].
+WARNING: Swapping transition levels 3d5(4F)4p_5Fo[5] [208] -> 3d5(4F)4p_5Fo[4] [205].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[2] [214] -> 3d5(4F)4p_5Fo[3] [206].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[1] [211] -> 3d5(4F)4p_5Fo[3] [206].
+WARNING: Swapping transition levels 3d5(4F)4p_5Fo[5] [208] -> 3d5(4F)4p_5Fo[3] [206].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[2] [214] -> 3d5(4F)4p_5Fo[2] [207].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[1] [211] -> 3d5(4F)4p_5Fo[2] [207].
+WARNING: Swapping transition levels 3d5(4F)4p_5Fo[5] [208] -> 3d5(4F)4p_5Fo[2] [207].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[2] [214] -> 3d5(4F)4p_5Fo[1] [210].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[1] [211] -> 3d5(4F)4p_5Fo[1] [210].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[2] [214] -> 3d5(a2F)4p_3Fo[4] [213].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Do[2] [214] -> 3d5(a2F)4p_3Fo[2] [212].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Fo[4] [213] -> 3d5(a2F)4p_3Fo[2] [212].
+WARNING: Swapping transition levels 3d5(a2F)4p_3Fo[3] [215] -> 3d5(a2F)4p_3Fo[2] [212].
+WARNING: Swapping transition levels 3d5(2H)4p_3Ho[6] [226] -> 3d5(2H)4p_3Ho[5] [222].
+WARNING: Swapping transition levels 3d5(4F)4p_5Do[2] [219] -> 3d5(2H)4p_3Ho[4] [218].
+WARNING: Swapping transition levels 3d5(4F)4p_5Do[1] [220] -> 3d5(2H)4p_3Ho[4] [218].
+WARNING: Swapping transition levels 3d5(4F)4p_5Do[0] [221] -> 3d5(2H)4p_3Ho[4] [218].
+WARNING: Swapping transition levels 3d5(2H)4p_3Ho[6] [226] -> 3d5(2H)4p_3Ho[4] [218].
+WARNING: Swapping transition levels 3d5(2H)4p_3Ho[5] [222] -> 3d5(2H)4p_3Ho[4] [218].
+Read 22139 effective collision strengths 
+Output 22139 effective collision strengths 
+Reading atomic-data-hillier/atomic/FE/III/30oct12/phot_sm_3000.dat
+Photoionisation target: 3d5(5)_6Se/3d5_6Se
+213 levels with cross-section type 1: Seaton formula fit [sigma_o, alpha, beta]
+156 levels with cross-section type 7: Modified Seaton formula fit (cross section zero until offset edge)
+188 levels with cross-section type 20: Opacity Project: smoothed [number of data points]
+
+===========> Fe III output:
+Adding in 17091 extra transitions with only upsilon values
+Writing to 'adata.txt'
+Writing to 'transitiondata.txt'
+Output 153151 transitions of which 10941 are forbidden and 22139 have collision strengths
+Writing to 'phixsdata2.txt'
+Downsampling cross sections assuming T=6000 Kelvin, nphixspoints=100, phixsnuincrement=0.03

@@ -1,0 +1,79 @@
+
+===========> He II input:
+Reading atomic-data-hillier/atomic/HE/II/5dec96/he2_osc.dat
+File specifies 30 levels
+File specifies 435 transitions
+Can't find LS term in Hillier level name '1___'
+Can't find LS term in Hillier level name '2___'
+Can't find LS term in Hillier level name '3___'
+Can't find LS term in Hillier level name '4___'
+Can't find LS term in Hillier level name '5___'
+Can't find LS term in Hillier level name '6___'
+Can't find LS term in Hillier level name '7___'
+Can't find LS term in Hillier level name '8___'
+Can't find LS term in Hillier level name '9___'
+Can't find LS term in Hillier level name '10___'
+Can't find LS term in Hillier level name '11___'
+Can't find LS term in Hillier level name '12___'
+Can't find LS term in Hillier level name '13___'
+Can't find LS term in Hillier level name '14___'
+Can't find LS term in Hillier level name '15___'
+Can't find LS term in Hillier level name '16___'
+Can't find LS term in Hillier level name '17___'
+Can't find LS term in Hillier level name '18___'
+Can't find LS term in Hillier level name '19___'
+Can't find LS term in Hillier level name '20___'
+Can't find LS term in Hillier level name '21___'
+Can't find LS term in Hillier level name '22___'
+Can't find LS term in Hillier level name '23___'
+Can't find LS term in Hillier level name '24___'
+Can't find LS term in Hillier level name '25___'
+Can't find LS term in Hillier level name '26___'
+Can't find LS term in Hillier level name '27___'
+Can't find LS term in Hillier level name '28___'
+Can't find LS term in Hillier level name '29___'
+Can't find LS term in Hillier level name '30___'
+Read 30 levels
+Read 435 transitions
+Found at least one transition specifying level name with no J value
+Reading atomic-data-hillier/atomic/HE/II/5dec96/he2col.dat
+Temperatures available for effective collision strengths (units of 1.0e+04 K):
+0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0
+Selecting 5000.000 K
+Discarding upsilon=0.005 for 1___ -> I (unlisted)
+Discarding upsilon=0.390 for 2___ -> I (unlisted)
+Discarding upsilon=4.597 for 3___ -> I (unlisted)
+Discarding upsilon=26.388 for 4___ -> I (unlisted)
+Discarding upsilon=101.111 for 5___ -> I (unlisted)
+Discarding upsilon=296.238 for 6___ -> I (unlisted)
+Discarding upsilon=722.520 for 7___ -> I (unlisted)
+Discarding upsilon=1543.377 for 8___ -> I (unlisted)
+Discarding upsilon=2980.412 for 9___ -> I (unlisted)
+Discarding upsilon=5314.385 for 10___ -> I (unlisted)
+Discarding upsilon=8940.795 for 11___ -> I (unlisted)
+Discarding upsilon=14288.531 for 12___ -> I (unlisted)
+Discarding upsilon=21661.548 for 13___ -> I (unlisted)
+Discarding upsilon=31800.000 for 14___ -> I (unlisted)
+Discarding upsilon=45200.000 for 15___ -> I (unlisted)
+Discarding upsilon=62800.000 for 16___ -> I (unlisted)
+Discarding upsilon=85300.000 for 17___ -> I (unlisted)
+Discarding upsilon=114000.000 for 18___ -> I (unlisted)
+Discarding upsilon=149000.000 for 19___ -> I (unlisted)
+Discarding upsilon=192000.000 for 20___ -> I (unlisted)
+Discarding upsilon=244000.000 for 21___ -> I (unlisted)
+Discarding upsilon=306000.000 for 22___ -> I (unlisted)
+Discarding upsilon=380000.000 for 23___ -> I (unlisted)
+Discarding upsilon=466000.000 for 24___ -> I (unlisted)
+Discarding upsilon=568000.000 for 25___ -> I (unlisted)
+Discarding upsilon=685000.000 for 26___ -> I (unlisted)
+Discarding upsilon=819000.000 for 27___ -> I (unlisted)
+Discarding upsilon=973000.000 for 28___ -> I (unlisted)
+Discarding upsilon=1150000.000 for 29___ -> I (unlisted)
+Discarding upsilon=1350000.000 for 30___ -> I (unlisted)
+WARNING: file specified 450 transitions, but 465 were found
+
+===========> He II output:
+Adding in 0 extra transitions with only upsilon values
+Writing to 'adata.txt'
+Writing to 'transitiondata.txt'
+Output 435 transitions of which 435 are forbidden and 435 have collision strengths

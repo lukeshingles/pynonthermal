@@ -1,0 +1,27 @@
+
+===========> O II input:
+Reading atomic-data-hillier/atomic/OXY/II/23mar05/o2osc_fin.dat
+File specifies 340 levels
+File specifies 8937 transitions
+Read 340 levels
+Read 8937 transitions
+Found at least one transition specifying level name with no J value
+Reading atomic-data-hillier/atomic/OXY/II/23mar05/o2col.dat
+Temperatures available for effective collision strengths (units of 1.0e+04 K):
+0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0
+Selecting 5000.000 K
+Read 3 effective collision strengths 
+Output 10 effective collision strengths 
+Reading atomic-data-hillier/atomic/OXY/II/23mar05/phot_sm_3000.dat
+Photoionisation target: 2p^2_3Pe/2s2_2p2_3Pe
+15 levels with cross-section type 1: Seaton formula fit [sigma_o, alpha, beta]
+31 levels with cross-section type 2: Hydrogenic split l (z states, n > 11) [n, l_start, l_end]
+173 levels with cross-section type 20: Opacity Project: smoothed [number of data points]
+
+===========> O II output:
+Adding in 2 extra transitions with only upsilon values
+Writing to 'adata.txt'
+Writing to 'transitiondata.txt'
+Output 8939 transitions of which 10 are forbidden and 8 have collision strengths
+Writing to 'phixsdata2.txt'
+Downsampling cross sections assuming T=6000 Kelvin, nphixspoints=100, phixsnuincrement=0.03

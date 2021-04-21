@@ -1,0 +1,31 @@
+
+===========> O III input:
+Reading atomic-data-hillier/atomic/OXY/III/15mar08/oiiiosc
+File specifies 343 levels
+File specifies 6516 transitions
+Read 343 levels
+Read 6516 transitions
+Found at least one transition specifying level name with no J value
+Reading atomic-data-hillier/atomic/OXY/III/15mar08/col_data_oiii_butler_2012.dat
+Temperatures available for effective collision strengths (units of 1.0e+04 K):
+0.180, 0.450, 0.900, 1.800, 4.500, 9.000, 18.000, 45.000, 90.000, 180.000
+Selecting 4500.000 K
+WARNING: Swapping transition levels 2s2_2p_3p_1Pe [23] -> 2p4_3Pe [20, 21, 22].
+WARNING: Swapping transition levels 2s2_2p_3p_3De [24, 25, 26] -> 2p4_3Pe [20, 21, 22].
+WARNING: Swapping transition levels 2s_2p2(4Pe)3p_3Do [76, 77, 78] -> 2s2_2p_4p_1Se [75].
+WARNING: Swapping transition levels 2s_2p2(4Pe)3p_5So [79] -> 2s2_2p_4p_1Se [75].
+Read 1224 effective collision strengths 
+Output 5772 effective collision strengths 
+Reading atomic-data-hillier/atomic/OXY/III/15mar08/phot_sm_0
+Photoionisation target: 2s2_2p_2Po/2s2s2p2Po
+7 levels with cross-section type 1: Seaton formula fit [sigma_o, alpha, beta]
+35 levels with cross-section type 2: Hydrogenic split l (z states, n > 11) [n, l_start, l_end]
+207 levels with cross-section type 20: Opacity Project: smoothed [number of data points]
+
+===========> O III output:
+Adding in 5019 extra transitions with only upsilon values
+Writing to 'adata.txt'
+Writing to 'transitiondata.txt'
+Output 11535 transitions of which 3051 are forbidden and 5673 have collision strengths
+Writing to 'phixsdata2.txt'
+Downsampling cross sections assuming T=6000 Kelvin, nphixspoints=100, phixsnuincrement=0.03

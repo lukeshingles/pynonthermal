@@ -1,0 +1,28 @@
+
+===========> Fe II input:
+Reading atomic-data-hillier/atomic/FE/II/10sep16/fe2_osc
+File specifies 2698 levels
+File specifies 530827 transitions
+Read 2698 levels
+Read 530827 transitions
+Reading atomic-data-hillier/atomic/FE/II/10sep16/fe2_col.dat
+Temperatures available for effective collision strengths (units of 1.0e+04 K):
+0.3, 0.5, 0.7, 1.0, 1.2, 1.5, 1.7, 2.0, 2.5, 3.0, 3.5, 4.5, 6.0, 8.0, 10.0
+Selecting 5000.000 K
+Read 10601 effective collision strengths 
+Output 10601 effective collision strengths 
+Reading atomic-data-hillier/atomic/FE/II/10sep16/phot_op.dat
+Photoionisation target: 3d6_5De
+58 levels with cross-section type 1: Seaton formula fit [sigma_o, alpha, beta]
+313 levels with cross-section type 2: Hydrogenic split l (z states, n > 11) [n, l_start, l_end]
+522 levels with cross-section type 8: Modified hydrogenic split l (cross-section zero until offset edge) [n,l_start,l_end,nu_o]
+198 levels with cross-section type 20: Opacity Project: smoothed [number of data points]
+3 levels with cross-section type 21: Opacity Project: scaled, smoothed [number of data poits]
+
+===========> Fe II output:
+Adding in 8193 extra transitions with only upsilon values
+Writing to 'adata.txt'
+Writing to 'transitiondata.txt'
+Output 539020 transitions of which 6628 are forbidden and 10601 have collision strengths
+Writing to 'phixsdata2.txt'
+Downsampling cross sections assuming T=6000 Kelvin, nphixspoints=100, phixsnuincrement=0.03

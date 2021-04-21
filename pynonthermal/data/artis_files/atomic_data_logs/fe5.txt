@@ -1,0 +1,19 @@
+
+===========> Fe V input:
+Reading atomic-data-hillier/atomic/FE/V/18oct00/fev_osc.dat
+File specifies 1000 levels
+File specifies 71983 transitions
+Read 1000 levels
+Read 71983 transitions
+Reading atomic-data-hillier/atomic/FE/V/18oct00/col_guess.dat
+Temperatures available for effective collision strengths (units of 1.0e+04 K):
+0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0
+Selecting 5000.000 K
+Read 0 effective collision strengths 
+Output 0 effective collision strengths 
+
+===========> Fe V output:
+Adding in 0 extra transitions with only upsilon values
+Writing to 'adata.txt'
+Writing to 'transitiondata.txt'
+Output 71983 transitions of which 0 are forbidden and 0 have collision strengths
