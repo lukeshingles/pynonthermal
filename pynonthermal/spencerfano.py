@@ -751,7 +751,7 @@ class SpencerFanoSolver():
         fig, axes = plt.subplots(nrows=2, ncols=1, sharex=True,
                                  figsize=(4.5, 5), tight_layout={"pad": 0.5, "w_pad": 0.3, "h_pad": 0.3})
         self.plot_yspectrum(axis=axes[0])
-        self.plot_chan_els(axis=axes[1])
+        self.plot_channels(axis=axes[1])
         if outputfilename is not None:
             print(f"Saving '{outputfilename}'")
             fig.savefig(str(outputfilename))
