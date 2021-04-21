@@ -17,9 +17,9 @@ def test_helium():
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=2000,
                                         verbose=True) as sf:
 
-        for Z, ionstage, ionnumberdensity in ions:
-            sf.add_ionisation(Z, ionstage, ionnumberdensity=ionnumberdensity)
-            sf.add_ion_ltepopexcitation(Z, ionstage, ionnumberdensity=ionnumberdensity)
+        for Z, ionstage, n_ion in ions:
+            sf.add_ionisation(Z, ionstage, n_ion=n_ion)
+            sf.add_ion_ltepopexcitation(Z, ionstage, n_ion=n_ion)
 
         sf.solve(depositionratedensity_ev=100)
 

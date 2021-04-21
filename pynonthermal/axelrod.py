@@ -213,7 +213,7 @@ def get_Latom_axelrod(Zboundbar, en_ev):
         math.log(2 * ME * vel ** 2 / I) + math.log(1. / (1. - beta ** 2)) - beta ** 2)
 
 
-def get_Lelec_axelrod(en_ev, nne, nnetot, nntot):
+def get_Lelec_axelrod(en_ev, n_e, n_e_tot, n_tot):
     # - 1/N * dE / dX [erg cm^2]
     # returns a positive number
 
@@ -228,13 +228,13 @@ def get_Lelec_axelrod(en_ev, nne, nnetot, nntot):
     gamma = en_erg / (ME * CLIGHT ** 2) + 1
     beta = math.sqrt(1. - 1. / (gamma ** 2))
     vel = beta * CLIGHT  # in cm/s
-    omegap = 5.64e4 * math.sqrt(nne)  # in per second
-    return 4 * math.pi * QE ** 4 / (ME * vel ** 2) * nne / nntot * (
+    omegap = 5.64e4 * math.sqrt(n_e)  # in per second
+    return 4 * math.pi * QE ** 4 / (ME * vel ** 2) * n_e / n_tot * (
         math.log(2 * ME * vel ** 2 / (HBAR * omegap)) + 0.5 * math.log(1. / (1. - beta ** 2)) - 0.5 * beta ** 2)
 
 
-def electronlossfunction_axelrod(en_ev, nne, nnetot):
+def electronlossfunction_axelrod(en_ev, n_e, n_e_tot):
     # - dE / dX [erg / cm]
     # returns a positive number
 
-    return get_Lelec_axelrod(en_ev, nne=nne, nnetot=nnetot, nntot=1)
+    return get_Lelec_axelrod(en_ev, n_e=n_e, n_e_tot=n_e_tot, n_tot=1)

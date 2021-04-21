@@ -9,7 +9,7 @@ from pynonthermal.constants import CLIGHT, EV, H, H_ionpot, K_B, ME, QE
 use_collstrengths = False
 
 
-def get_lte_pops(adata, Z, ionstage, ionnumberdensity, temperature):
+def get_lte_pops(adata, Z, ionstage, n_ion, temperature):
     poplist = []
 
     for _, ion in adata.iterrows():
@@ -21,7 +21,7 @@ def get_lte_pops(adata, Z, ionstage, ionnumberdensity, temperature):
 
             for levelindex, level in ion.levels.iterrows():
                 ion_popfrac = 1. / ltepartfunc * level.g * math.exp(-level.energy_ev / K_B / temperature)
-                levelnumberdensity = ionnumberdensity * ion_popfrac
+                levelnumberdensity = n_ion * ion_popfrac
 
                 poprow = (levelindex, levelnumberdensity, levelnumberdensity, ion_popfrac)
                 poplist.append(poprow)
