@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+import numba
 
 import numpy as np
 import pandas as pd
@@ -69,100 +70,7 @@ def get_Zboundbar(ions, ionpopdict):
     return Zboundbar
 
 
-def get_n_e_tot(ions, ionpopdict):
-    # total number density of electrons (free + bound) [cm-^3]
-    # return get_Zbar(ions, ionpopdict) * get_n_tot(ions, ionpopdict)
-    n_e_tot = 0.
-    for Z, ionstage in ions:
-        n_e_tot += Z * ionpopdict[(Z, ionstage)]
-
-    return n_e_tot
-
-
-def get_n_e(ions, ionpopdict):
-    # number density of free electrons [cm-^3]
-    n_e = 0.
-    for Z, ionstage in ions:
-        charge = ionstage - 1
-        assert(charge >= 0)
-        n_e += charge * ionpopdict[(Z, ionstage)]
-
-    return n_e
-
-
-def get_lte_pops(adata, ions, ionpopdict, temperature):
-    poplist = []
-
-    for _, ion in adata.iterrows():
-        ionid = (ion.Z, ion.ion_stage)
-        if ionid in ions:
-            Z = ion.Z
-            ionstage = ion.ion_stage
-            n_ion = ionpopdict[(Z, ionstage)]
-
-            ltepartfunc = ion.levels.eval('g * exp(-energy_ev / @K_B / @temperature)').sum()
-
-            for levelindex, level in ion.levels.iterrows():
-                ion_popfrac = 1. / ltepartfunc * level.g * math.exp(-level.energy_ev / K_B / temperature)
-                levelnumberdensity = n_ion * ion_popfrac
-
-                poprow = (Z, ionstage, levelindex, levelnumberdensity, levelnumberdensity, ion_popfrac)
-                poplist.append(poprow)
-
-    dfpop = pd.DataFrame(poplist, columns=['Z', 'ion_stage', 'level', 'n_LTE', 'n_NLTE', 'ion_popfrac'])
-    return dfpop
-
-
-def get_d_etaexcitation_by_d_en_vec(engrid, yvec, ions, dftransitions, deposition_density_ev):
-    npts = len(engrid)
-    part_integrand = np.zeros(npts)
-
-    for Z, ion_stage in ions:
-        if not (Z, ion_stage) in dftransitions:
-            continue
-        for _, row in dftransitions[(Z, ion_stage)].iterrows():
-            levelnumberdensity = row.lower_pop
-            # levelnumberdensity = n_ion
-            epsilon_trans_ev = row.epsilon_trans_ev
-            if epsilon_trans_ev >= engrid[0]:
-                xsvec = pynonthermal.excitation.get_xs_excitation_vector(engrid, row)
-                part_integrand += (levelnumberdensity * epsilon_trans_ev * xsvec / deposition_density_ev)
-
-    return yvec * part_integrand
-
-
-def get_d_etaion_by_d_en_vec(engrid, yvec, ions, ionpopdict, dfcollion, deposition_density_ev):
-    npts = len(engrid)
-    part_integrand = np.zeros(npts)
-
-    for Z, ionstage in ions:
-        n_ion = ionpopdict[(Z, ionstage)]
-        dfcollion_thision = dfcollion.query('Z == @Z and ionstage == @ionstage', inplace=False)
-        # print(dfcollion_thision)
-
-        for index, shell in dfcollion_thision.iterrows():
-            # J = pynonthermal.collion.get_J(shell.Z, shell.ionstage, shell.ionpot_ev)
-            xsvec = pynonthermal.collion.get_arxs_array_shell(engrid, shell)
-
-            part_integrand += (n_ion * shell.ionpot_ev * xsvec / deposition_density_ev)
-
-    return yvec * part_integrand
-
-
-def get_n_e_nt(engrid, yvec):
-    # oneovervelocity = np.sqrt(9.10938e-31 / 2 / engrid / 1.60218e-19) / 100  # in s/cm
-    # enovervelocity = engrid * oneovervelocity
-    # en_tot = np.dot(yvec, enovervelocity) * (engrid[1] - engrid[0])
-    n_e_nt = 0.
-    deltaen = (engrid[1] - engrid[0])
-    for i, en in enumerate(engrid):
-        # oneovervelocity = np.sqrt(9.10938e-31 / 2 / en / 1.60218e-19) / 100.
-        velocity = np.sqrt(2 * en * 1.60218e-19 / 9.10938e-31) * 100.  # cm/s
-        n_e_nt += yvec[i] / velocity * deltaen
-
-    return n_e_nt
-
-
+@numba.njit()
 def get_energyindex_lteq(en_ev, engrid):
     # find energy bin lower boundary is less than or equal to search value
     # assert en_ev >= engrid[0]
@@ -179,6 +87,7 @@ def get_energyindex_lteq(en_ev, engrid):
         return index
 
 
+@numba.njit()
 def get_energyindex_gteq(en_ev, engrid):
     # find energy bin lower boundary is greater than or equal to search value
     deltaen = engrid[1] - engrid[0]
