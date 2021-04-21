@@ -2,12 +2,9 @@
 import math
 import numba
 
-import numpy as np
-import pandas as pd
 from pathlib import Path
 
-from .constants import EV, H, K_B, ME, QE
-import pynonthermal.collion
+from .constants import EV, H, ME, QE
 
 DATADIR = Path(__file__).absolute().parent / 'data'
 

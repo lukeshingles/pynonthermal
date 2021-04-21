@@ -1,8 +1,4 @@
 import math
-import pandas as pd
-
-from pathlib import Path
-import pynonthermal
 
 # cgs units to match ARTIS
 EV = 1.6021772e-12  # eV in erg
