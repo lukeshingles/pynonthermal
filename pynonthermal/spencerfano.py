@@ -625,7 +625,7 @@ class SpencerFanoSolver():
                                      figsize=(5, 4), tight_layout={"pad": 0.5, "w_pad": 0.3, "h_pad": 0.3})
 
         axis.plot(self.engrid, np.log10(self.yvec * self.engrid), marker="None", lw=1.5, color='black')
-        axis.set_ylabel(r'log d(E y(E))/dE', fontsize=fs)
+        axis.set_ylabel(r'log d(E y)/dE', fontsize=fs)
         # axes[0].plot(engrid, np.log10(yvec), marker="None", lw=1.5, color='black')
         # axes[0].set_ylabel(r'log y(E) [s$^{-1}$ cm$^{-2}$ eV$^{-1}$]', fontsize=fs)
         # axes[0].set_ylim(bottom=15.5, top=19.)
@@ -754,7 +754,7 @@ class SpencerFanoSolver():
                 plt.show()
 
     def plot_spec_channels(self, outputfilename):
-        fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True,
+        fig, axes = plt.subplots(nrows=2, ncols=1, sharex=True,
                                  figsize=(4.5, 5), tight_layout={"pad": 0.5, "w_pad": 0.3, "h_pad": 0.3})
         self.plot_yspectrum(axis=axes[0])
         self.plot_channels(axis=axes[1])
