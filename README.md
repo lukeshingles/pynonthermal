@@ -14,12 +14,12 @@ If the internal set of levels and transitions are applied (e.g., using ```add_io
 ## Installation
 For the latest experimental version, pynonthermal can be installed with:
 ```sh
-python3 -m pip install -e pip install git+git://github.com/lukeshingles/pynonthermal.git
+python3 -m pip install git+git://github.com/lukeshingles/pynonthermal.git
 ```
 
 If this version crashes or causes problems, you can try dropping back to a released version.
 ```sh
-python3 -m pip install -e pip install pynonthermal
+python3 -m pip install pynonthermal
 ```
 
 ## Usage
