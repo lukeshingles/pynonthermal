@@ -30,6 +30,20 @@ The following plot shows the energy distribution of contributions to ionisation,
 
 ![Emission plot](https://raw.githubusercontent.com/lukeshingles/pynonthermal/main/docs/oxygen_channels.svg)
 
+## Advanced Usage
+Advanced users will likely want to control the particular excitation transitions that are included in the solver. Individual excitation transitions can be added with:
+
+```python
+SpencerFanoSolver.add_excitation(
+  Z, ionstage, n_level, xs_vec, epsilon_trans_ev, transitionkey=(lower, upper)
+)
+```
+Z is the atomic number. ionstage is the one more than the ion charge (e.g., Fe I or ion stage 1 has charge zero). The argument xs_vec is a numpy array of cross sections [cm<sup>2</sup>] defined at every energy in the sf.engrid array [eV]. The transition key can be almost anything that is unique within the ion and is used to refer back to the level pair when requesting the excitation rate coefficient.
+
+```python
+nt_exc = SpencerFanoSolver.get_excitation_ratecoeff(Z, ionstage, transitionkey)
+```
+
 ## Meta
 
 Distributed under the MIT license. See ``LICENSE`` for more information.
