@@ -35,7 +35,7 @@ setup(
     author="Luke Shingles",
     author_email="luke.shingles@gmail.com",
     packages=find_packages(),
-    url="https://www.github.com/lukeshingles/artistools/",
+    url="https://www.github.com/lukeshingles/pynonthermal/",
     license="MIT",
     description="A non-thermal electron deposition (Spencer-Fano equation) solver.",
     long_description=(Path(__file__).absolute().parent / "README.md").open('rt').read(),
