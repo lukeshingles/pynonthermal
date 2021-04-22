@@ -605,7 +605,7 @@ class SpencerFanoSolver():
             dfcollion_thision = self.dfcollion.query('Z == @Z and ionstage == @ionstage', inplace=False)
 
             for index, shell in dfcollion_thision.iterrows():
-                xsvec = at.nonthermal.get_arxs_array_shell(self.engrid, shell)
+                xsvec = pynonthermal.collion.get_arxs_array_shell(self.engrid, shell)
 
                 part_integrand += (n_ion * shell.ionpot_ev * xsvec / self.depositionratedensity_ev)
 
