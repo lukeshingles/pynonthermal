@@ -31,6 +31,8 @@ def get_lte_pops(adata, Z, ionstage, n_ion, temperature):
 
 
 def get_xs_excitation(en_ev, row):
+    """Get the excitation cross section in cm^2 at energy en_ev [eV]"""
+
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
 
     coll_str = row.collstr
@@ -72,6 +74,8 @@ def get_xs_excitation(en_ev, row):
 
 
 def get_xs_excitation_vector(engrid, row):
+    """Get an array containing the excitation cross section in cm^2 at every energy in the array engrid (eV)"""
+
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
     npts = len(engrid)
     xs_excitation_vec = np.empty(npts)
