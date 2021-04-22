@@ -30,7 +30,7 @@ class PyTest(TestCommand):
 print(datetime.datetime.now().isoformat())
 setup(
     name="pynonthermal",
-    version="0.0.1",
+    version="2021.04.22",
     # version=datetime.datetime.now().isoformat(),
     author="Luke Shingles",
     author_email="luke.shingles@gmail.com",
