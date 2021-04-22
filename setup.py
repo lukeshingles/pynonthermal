@@ -39,6 +39,7 @@ setup(
     license="MIT",
     description="A non-thermal electron deposition (Spencer-Fano equation) solver.",
     long_description=(Path(__file__).absolute().parent / "README.md").open('rt').read(),
+    long_description_content_type='text/markdown',
     install_requires=(Path(__file__).absolute().parent / "requirements.txt").open('rt').read().splitlines(),
     python_requires='>==3.8',
     # test_suite='tests',

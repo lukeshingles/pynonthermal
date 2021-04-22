@@ -24,10 +24,6 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Clone artistools
-      run: |
-        git clone https://github.com/artis-mcrt/artistools.git
-
     - name: Get pip cache dir
       id: pip-cache
       run: |
@@ -46,8 +42,6 @@ jobs:
       run: |
         python3 -m pip install --upgrade pip
         python3 -m pip install -r requirements.txt
-        python3 -m pip install -r artistools/requirements.txt
-        python3 -m pip install -e artistools/
 
         # upgrade all installed packages to their latest versions
         python3 -m pip list --format=freeze --outdated | cut -d '=' -f1 | xargs -n1 python3 -m pip install --upgrade
@@ -67,7 +61,7 @@ jobs:
 
     - name: Test with pytest
       run: |
-        pytest -s --durations=0 --ignore=artistools
+        pytest -s --durations=0
 
     # - name: Test with pytest
     #   run: |
