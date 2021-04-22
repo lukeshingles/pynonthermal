@@ -10,13 +10,7 @@ Ionisation cross sections are formula fits from Arnaud & Rothenflug (1985) and A
 
 
 ## Installation
-This package depends on artistools, which currently must be installed by:
-```sh
-git clone https://github.com/artis-mcrt/artistools.git
-python3 -m pip install -e artistools
-```
-
-Then, pynonthermal can be installed with:
+For the latest version, pynonthermal can be installed with:
 ```sh
 git clone https://github.com/lukeshingles/pynonthermal.git
 python3 -m pip install -e pynonthermal
