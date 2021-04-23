@@ -24,7 +24,7 @@ python3 -m pip install pynonthermal
 ```
 
 ## Usage
-See the [quickstart notebook](https://github.com/lukeshingles/pynonthermal/blob/main/quickstart.ipynb) for an example of how to set up the composition and use the solver to determine ionisation and heating rates.
+See the [quickstart notebook](https://github.com/lukeshingles/pynonthermal/blob/main/quickstart.ipynb) [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/lukeshingles/pynonthermal/HEAD?filepath=quickstart.ipynb) for an example of how to set up the composition and use the solver to determine ionisation and heating rates.
 
 ## Example output
 The following plot shows the energy distribution of contributions to ionisation, excitation, and heating for a pure oxygen plasma (electron fraction 1e-2), reproducing figure 2 of KF92. The area under each curve gives the fraction of deposited energy going into that particular channel.
