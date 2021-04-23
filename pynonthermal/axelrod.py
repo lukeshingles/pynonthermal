@@ -91,9 +91,9 @@ def get_mean_binding_energy(atomic_number, ion_stage, electron_binding, ionpot_e
                 # For some reason in the Lotz data, this is no energy for the M5 shell before Ni. So if the complaint
                 # is for 8 (corresponding to that shell) then just use the M4 value
                 print("WARNING: I'm trying to use a binding energy when I have no data. "
-                      f"element {atomic_number} ionstage {ion_stage}\n")
+                      f"element {atomic_number} ion_stage {ion_stage}\n")
                 assert(electron_loop == 8)
-                # print("Z = %d, ion_stage = %d\n", get_element(element), get_ionstage(element, ion));
+                # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
         if (use2 < use3):
             total += electronsinshell / use3
         else:
@@ -124,9 +124,9 @@ def get_mean_binding_energy_alt(atomic_number, ion_stage, electron_binding, ionp
                 # For some reason in the Lotz data, this is no energy for the M5 shell before Ni. So if the complaint
                 # is for 8 (corresponding to that shell) then just use the M4 value
                 print("WARNING: I'm trying to use a binding energy when I have no data. "
-                      f"element {atomic_number} ionstage {ion_stage}\n")
+                      f"element {atomic_number} ion_stage {ion_stage}\n")
                 assert(electron_loop == 8)
-                # print("Z = %d, ion_stage = %d\n", get_element(element), get_ionstage(element, ion));
+                # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
         if (use2 < use3):
             total += electronsinshell * use3
         else:
@@ -163,9 +163,9 @@ def get_lotz_xs_ionisation(atomic_number, ion_stage, electron_binding, ionpot_ev
                 # For some reason in the Lotz data, this is no energy for the M5 shell before Ni. So if the complaint
                 # is for 8 (corresponding to that shell) then just use the M4 value
                 print("WARNING: I'm trying to use a binding energy when I have no data. "
-                      f"element {atomic_number} ionstage {ion_stage}\n")
+                      f"element {atomic_number} ion_stage {ion_stage}\n")
                 assert(electron_loop == 8)
-                # print("Z = %d, ion_stage = %d\n", get_element(element), get_ionstage(element, ion));
+                # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
 
         if (use2 < use3):
             p = use3

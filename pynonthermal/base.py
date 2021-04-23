@@ -39,8 +39,8 @@ def electronlossfunction(energy_ev, n_e_cgs):
 def get_n_tot(ions, ionpopdict):
     # total number density of all nuclei [cm^-3]
     n_tot = 0.
-    for Z, ionstage in ions:
-        n_tot += ionpopdict[(Z, ionstage)]
+    for Z, ion_stage in ions:
+        n_tot += ionpopdict[(Z, ion_stage)]
     return n_tot
 
 
@@ -49,8 +49,8 @@ def get_Zbar(ions, ionpopdict):
     # i.e. protons per nucleus
     Zbar = 0.
     n_tot = get_n_tot(ions, ionpopdict)
-    for Z, ionstage in ions:
-        n_ion = ionpopdict[(Z, ionstage)]
+    for Z, ion_stage in ions:
+        n_ion = ionpopdict[(Z, ion_stage)]
         Zbar += Z * n_ion / n_tot
 
     return Zbar
@@ -60,9 +60,9 @@ def get_Zboundbar(ions, ionpopdict):
     # number density-weighted average number of bound electrons per nucleus
     Zboundbar = 0.
     n_tot = get_n_tot(ions, ionpopdict)
-    for Z, ionstage in ions:
-        n_ion = ionpopdict[(Z, ionstage)]
-        Zboundbar += (Z - ionstage + 1) * n_ion / n_tot
+    for Z, ion_stage in ions:
+        n_ion = ionpopdict[(Z, ion_stage)]
+        Zboundbar += (Z - ion_stage + 1) * n_ion / n_tot
 
     return Zboundbar
 

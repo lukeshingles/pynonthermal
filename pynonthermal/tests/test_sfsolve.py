@@ -9,7 +9,7 @@ def test_helium():
     # KF1992 Figure 3. Pure-Helium Plasma
     x_e = 1e-4
     ions = [
-        # Z ionstage numberdensity
+        # Z ion_stage numberdensity
         (2, 1, 1. - x_e),
         (2, 2, x_e),
     ]
@@ -17,9 +17,9 @@ def test_helium():
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=2000,
                                         verbose=True) as sf:
 
-        for Z, ionstage, n_ion in ions:
-            sf.add_ionisation(Z, ionstage, n_ion=n_ion)
-            sf.add_ion_ltepopexcitation(Z, ionstage, n_ion=n_ion)
+        for Z, ion_stage, n_ion in ions:
+            sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
+            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion)
 
         sf.solve(depositionratedensity_ev=100)
 

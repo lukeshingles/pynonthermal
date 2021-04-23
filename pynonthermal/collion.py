@@ -14,7 +14,7 @@ def read_colliondata(collionfilename='collion.txt'):
             collionfile, delim_whitespace=True, header=None, names=[
                 'Z', 'nelec', 'n', 'l', 'ionpot_ev', 'A', 'B', 'C', 'D'])
 
-    dfcollion.eval('ionstage = Z - nelec + 1', inplace=True)
+    dfcollion.eval('ion_stage = Z - nelec + 1', inplace=True)
 
     return dfcollion
 
@@ -49,10 +49,10 @@ def Psecondary(e_p, ionpot_ev, J, e_s=-1, epsilon=-1):
     return 1. / J / atan((e_p - ionpot_ev) / 2. / J) / (1 + ((e_s / J) ** 2))
 
 
-def get_J(Z, ionstage, ionpot_ev):
+def get_J(Z, ion_stage, ionpot_ev):
     # returns an energy in eV
     # values from Opal et al. 1971 as applied by Kozma & Fransson 1992
-    if (ionstage == 1):
+    if (ion_stage == 1):
         if (Z == 2):  # He I
             return 15.8
         elif (Z == 10):  # Ne I
@@ -79,9 +79,9 @@ def get_arxs_array_shell(arr_enev, shell):
     return ar_xs_array
 
 
-def get_arxs_array_ion(arr_enev, dfcollion, Z, ionstage):
+def get_arxs_array_ion(arr_enev, dfcollion, Z, ion_stage):
     ar_xs_array = np.zeros(len(arr_enev))
-    dfcollion_thision = dfcollion.query('Z == @Z and ionstage == @ionstage')
+    dfcollion_thision = dfcollion.query('Z == @Z and ion_stage == @ion_stage')
     for index, shell in dfcollion_thision.iterrows():
         ar_xs_array += get_arxs_array_shell(arr_enev, shell)
 

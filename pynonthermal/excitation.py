@@ -9,13 +9,13 @@ from pynonthermal.constants import CLIGHT, EV, H, H_ionpot, K_B, ME, QE
 use_collstrengths = False
 
 
-def get_lte_pops(adata, Z, ionstage, n_ion, temperature):
+def get_lte_pops(adata, Z, ion_stage, n_ion, temperature):
     poplist = []
 
     for _, ion in adata.iterrows():
-        if ion.Z == Z and ion.ion_stage == ionstage:
+        if ion.Z == Z and ion.ion_stage == ion_stage:
             Z = ion.Z
-            ionstage = ion.ion_stage
+            ion_stage = ion.ion_stage
 
             ltepartfunc = ion.levels.eval('g * exp(-energy_ev / @K_B / @temperature)').sum()
 
