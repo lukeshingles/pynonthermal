@@ -12,6 +12,11 @@ The impact ionisation cross sections are formula fits from [Arnaud & Rothenflug 
 
 If the internal set of levels and transitions are applied (e.g., using ```add_ion_ltepopexcitation()```), these are imported from the [CMFGEN](https://kookaburra.phyast.pitt.edu/hillier/web/CMFGEN.htm) atomic data compilation. See the individual source files for atomic data references.
 
+## Example output
+The following plot shows the energy distribution of contributions to ionisation, excitation, and heating for a pure oxygen plasma (electron fraction 1e-2), reproducing figure 2 of KF92. The area under each curve gives the fraction of deposited energy going into that particular channel.
+
+![Emission plot](https://raw.githubusercontent.com/lukeshingles/pynonthermal/main/docs/oxygen_channels.svg)
+
 ## Installation
 For the latest experimental version, pynonthermal can be installed with:
 ```sh
@@ -25,11 +30,6 @@ python3 -m pip install pynonthermal
 
 ## Usage
 See the [quickstart notebook](https://github.com/lukeshingles/pynonthermal/blob/main/quickstart.ipynb) [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/lukeshingles/pynonthermal/HEAD?filepath=quickstart.ipynb) for an example of how to set up the composition and use the solver to determine ionisation and heating rates.
-
-## Example output
-The following plot shows the energy distribution of contributions to ionisation, excitation, and heating for a pure oxygen plasma (electron fraction 1e-2), reproducing figure 2 of KF92. The area under each curve gives the fraction of deposited energy going into that particular channel.
-
-![Emission plot](https://raw.githubusercontent.com/lukeshingles/pynonthermal/main/docs/oxygen_channels.svg)
 
 ## Advanced Usage
 Advanced users will likely want to control the particular excitation transitions that are included in the solver. Individual excitation transitions can be added with:
