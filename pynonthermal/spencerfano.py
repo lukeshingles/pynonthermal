@@ -304,6 +304,9 @@ class SpencerFanoSolver():
         del self.sfmatrix  # this can take up a lot of memory
 
     def calculate_nt_frac_excitation_ion(self, Z, ion_stage):
+        if (Z, ion_stage) not in self.excitationlists:
+            return 0.
+
         # integral in Kozma & Fransson equation 9, but summed over all transitions for given ion
         deltaen = self.engrid[1] - self.engrid[0]
         npts = len(self.engrid)
@@ -330,7 +333,7 @@ class SpencerFanoSolver():
             N_e_ion = 0.
             n_ion = self.ionpopdict[(Z, ion_stage)]
 
-            if self.excitationlists:
+            if self.excitationlists and (Z, ion_stage) in self.excitationlists:
                 for levelnumberdensity, xsvec, epsilon_trans_ev in self.excitationlists[(Z, ion_stage)].values():
                     if energy_ev + epsilon_trans_ev >= self.engrid[0]:
                         i = self.get_energyindex_lteq(en_ev=energy_ev + epsilon_trans_ev)
