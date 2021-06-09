@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import math
-import numba
 
 from pathlib import Path
 
@@ -67,7 +66,6 @@ def get_Zboundbar(ions, ionpopdict):
     return Zboundbar
 
 
-@numba.njit()
 def get_energyindex_lteq(en_ev, engrid):
     # find energy bin lower boundary is less than or equal to search value
     # assert en_ev >= engrid[0]
@@ -84,7 +82,6 @@ def get_energyindex_lteq(en_ev, engrid):
         return index
 
 
-@numba.njit()
 def get_energyindex_gteq(en_ev, engrid):
     # find energy bin lower boundary is greater than or equal to search value
     deltaen = engrid[1] - engrid[0]
