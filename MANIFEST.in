@@ -1,1 +1,2 @@
 recursive-include pynonthermal *.*
+include requirements.txt
