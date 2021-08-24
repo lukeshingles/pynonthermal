@@ -75,6 +75,18 @@ class SpencerFanoSolver():
         return electronlossfunction(en_ev, self.get_n_e())
 
     def add_excitation(self, Z, ion_stage, levelnumberdensity, xs_vec, epsilon_trans_ev, transitionkey=None):
+        """
+        Add a bound-bound non-thermal collisional excitation to the solver.
+
+        levelnumberdensity:
+            the level population density in cm^-3
+        xs_vec:
+            an array of cross sections in cm^2 defined at every energy in the SpencerFanoSolver.engrid array [eV]
+        epsilon_trans_ev:
+            the transition energy in eV
+        transitionkey:
+            any key to uniquely identify the transition so that the rate coefficient can be retrieved later
+        """
         assert not self._solved
         assert len(xs_vec) == len(self.engrid)
 
