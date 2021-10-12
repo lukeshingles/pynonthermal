@@ -287,9 +287,9 @@ class SpencerFanoSolver():
             # else it will be calculated on demand from ion populations
 
         npts = len(self.engrid)
+        n_e = self.get_n_e()
 
         if self.verbose:
-            n_e = self.get_n_e()
             n_ion_tot = self.get_n_ion_tot()
             x_e = n_e / n_ion_tot
             print(f' n_ion_tot: {n_ion_tot:.2e} [/cm3]        (total ion density)')
