@@ -201,6 +201,13 @@ class SpencerFanoSolver():
         # in Kozma & Fransson 1992 equation 4
 
         prefactors = [n_ion * ar_xs_array[j] / atan((self.engrid[j] - ionpot_ev) / 2. / J) * deltaen for j in range(npts)]
+
+        # Luke Shingles: the use of min and max on the epsilon limits keeps energies
+        # from becoming unphysical. This insight came from reading the
+        # CMFGEN Fortran source code (Li, Dessart, Hillier 2012, doi:10.1111/j.1365-2966.2012.21198.x)
+        # I had neglected this, so the limits of integration were incorrect. The fix didn't massively affect
+        # ionisation rates or spectra, but it was a source of error that let to energy fractions not adding up to 100%.
+
         epsilon_uppers = [min((self.engrid[j] + ionpot_ev) / 2, self.engrid[j]) for j in range(npts)]
         int_eps_uppers = [atan((epsilon_upper - ionpot_ev) / J) for epsilon_upper in epsilon_uppers]
 
