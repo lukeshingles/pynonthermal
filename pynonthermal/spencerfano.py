@@ -757,7 +757,7 @@ class SpencerFanoSolver():
 
         axis.set_ylim(bottom=0, top=1.)
         axis.legend(loc='best', handlelength=2, frameon=False, numpoints=1, prop={'size': 10})
-        axis.set_ylabel(r'd $\eta$ / dE [eV$^{-1}$]', fontsize=fs)
+        axis.set_ylabel(r'E d$\eta$ / dE [eV$^{-1}$]', fontsize=fs)
 
         etatot_int = etaion_int + etaexc_int + etaheat_int
 
