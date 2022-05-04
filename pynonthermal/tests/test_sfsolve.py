@@ -33,4 +33,4 @@ def test_helium():
         assert np.isclose(frac_excitation_tot, 0.3315, atol=0.05)
         assert np.isclose(frac_ionisation_tot, 0.4849, atol=0.05)
 
-        sf.plot_spec_channels(outputfilename=outputfolder / 'spec_channels.pdf')
+        sf.plot_spec_channels(outputfilename=outputfolder / 'spec_channels.pdf', xscalelog=True)

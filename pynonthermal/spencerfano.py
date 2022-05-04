@@ -665,7 +665,7 @@ class SpencerFanoSolver():
             else:
                 plt.show()
 
-    def plot_channels(self, outputfilename=None, axis=None):
+    def plot_channels(self, outputfilename=None, axis=None, xscalelog=False):
         assert self._solved
         fs = 12
         if axis is None:
@@ -763,7 +763,8 @@ class SpencerFanoSolver():
 
         #    ax.annotate(modellabel, xy=(0.97, 0.95), xycoords='axes fraction', horizontalalignment='right',
         #                verticalalignment='top', fontsize=fs)
-        axis.set_xscale('log')
+        if xscalelog:
+            axis.set_xscale('log')
         # ax.set_yscale('log')
         axis.set_xlim(left=min(1., self.engrid[0]))
         axis.set_xlim(right=self.engrid[-1] * 1.)
@@ -776,13 +777,13 @@ class SpencerFanoSolver():
             else:
                 plt.show()
 
-    def plot_spec_channels(self, outputfilename):
+    def plot_spec_channels(self, outputfilename, xscalelog=False):
         fig, axes = plt.subplots(nrows=2, ncols=1, sharex=True,
                                  figsize=(4.5, 5), tight_layout={"pad": 0.5, "w_pad": 0.3, "h_pad": 0.3})
 
-        self.plot_yspectrum(axis=axes[0], en_y_on_d_en=True, xscalelog=True)
+        self.plot_yspectrum(axis=axes[0], en_y_on_d_en=True, xscalelog=xscalelog)
 
-        self.plot_channels(axis=axes[1])
+        self.plot_channels(axis=axes[1], xscalelog=xscalelog)
 
         if outputfilename is not None:
             print(f"Saving '{outputfilename}'")
