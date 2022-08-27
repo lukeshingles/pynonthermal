@@ -7,14 +7,17 @@ from math import atan
 import pynonthermal
 
 
-def read_colliondata(collionfilename='collion.txt'):
-    with open(Path(pynonthermal.DATADIR, collionfilename), 'r') as collionfile:
-        expectedrowcount = int(collionfile.readline().strip())   # can ignore this line
+def read_colliondata(collionfilename="collion.txt"):
+    with open(Path(pynonthermal.DATADIR, collionfilename), "r") as collionfile:
+        expectedrowcount = int(collionfile.readline().strip())  # can ignore this line
         dfcollion = pd.read_csv(
-            collionfile, delim_whitespace=True, header=None, names=[
-                'Z', 'nelec', 'n', 'l', 'ionpot_ev', 'A', 'B', 'C', 'D'])
+            collionfile,
+            delim_whitespace=True,
+            header=None,
+            names=["Z", "nelec", "n", "l", "ionpot_ev", "A", "B", "C", "D"],
+        )
 
-    dfcollion.eval('ion_stage = Z - nelec + 1', inplace=True)
+    dfcollion.eval("ion_stage = Z - nelec + 1", inplace=True)
 
     return dfcollion
 
@@ -46,18 +49,18 @@ def Psecondary(e_p, ionpot_ev, J, e_s=-1, epsilon=-1):
     # Psecondary_e_s_max = 1. / J / 2.
     # return 1. / Psecondary_e_s_max if (e_s < Psecondary_e_s_max) else 0.
 
-    return 1. / J / atan((e_p - ionpot_ev) / 2. / J) / (1 + ((e_s / J) ** 2))
+    return 1.0 / J / atan((e_p - ionpot_ev) / 2.0 / J) / (1 + ((e_s / J) ** 2))
 
 
 def get_J(Z, ion_stage, ionpot_ev):
     # returns an energy in eV
     # values from Opal et al. 1971 as applied by Kozma & Fransson 1992
-    if (ion_stage == 1):
-        if (Z == 2):  # He I
+    if ion_stage == 1:
+        if Z == 2:  # He I
             return 15.8
-        elif (Z == 10):  # Ne I
+        elif Z == 10:  # Ne I
             return 24.2
-        elif (Z == 18):  # Ar I
+        elif Z == 18:  # Ar I
             return 10.0
 
     return 0.6 * ionpot_ev
@@ -68,20 +71,32 @@ def ar_xs(energy_ev, ionpot_ev, A, B, C, D):
     if u <= 1:
         return 0
 
-    return 1e-14 * (
-        A * (1 - 1 / u) + B * pow((1 - 1 / u), 2) + C * math.log(u) + D * math.log(u) / u) / (u * pow(ionpot_ev, 2))
+    return (
+        1e-14
+        * (
+            A * (1 - 1 / u)
+            + B * pow((1 - 1 / u), 2)
+            + C * math.log(u)
+            + D * math.log(u) / u
+        )
+        / (u * pow(ionpot_ev, 2))
+    )
 
 
 def get_arxs_array_shell(arr_enev, shell):
     ar_xs_array = np.array(
-        [ar_xs(energy_ev, shell.ionpot_ev, shell.A, shell.B, shell.C, shell.D) for energy_ev in arr_enev])
+        [
+            ar_xs(energy_ev, shell.ionpot_ev, shell.A, shell.B, shell.C, shell.D)
+            for energy_ev in arr_enev
+        ]
+    )
 
     return ar_xs_array
 
 
 def get_arxs_array_ion(arr_enev, dfcollion, Z, ion_stage):
     ar_xs_array = np.zeros(len(arr_enev))
-    dfcollion_thision = dfcollion.query('Z == @Z and ion_stage == @ion_stage')
+    dfcollion_thision = dfcollion.query("Z == @Z and ion_stage == @ion_stage")
     for index, shell in dfcollion_thision.iterrows():
         ar_xs_array += get_arxs_array_shell(arr_enev, shell)
 

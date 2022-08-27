@@ -24,6 +24,7 @@ class PyTest(TestCommand):
         """Execute the test runner command."""
         # Import here, because outside the required eggs aren't loaded yet
         import pytest
+
         sys.exit(pytest.main(self.test_args))
 
 
@@ -38,11 +39,15 @@ setup(
     url="https://www.github.com/lukeshingles/pynonthermal/",
     license="MIT",
     description="A non-thermal electron deposition (Spencer-Fano equation) solver.",
-    long_description=(Path(__file__).absolute().parent / "README.md").open('rt').read(),
-    long_description_content_type='text/markdown',
-    install_requires=(Path(__file__).absolute().parent / "requirements.txt").open('rt').read().splitlines(),
-    python_requires='>==3.8',
+    long_description=(Path(__file__).absolute().parent / "README.md").open("rt").read(),
+    long_description_content_type="text/markdown",
+    install_requires=(Path(__file__).absolute().parent / "requirements.txt")
+    .open("rt")
+    .read()
+    .splitlines(),
+    python_requires=">==3.8",
     # test_suite='tests',
-    setup_requires=['coveralls', 'pytest', 'pytest-runner', 'pytest-cov'],
-    tests_require=['coveralls', 'pytest', 'pytest-runner', 'pytest-cov'],
-    include_package_data=True)
+    setup_requires=["coveralls", "pytest", "pytest-runner", "pytest-cov"],
+    tests_require=["coveralls", "pytest", "pytest-runner", "pytest-cov"],
+    include_package_data=True,
+)

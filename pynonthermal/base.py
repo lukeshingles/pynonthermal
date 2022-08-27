@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .constants import EV, H, ME, QE
 
-DATADIR = Path(__file__).absolute().parent / 'data'
+DATADIR = Path(__file__).absolute().parent / "data"
 
 experiment_use_Latom_in_spencerfano = False
 
@@ -25,11 +25,18 @@ def electronlossfunction(energy_ev, n_e_cgs):
 
     if energy_ev > 14:
         assert 2 * energy > zetae
-        lossfunc = n_e * 2 * math.pi * QE ** 4 / energy * math.log(2 * energy / zetae)
+        lossfunc = n_e * 2 * math.pi * QE**4 / energy * math.log(2 * energy / zetae)
     else:
         v = math.sqrt(2 * energy / ME)  # velocity in m/s
         eulergamma = 0.577215664901532
-        lossfunc = n_e * 2 * math.pi * QE ** 4 / energy * math.log(ME * pow(v, 3) / (eulergamma * pow(QE, 2) * omegap))
+        lossfunc = (
+            n_e
+            * 2
+            * math.pi
+            * QE**4
+            / energy
+            * math.log(ME * pow(v, 3) / (eulergamma * pow(QE, 2) * omegap))
+        )
 
     # lossfunc is now [erg / cm]
     return lossfunc / EV  # return as [eV / cm]
@@ -37,7 +44,7 @@ def electronlossfunction(energy_ev, n_e_cgs):
 
 def get_n_tot(ions, ionpopdict):
     # total number density of all nuclei [cm^-3]
-    n_tot = 0.
+    n_tot = 0.0
     for Z, ion_stage in ions:
         n_tot += ionpopdict[(Z, ion_stage)]
     return n_tot
@@ -46,7 +53,7 @@ def get_n_tot(ions, ionpopdict):
 def get_Zbar(ions, ionpopdict):
     # number density-weighted average atomic number
     # i.e. protons per nucleus
-    Zbar = 0.
+    Zbar = 0.0
     n_tot = get_n_tot(ions, ionpopdict)
     for Z, ion_stage in ions:
         n_ion = ionpopdict[(Z, ion_stage)]
@@ -57,7 +64,7 @@ def get_Zbar(ions, ionpopdict):
 
 def get_Zboundbar(ions, ionpopdict):
     # number density-weighted average number of bound electrons per nucleus
-    Zboundbar = 0.
+    Zboundbar = 0.0
     n_tot = get_n_tot(ions, ionpopdict)
     for Z, ion_stage in ions:
         n_ion = ionpopdict[(Z, ion_stage)]
@@ -76,7 +83,7 @@ def get_energyindex_lteq(en_ev, engrid):
 
     if index < 0:
         return 0
-    elif (index > len(engrid) - 1):
+    elif index > len(engrid) - 1:
         return len(engrid) - 1
     else:
         return index
@@ -90,7 +97,7 @@ def get_energyindex_gteq(en_ev, engrid):
 
     if index < 0:
         return 0
-    elif (index > len(engrid) - 1):
+    elif index > len(engrid) - 1:
         return len(engrid) - 1
     else:
         return index
