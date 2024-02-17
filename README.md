@@ -1,5 +1,5 @@
 # pynonthermal
-[![Build and test](https://github.com/lukeshingles/pynonthermal/actions/workflows/pythonapp.yml/badge.svg)](https://github.com/lukeshingles/pynonthermal/actions/workflows/pythonapp.yml)
+[![Build and test](https://github.com/lukeshingles/pynonthermal/actions/workflows/pytest.yml/badge.svg)](https://github.com/lukeshingles/pynonthermal/actions/workflows/pytest.yml)
 [![codecov](https://codecov.io/gh/lukeshingles/pynonthermal/branch/main/graph/badge.svg?token=574XDCYFIi)](https://codecov.io/gh/lukeshingles/pynonthermal)
 
 pynonthermal is a non-thermal energy deposition (Spencer-Fano equation) solver.
