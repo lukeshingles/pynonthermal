@@ -1,25 +1,27 @@
 # functions related to Axelrod 1980 non-thermal treatment
 
 import math
-import numpy as np
 from pathlib import Path
 
-import pynonthermal
+import numpy as np
 
-from pynonthermal.constants import CLIGHT, EV, H, ME, QE
+import pynonthermal
+from pynonthermal.constants import CLIGHT
+from pynonthermal.constants import EV
+from pynonthermal.constants import H
+from pynonthermal.constants import ME
+from pynonthermal.constants import QE
 
 
 def read_binding_energies(modelpath=None):
     collionfilename = Path(pynonthermal.DATADIR, "binding_energies.txt")
 
-    with open(collionfilename, "r") as f:
-        nt_shells, n_z_binding = [int(x) for x in f.readline().split()]
+    with collionfilename.open() as f:
+        nt_shells, n_z_binding = (int(x) for x in f.readline().split())
         electron_binding = np.zeros((n_z_binding, nt_shells))
 
         for i in range(n_z_binding):
-            electron_binding[i] = (
-                np.array([float(x) for x in f.readline().split()]) * EV
-            )
+            electron_binding[i] = np.array([float(x) for x in f.readline().split()]) * EV
 
     return electron_binding
 
@@ -31,7 +33,7 @@ def get_electronoccupancy(atomic_number, ion_stage, nt_shells):
     ioncharge = ion_stage - 1
     nbound = atomic_number - ioncharge  # number of bound electrons
 
-    for electron_loop in range(nbound):
+    for _ in range(nbound):
         if q[0] < 2:  # K 1s
             q[0] += 1
         elif q[1] < 2:  # L1 2s
@@ -143,9 +145,7 @@ def get_mean_binding_energy_alt(atomic_number, ion_stage, electron_binding, ionp
     return total / ecount
 
 
-def get_lotz_xs_ionisation(
-    atomic_number, ion_stage, electron_binding, ionpot_ev, en_ev
-):
+def get_lotz_xs_ionisation(atomic_number, ion_stage, electron_binding, ionpot_ev, en_ev):
     # Axelrod 1980 Eq 3.38
 
     en_erg = en_ev * EV
@@ -177,22 +177,13 @@ def get_lotz_xs_ionisation(
                 assert electron_loop == 8
                 # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
 
-        if use2 < use3:
-            p = use3
-        else:
-            p = use2
+        p = use3 if use2 < use3 else use2
 
         if 0.5 * beta**2 * ME * CLIGHT**2 > p:
             part_sigma += (
                 electronsinshell
                 / p
-                * (
-                    (
-                        math.log(beta**2 * ME * CLIGHT**2 / 2.0 / p)
-                        - math.log10(1 - beta**2)
-                        - beta**2
-                    )
-                )
+                * (math.log(beta**2 * ME * CLIGHT**2 / 2.0 / p) - math.log10(1 - beta**2) - beta**2)
             )
 
     Aconst = 1.33e-14 * EV * EV
@@ -234,11 +225,7 @@ def get_Latom_axelrod(Zboundbar, en_ev):
         * QE**4
         / (ME * vel**2)
         * Zboundbar
-        * (
-            math.log(2 * ME * vel**2 / I)
-            + math.log(1.0 / (1.0 - beta**2))
-            - beta**2
-        )
+        * (math.log(2 * ME * vel**2 / I) + math.log(1.0 / (1.0 - beta**2)) - beta**2)
     )
 
 
@@ -265,11 +252,7 @@ def get_Lelec_axelrod(en_ev, n_e, n_e_tot, n_tot):
         / (ME * vel**2)
         * n_e
         / n_tot
-        * (
-            math.log(2 * ME * vel**2 / (HBAR * omegap))
-            + 0.5 * math.log(1.0 / (1.0 - beta**2))
-            - 0.5 * beta**2
-        )
+        * (math.log(2 * ME * vel**2 / (HBAR * omegap)) + 0.5 * math.log(1.0 / (1.0 - beta**2)) - 0.5 * beta**2)
     )
 
 

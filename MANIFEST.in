@@ -1,2 +1,3 @@
 recursive-include pynonthermal *.*
 include requirements.txt
+include LICENCE

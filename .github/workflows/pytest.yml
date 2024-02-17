@@ -1,0 +1,62 @@
+---
+name: Installation and pytest
+
+on:
+    push:
+    merge_group:
+    schedule:
+        - cron: 0 13 * * 1
+    #pull_request:
+    workflow_dispatch:
+    repository_dispatch:
+        types: [trigger_checks]
+
+jobs:
+    pytest:
+        timeout-minutes: 10
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-latest]
+                # os: [macos-14]
+                python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        env:
+            OS: ${{ matrix.os }}
+            PYTHON: ${{ matrix.python-version }}
+
+        name: pytest python${{ matrix.python-version }}
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Python ${{ matrix.python-version }}
+              uses: actions/setup-python@v5
+              with:
+                  cache: pip
+                  python-version: ${{ matrix.python-version }}
+
+            - name: Install artistools
+              run: |
+                  python3 -m pip install --upgrade pip
+                  python3 -m pip install .
+
+            - name: Test with pytest
+              run: pytest --cov=./ --cov-report=xml
+
+            - name: Report coverage
+              run: coverage report
+
+            - name: Upload coverage to Codecov
+              uses: codecov/codecov-action@v4
+              with:
+                  token: ${{ secrets.CODECOV_TOKEN }}
+                  files: ./coverage.xml
+                  # directory: ./coverage/reports/
+                  flags: unittests
+                  env_vars: OS,PYTHON
+                  name: codecov-umbrella
+                  fail_ci_if_error: false
+                  verbose: true

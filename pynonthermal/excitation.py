@@ -1,10 +1,16 @@
-import numpy as np
 import math
+
+import numpy as np
 import pandas as pd
 
-
 import pynonthermal
-from pynonthermal.constants import CLIGHT, EV, H, H_ionpot, K_B, ME, QE
+from pynonthermal.constants import CLIGHT
+from pynonthermal.constants import EV
+from pynonthermal.constants import H
+from pynonthermal.constants import H_ionpot
+from pynonthermal.constants import K_B
+from pynonthermal.constants import ME
+from pynonthermal.constants import QE
 
 use_collstrengths = False
 
@@ -17,17 +23,10 @@ def get_lte_pops(adata, Z, ion_stage, n_ion, temperature):
             Z = ion.Z
             ion_stage = ion.ion_stage
 
-            ltepartfunc = ion.levels.eval(
-                "g * exp(-energy_ev / @K_B / @temperature)"
-            ).sum()
+            ltepartfunc = ion.levels.eval("g * exp(-energy_ev / @K_B / @temperature)").sum()
 
             for levelindex, level in ion.levels.iterrows():
-                ion_popfrac = (
-                    1.0
-                    / ltepartfunc
-                    * level.g
-                    * math.exp(-level.energy_ev / K_B / temperature)
-                )
+                ion_popfrac = 1.0 / ltepartfunc * level.g * math.exp(-level.energy_ev / K_B / temperature)
                 levelnumberdensity = n_ion * ion_popfrac
 
                 poprow = (
@@ -38,13 +37,11 @@ def get_lte_pops(adata, Z, ion_stage, n_ion, temperature):
                 )
                 poplist.append(poprow)
 
-    dfpop = pd.DataFrame(poplist, columns=["level", "n_LTE", "n_NLTE", "ion_popfrac"])
-    return dfpop
+    return pd.DataFrame(poplist, columns=["level", "n_LTE", "n_NLTE", "ion_popfrac"])
 
 
 def get_xs_excitation(en_ev, row):
-    """Get the excitation cross section in cm^2 at energy en_ev [eV]"""
-
+    """Get the excitation cross section in cm^2 at energy en_ev [eV]."""
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
 
     coll_str = row.collstr
@@ -57,13 +54,11 @@ def get_xs_excitation(en_ev, row):
     if coll_str >= 0 and use_collstrengths:
         # collision strength is available, so use it
         # Li et al. 2012 equation 11
-        constantfactor = (
-            pow(H_ionpot, 2) / row.lower_g * coll_str * math.pi * A_naught_squared
-        )
+        constantfactor = pow(H_ionpot, 2) / row.lower_g * coll_str * math.pi * A_naught_squared
 
         return constantfactor * (en_ev * EV) ** -2
 
-    elif not row.forbidden:
+    if not row.forbidden:
         nu_trans = epsilon_trans / H
         g = row.upper_g / row.lower_g
         fij = g * ME * pow(CLIGHT, 3) / (8 * pow(QE * nu_trans * math.pi, 2)) * row.A
@@ -76,9 +71,7 @@ def get_xs_excitation(en_ev, row):
 
         prefactor = 45.585750051
         # Eq 4 of Mewe 1972, possibly from Seaton 1962?
-        constantfactor = (
-            prefactor * A_naught_squared * pow(H_ionpot / epsilon_trans, 2) * fij
-        )
+        constantfactor = prefactor * A_naught_squared * pow(H_ionpot / epsilon_trans, 2) * fij
 
         U = en_ev / epsilon_trans_ev
         g_bar = A * np.log(U) + B
@@ -89,9 +82,7 @@ def get_xs_excitation(en_ev, row):
 
 
 def get_xs_excitation_vector(engrid, row):
-    """Get an array containing the excitation cross section in cm^2 at every energy in the array engrid (eV)
-    """
-
+    """Get an array containing the excitation cross section in cm^2 at every energy in the array engrid (eV)."""
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
     npts = len(engrid)
     xs_excitation_vec = np.empty(npts)
@@ -100,21 +91,15 @@ def get_xs_excitation_vector(engrid, row):
     epsilon_trans = row.epsilon_trans_ev * EV
     epsilon_trans_ev = row.epsilon_trans_ev
 
-    startindex = pynonthermal.get_energyindex_gteq(
-        en_ev=epsilon_trans_ev, engrid=engrid
-    )
+    startindex = pynonthermal.get_energyindex_gteq(en_ev=epsilon_trans_ev, engrid=engrid)
     xs_excitation_vec[:startindex] = 0.0
 
     if coll_str >= 0 and use_collstrengths:
         # collision strength is available, so use it
         # Li et al. 2012 equation 11
-        constantfactor = (
-            pow(H_ionpot, 2) / row.lower_g * coll_str * math.pi * A_naught_squared
-        )
+        constantfactor = pow(H_ionpot, 2) / row.lower_g * coll_str * math.pi * A_naught_squared
 
-        xs_excitation_vec[startindex:] = (
-            constantfactor * (engrid[startindex:] * EV) ** -2
-        )
+        xs_excitation_vec[startindex:] = constantfactor * (engrid[startindex:] * EV) ** -2
 
     elif not row.forbidden:
         nu_trans = epsilon_trans / H
@@ -129,9 +114,7 @@ def get_xs_excitation_vector(engrid, row):
 
         prefactor = 45.585750051
         # Eq 4 of Mewe 1972, possibly from Seaton 1962?
-        constantfactor = (
-            prefactor * A_naught_squared * pow(H_ionpot / epsilon_trans, 2) * fij
-        )
+        constantfactor = prefactor * A_naught_squared * pow(H_ionpot / epsilon_trans, 2) * fij
 
         U = engrid[startindex:] / epsilon_trans_ev
         g_bar = A * np.log(U) + B

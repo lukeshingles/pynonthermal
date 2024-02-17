@@ -1,0 +1,59 @@
+---
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v4.5.0
+      hooks:
+          - id: check-added-large-files
+            args: [--maxkb=800]
+          - id: check-ast
+          - id: check-case-conflict
+          - id: check-builtin-literals
+          - id: check-docstring-first
+          - id: check-executables-have-shebangs
+          - id: check-json
+          - id: check-merge-conflict
+          - id: check-symlinks
+          - id: check-toml
+          - id: check-yaml
+          - id: detect-private-key
+          - id: destroyed-symlinks
+          - id: fix-byte-order-marker
+          - id: forbid-new-submodules
+          - id: mixed-line-ending
+            args: [--fix=lf]
+          - id: name-tests-test
+            args: [--pytest-test-first]
+          - id: requirements-txt-fixer
+          #   - id: trailing-whitespace
+
+    - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
+      rev: 0.2.3
+      hooks:
+          - id: yamlfmt
+
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.2.1
+      hooks:
+          - id: ruff
+            args: [--fix, --exit-non-zero-on-fix]
+
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      rev: v0.2.1
+      hooks:
+          - id: ruff-format
+
+    - repo: https://github.com/pre-commit/mirrors-mypy
+      rev: v1.8.0
+      hooks:
+          - id: mypy
+            additional_dependencies: [numpy, types-PyYAML, pandas>=2.0.3]
+            types: [python]
+            require_serial: true
+
+    # - repo: local
+    #   hooks:
+    #       - id: mypy
+    #         name: mypy
+    #         entry: mypy
+    #         types: [python]
+    #         language: python

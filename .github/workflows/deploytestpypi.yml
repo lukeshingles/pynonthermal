@@ -1,0 +1,41 @@
+---
+name: Upload Package to TestPyPI
+
+on:
+    push:
+        branches:
+            - '*'
+        tags:
+            - '*'
+    repository_dispatch:
+        types: [trigger_checks]
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: actions/setup-python@v5
+              with:
+                  cache: pip
+                  python-version-file: .python-version
+
+            - name: Install dependencies
+              run: |
+                  python3 -m pip install --upgrade pip
+                  python3 -m pip install -r requirements.txt
+                  python3 -m pip install --upgrade setuptools setuptools_scm[toml] wheel twine build
+
+            - name: Build
+              run: |
+                  python3 -m setuptools_scm
+                  python3 -m build --sdist --wheel --outdir dist/ .
+                  python3 -m twine check dist/*
+
+            - name: Publish to Test PyPI
+              run: |
+                  python3 -m twine upload --skip-existing --verbose -r testpypi -u __token__ -p ${{ secrets.TESTPYPI_TOKEN }} --non-interactive dist/*

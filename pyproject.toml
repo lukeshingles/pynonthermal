@@ -1,0 +1,177 @@
+[build-system]
+requires = ["setuptools>=68.2", "setuptools_scm[toml]>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pynonthermal"
+authors = [
+    {name = "Luke J. Shingles", email = "luke.shingles@gmail.com"},
+]
+description="A non-thermal electron deposition (Spencer-Fano equation) solver."
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Intended Audience :: Science/Research",
+]
+dynamic = ["version", "dependencies", "entry-points", "readme", "scripts"]
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+
+[project.urls]
+Repository = "https://www.github.com/lukeshingles/pynonthermal/"
+
+[tool.mypy]
+check_untyped_defs = false
+disallow_any_explicit = false
+disallow_any_generics = false
+disallow_any_unimported = false
+disallow_incomplete_defs = false
+disallow_subclassing_any = false
+disallow_untyped_calls = false
+disallow_untyped_defs = false
+error_summary = true
+enable_error_code = [
+  "comparison-overlap",
+  "ignore-without-code",
+  "redundant-expr",
+  "redundant-self",
+  "truthy-bool",
+  "unused-awaitable",
+]
+exclude = "(build)|(dist)|(tests)|(data)"
+ignore_missing_imports = true
+implicit_optional = false
+implicit_reexport = true
+packages = "pynonthermal"
+plugins = 'numpy.typing.mypy_plugin'
+pretty = true
+python_version = '3.12'
+scripts_are_modules = true
+strict_equality = true
+extra_checks = true
+warn_redundant_casts = true
+warn_unreachable = false
+warn_unused_configs = true
+warn_unused_ignores = true
+
+[tool.pyright]
+exclude=['**/node_modules','**/__pycache__','**/.*', 'build', 'dist']
+useLibraryCodeForTypes = false
+
+[tool.pytest.ini_options]
+addopts = " --durations=0  --typeguard-packages=pynonthermal"
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"
+fix = true
+show-fixes = true
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ARG001", # ignored because variables in df.eval() are not detected
+    "ANN",
+    "B005",  # strip-with-multi-characters
+    "B007",  # variable not used in loop body (but sometimes it is with DataFrame.eval)
+    "B905", # zip without explicit strict parameter
+    "C901",  # complex-structure
+    "COM812",  # missing-trailing-comma
+    "CPY001", # missing-copyright-notice
+    "D100",  # undocumented-public-module
+    "D101",  # undocumented-public-class
+    "D102",  # undocumented-public-method
+    "D103",  # undocumented-public-function
+    "D104",  # undocumented-public-package
+    "D107",  # undocumented-public-init
+    "D203",  # one-blank-line-before-class
+    "D205",  # blank-line-after-summary
+    "D213",  # multi-line-summary-second-line
+    "D417",  # undocumented-param
+    "E501", # Line too long
+    "E741",  # mixed-case-variable-in-global-scope
+    "ERA001",  # commented-out-code
+    "FBT",
+    "FIX002",  # line contains TODO
+    "ISC001", # single-line-implicit-string-concatenation
+    "N802",  # Function name should be lowercase
+    "N803",  # Argument name should be lowercase
+    "N806",  # non-lowercase-variable-in-function
+    "N816",  # variable-name-too-short
+    "N999",  # invalid-module-name
+    "PD901",  # df is a bad variable name
+    "PERF203", # try-except-in-loop
+    #"PGH001",  # No builtin `eval()` allowed
+    "PLR0911",  # too-many-return-statements
+    "PLR0912",  # too-many-branches
+    "PLR0913",  # too-many-arguments
+    "PLR0915",  # too-many-statements
+    "PLR2004",  # magic-value-comparison
+    "PLW2901",  # redefined-loop-name
+    "PYI024", # Use `typing.NamedTuple` instead of `collections.namedtuple`
+    "S101",  # Use of assert detected
+    "S301",  # suspicious-pickle-usage
+    #"S307",  # suspicious-eval-usage
+    "S311",  # suspicious-non-cryptographic-random-usage
+    "S603",  # subprocess-without-shell-equals-true
+    "S607",  # start-process-with-partial-path
+    "SLF001",  # private-member-access
+    "T201",  # print found
+    "TD002",  # missing-todo-author
+    "TD003",  # missing-todo-link
+]
+fixable = ["ALL"]
+unfixable = [
+    "COM812",  # missing-trailing-comma
+    "ERA001",  # commented-out-code (will just delete it!)
+    "F401",  # unused-import
+    "F841",  # unused-variable
+    "SIM222", # expr-or-true
+    "SIM223", # expr-and-false
+]
+
+[tool.ruff.lint.flake8-import-conventions.extend-aliases]
+"artistools" = "at"
+"matplotlib" = "mpl"
+"matplotlib.pyplot" = "plt"
+"matplotlib.typing" = "mplt"
+"numpy.typing" = "npt"
+"typing" = "t"
+"polars" = "pl"
+"polars.selectors" = "cs"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+order-by-type = false
+
+[tool.setuptools]
+packages = ["pynonthermal"]
+include-package-data = true
+license-files = ["LICENSE"]
+
+#[tool.setuptools.packages.find]
+#where = ["."]
+
+[tool.setuptools.dynamic]
+readme = {file = ["README.md"]}
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools_scm]
+write_to = "_version.py"
+local_scheme = "no-local-version"
+
+[tool.vulture]
+exclude = [".*", "build/", ".eggs/"]
+#ignore_names = ["visit_*", "do_*"]
+paths = ["pynonthermal"]
+sort_by_size = true

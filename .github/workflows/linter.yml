@@ -1,0 +1,63 @@
+---
+name: Linter
+
+on:
+    push:
+    merge_group:
+    schedule:
+        - cron: 0 13 * * 1
+    #pull_request:
+    workflow_dispatch:
+    repository_dispatch:
+        types: [trigger_checks]
+
+jobs:
+    pre-commit:
+        runs-on: macos-14
+        env:
+            RUFF_OUTPUT_FORMAT: github
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  cache: pip
+                  python-version-file: .python-version
+
+            - name: Install dependencies
+              run: |
+                  python3 -m pip install --upgrade pip wheel mypy
+                  python3 -m pip install -r requirements.txt
+
+            - name: Run pre-commit
+              run: |
+                  pre-commit run --all-files
+
+    lint:
+        runs-on: macos-14
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  cache: pip
+                  python-version-file: .python-version
+
+            - name: Install dependencies
+              run: |
+                  python3 -m pip install --upgrade pip wheel pylint mypy ruff
+                  python3 -m pip install -r requirements.txt
+
+            - name: Run Ruff
+              run: ruff check --output-format=github .
+
+            - name: Run Ruff Format
+              run: ruff format --diff .
+
+            - name: Run mypy
+              run: |
+                  mypy --install-types --non-interactive

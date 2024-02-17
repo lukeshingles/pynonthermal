@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import math
-
 from pathlib import Path
 
-from .constants import EV, H, ME, QE
+from pynonthermal.constants import EV
+from pynonthermal.constants import H
+from pynonthermal.constants import ME
+from pynonthermal.constants import QE
 
 DATADIR = Path(__file__).absolute().parent / "data"
 
@@ -29,14 +31,7 @@ def electronlossfunction(energy_ev, n_e_cgs):
     else:
         v = math.sqrt(2 * energy / ME)  # velocity in m/s
         eulergamma = 0.577215664901532
-        lossfunc = (
-            n_e
-            * 2
-            * math.pi
-            * QE**4
-            / energy
-            * math.log(ME * pow(v, 3) / (eulergamma * pow(QE, 2) * omegap))
-        )
+        lossfunc = n_e * 2 * math.pi * QE**4 / energy * math.log(ME * pow(v, 3) / (eulergamma * pow(QE, 2) * omegap))
 
     # lossfunc is now [erg / cm]
     return lossfunc / EV  # return as [eV / cm]
@@ -83,10 +78,11 @@ def get_energyindex_lteq(en_ev, engrid):
 
     if index < 0:
         return 0
-    elif index > len(engrid) - 1:
+
+    if index > len(engrid) - 1:
         return len(engrid) - 1
-    else:
-        return index
+
+    return index
 
 
 def get_energyindex_gteq(en_ev, engrid):
@@ -97,7 +93,8 @@ def get_energyindex_gteq(en_ev, engrid):
 
     if index < 0:
         return 0
-    elif index > len(engrid) - 1:
+
+    if index > len(engrid) - 1:
         return len(engrid) - 1
-    else:
-        return index
+
+    return index

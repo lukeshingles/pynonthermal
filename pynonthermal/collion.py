@@ -1,23 +1,24 @@
 import math
-import pandas as pd
-import numpy as np
-from pathlib import Path
 from math import atan
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
 
 import pynonthermal
 
 
 def read_colliondata(collionfilename="collion.txt"):
-    with open(Path(pynonthermal.DATADIR, collionfilename), "r") as collionfile:
-        expectedrowcount = int(collionfile.readline().strip())  # can ignore this line
+    with open(Path(pynonthermal.DATADIR, collionfilename)) as collionfile:  # noqa: PTH123
+        _expectedrowcount = int(collionfile.readline().strip())  # can ignore this line
         dfcollion = pd.read_csv(
             collionfile,
-            delim_whitespace=True,
+            sep=r"\s+",
             header=None,
             names=["Z", "nelec", "n", "l", "ionpot_ev", "A", "B", "C", "D"],
         )
 
-    dfcollion.eval("ion_stage = Z - nelec + 1", inplace=True)
+    dfcollion["ion_stage"] = dfcollion["Z"] - dfcollion["nelec"] + 1
 
     return dfcollion
 
@@ -58,9 +59,9 @@ def get_J(Z, ion_stage, ionpot_ev):
     if ion_stage == 1:
         if Z == 2:  # He I
             return 15.8
-        elif Z == 10:  # Ne I
+        if Z == 10:  # Ne I
             return 24.2
-        elif Z == 18:  # Ar I
+        if Z == 18:  # Ar I
             return 10.0
 
     return 0.6 * ionpot_ev
@@ -73,25 +74,13 @@ def ar_xs(energy_ev, ionpot_ev, A, B, C, D):
 
     return (
         1e-14
-        * (
-            A * (1 - 1 / u)
-            + B * pow((1 - 1 / u), 2)
-            + C * math.log(u)
-            + D * math.log(u) / u
-        )
+        * (A * (1 - 1 / u) + B * pow((1 - 1 / u), 2) + C * math.log(u) + D * math.log(u) / u)
         / (u * pow(ionpot_ev, 2))
     )
 
 
 def get_arxs_array_shell(arr_enev, shell):
-    ar_xs_array = np.array(
-        [
-            ar_xs(energy_ev, shell.ionpot_ev, shell.A, shell.B, shell.C, shell.D)
-            for energy_ev in arr_enev
-        ]
-    )
-
-    return ar_xs_array
+    return np.array([ar_xs(energy_ev, shell.ionpot_ev, shell.A, shell.B, shell.C, shell.D) for energy_ev in arr_enev])
 
 
 def get_arxs_array_ion(arr_enev, dfcollion, Z, ion_stage):

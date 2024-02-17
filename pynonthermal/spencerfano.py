@@ -1,23 +1,22 @@
-import math
-import matplotlib.pyplot as plt
-import numpy as np
+from __future__ import annotations
 
-from scipy import linalg
+import math
 from math import atan
 from pathlib import Path
 
 import artistools as at
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy import linalg
+
 import pynonthermal
 import pynonthermal.collion
 import pynonthermal.excitation
-
-from .base import electronlossfunction
+from pynonthermal.base import electronlossfunction
 
 
 class SpencerFanoSolver:
-    def __init__(
-        self, emin_ev=1, emax_ev=3000, npts=4000, verbose=False, use_ar1985=False
-    ):
+    def __init__(self, emin_ev=1, emax_ev=3000, npts=4000, verbose=False, use_ar1985=False):
         self._solved = False
         self.ionpopdict = {}  # key is (Z, ion_stage) value is number density
 
@@ -63,12 +62,11 @@ class SpencerFanoSolver:
         self.sfmatrix = np.zeros((npts, npts))
 
     def __enter__(self):
-        # print('enter method called')
+        """Enter the context manager."""
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        # print('exit method called')
-        pass
+        """Exit the context manager."""
 
     def get_energyindex_lteq(self, en_ev):
         return pynonthermal.get_energyindex_lteq(en_ev, engrid=self.engrid)
@@ -88,8 +86,7 @@ class SpencerFanoSolver:
         epsilon_trans_ev,
         transitionkey=None,
     ):
-        """
-        Add a bound-bound non-thermal collisional excitation to the solver.
+        """Add a bound-bound non-thermal collisional excitation to the solver.
 
         levelnumberdensity:
             the level population density in cm^-3
@@ -107,9 +104,7 @@ class SpencerFanoSolver:
             self.excitationlists[(Z, ion_stage)] = {}
 
         if transitionkey is None:
-            transitionkey = len(
-                self.excitationlists[(Z, ion_stage)]
-            )  # simple number index
+            transitionkey = len(self.excitationlists[(Z, ion_stage)])  # simple number index
 
         assert transitionkey not in self.excitationlists[(Z, ion_stage)]
         self.excitationlists[(Z, ion_stage)][transitionkey] = (
@@ -117,41 +112,29 @@ class SpencerFanoSolver:
             xs_vec,
             epsilon_trans_ev,
         )
-        vec_xs_excitation_levelnumberdensity_deltae = (
-            levelnumberdensity * self.deltaen * xs_vec
-        )
+        vec_xs_excitation_levelnumberdensity_deltae = levelnumberdensity * self.deltaen * xs_vec
         xsstartindex = self.get_energyindex_lteq(en_ev=epsilon_trans_ev)
 
         for i, en in enumerate(self.engrid):
             stopindex = self.get_energyindex_lteq(en_ev=en + epsilon_trans_ev)
 
-            startindex = i if i > xsstartindex else xsstartindex
+            startindex = max(i, xsstartindex)
             # for j in range(startindex, stopindex):
-            self.sfmatrix[
-                i, startindex:stopindex
-            ] += vec_xs_excitation_levelnumberdensity_deltae[startindex:stopindex]
+            self.sfmatrix[i, startindex:stopindex] += vec_xs_excitation_levelnumberdensity_deltae[startindex:stopindex]
 
             # do the last bit separately because we're not using the full deltaen interval
 
             delta_en_actual = en + epsilon_trans_ev - self.engrid[stopindex]
             self.sfmatrix[i, stopindex] += (
-                vec_xs_excitation_levelnumberdensity_deltae[stopindex]
-                * delta_en_actual
-                / self.deltaen
+                vec_xs_excitation_levelnumberdensity_deltae[stopindex] * delta_en_actual / self.deltaen
             )
 
-    def add_ion_ltepopexcitation(
-        self, Z, ion_stage, n_ion, temperature=3000, adata=None
-    ):
+    def add_ion_ltepopexcitation(self, Z, ion_stage, n_ion, temperature=3000, adata=None):
         if adata is None:
             # use ARTIS atomic data read by the artistools package to get the levels
-            adata = at.atomic.get_levels(
-                Path(pynonthermal.DATADIR, "artis_files"), get_transitions=True
-            )
+            adata = at.atomic.get_levels(Path(pynonthermal.DATADIR, "artis_files"), get_transitions=True)
 
-        dfpops_thision = pynonthermal.excitation.get_lte_pops(
-            adata, Z, ion_stage, n_ion, temperature=temperature
-        )
+        dfpops_thision = pynonthermal.excitation.get_lte_pops(adata, Z, ion_stage, n_ion, temperature=temperature)
 
         popdict = {x.level: x["n_NLTE"] for _, x in dfpops_thision.iterrows()}
 
@@ -181,23 +164,16 @@ class SpencerFanoSolver:
         dftransitions = ion.transitions.query(filterquery, inplace=False).copy()
 
         if not dftransitions.empty:
-            dftransitions.eval(
+            dftransitions = dftransitions.eval(
                 "epsilon_trans_ev = @ion.levels.loc[upper].energy_ev.values -"
                 " @ion.levels.loc[lower].energy_ev.values",
-                inplace=True,
             )
-            dftransitions.query("epsilon_trans_ev >= @self.engrid[0]", inplace=True)
+            dftransitions = dftransitions.query("epsilon_trans_ev >= @self.engrid[0]")
 
             if not dftransitions.empty:
-                dftransitions.eval(
-                    "lower_g = @ion.levels.loc[lower].g.values", inplace=True
-                )
-                dftransitions.eval(
-                    "upper_g = @ion.levels.loc[upper].g.values", inplace=True
-                )
-                dftransitions["lower_pop"] = dftransitions.apply(
-                    lambda x: popdict.get(x.lower, 0.0), axis=1
-                )
+                dftransitions = dftransitions.eval("lower_g = @ion.levels.loc[lower].g.values")
+                dftransitions = dftransitions.eval("upper_g = @ion.levels.loc[upper].g.values")
+                dftransitions["lower_pop"] = dftransitions.apply(lambda x: popdict.get(x.lower, 0.0), axis=1)
 
             if self.verbose:
                 print(
@@ -209,12 +185,10 @@ class SpencerFanoSolver:
                 )
 
             for _, transition in dftransitions.iterrows():
-                levelnumberdensity = transition.lower_pop
                 epsilon_trans_ev = transition.epsilon_trans_ev
                 if epsilon_trans_ev >= self.engrid[0]:
-                    xs_vec = pynonthermal.excitation.get_xs_excitation_vector(
-                        self.engrid, transition
-                    )
+                    xs_vec = pynonthermal.excitation.get_xs_excitation_vector(self.engrid, transition)
+                    levelnumberdensity = transition.lower_pop
                     self.add_excitation(
                         Z,
                         ion_stage,
@@ -238,11 +212,7 @@ class SpencerFanoSolver:
         if ionpot_ev <= self.engrid[0]:
             xsstartindex = 0
         else:
-            xsstartindex = npts + 1
-            for i in range(npts):
-                if ar_xs_array[i] > 0.0:
-                    xsstartindex = i
-                    break
+            xsstartindex = next((i for i in range(npts) if ar_xs_array[i] > 0.0), npts + 1)
             xsstartindex = self.get_energyindex_gteq(en_ev=ionpot_ev)
 
         # J * atan[(epsilon - ionpot_ev) / J] is the indefinite integral of
@@ -250,11 +220,7 @@ class SpencerFanoSolver:
         # in Kozma & Fransson 1992 equation 4
 
         prefactors = [
-            n_ion
-            * ar_xs_array[j]
-            / atan((self.engrid[j] - ionpot_ev) / 2.0 / J)
-            * deltaen
-            for j in range(npts)
+            n_ion * ar_xs_array[j] / atan((self.engrid[j] - ionpot_ev) / 2.0 / J) * deltaen for j in range(npts)
         ]
 
         # Luke Shingles: the use of min and max on the epsilon limits keeps energies
@@ -263,20 +229,12 @@ class SpencerFanoSolver:
         # I had neglected this, so the limits of integration were incorrect. The fix didn't massively affect
         # ionisation rates or spectra, but it was a source of error that let to energy fractions not adding up to 100%.
 
-        epsilon_uppers = [
-            min((self.engrid[j] + ionpot_ev) / 2, self.engrid[j]) for j in range(npts)
-        ]
-        int_eps_uppers = [
-            atan((epsilon_upper - ionpot_ev) / J) for epsilon_upper in epsilon_uppers
-        ]
+        epsilon_uppers = [min((self.engrid[j] + ionpot_ev) / 2, self.engrid[j]) for j in range(npts)]
+        int_eps_uppers = [atan((epsilon_upper - ionpot_ev) / J) for epsilon_upper in epsilon_uppers]
 
         # for the resulting arrays, use index j - i corresponding to energy endash - en
-        epsilon_lowers1 = [
-            max(self.engrid[j] - self.engrid[0], ionpot_ev) for j in range(npts)
-        ]
-        int_eps_lowers1 = [
-            atan((epsilon_lower - ionpot_ev) / J) for epsilon_lower in epsilon_lowers1
-        ]
+        epsilon_lowers1 = [max(self.engrid[j] - self.engrid[0], ionpot_ev) for j in range(npts)]
+        int_eps_lowers1 = [atan((epsilon_lower - ionpot_ev) / J) for epsilon_lower in epsilon_lowers1]
 
         for i, en in enumerate(self.engrid):
             # endash ranges from en to SF_EMAX, but skip over the zero-cross section points
@@ -293,9 +251,7 @@ class SpencerFanoSolver:
                 # integral at y(E') where E' >= E and E' = engrid[j]
 
                 if epsilon_lowers1[j - i] <= epsilon_uppers[j]:
-                    self.sfmatrix[i, j] += prefactors[j] * (
-                        int_eps_uppers[j] - int_eps_lowers1[j - i]
-                    )
+                    self.sfmatrix[i, j] += prefactors[j] * (int_eps_uppers[j] - int_eps_lowers1[j - i])
 
             if 2 * en + ionpot_ev < self.engrid[-1] + (self.engrid[1] - self.engrid[0]):
                 secondintegralstartindex = self.get_energyindex_lteq(2 * en + ionpot_ev)
@@ -310,9 +266,7 @@ class SpencerFanoSolver:
             for j in range(secondintegralstartindex, npts):
                 if epsilon_lower2 <= epsilon_uppers[j]:
                     int_eps_lower2 = atan((epsilon_lower2 - ionpot_ev) / J)
-                    self.sfmatrix[i, j] -= prefactors[j] * (
-                        int_eps_uppers[j] - int_eps_lower2
-                    )
+                    self.sfmatrix[i, j] -= prefactors[j] * (int_eps_uppers[j] - int_eps_lower2)
 
     def add_ionisation(self, Z, ion_stage, n_ion):
         assert not self._solved
@@ -328,9 +282,7 @@ class SpencerFanoSolver:
             )
         assert n_ion > 0.0
         self.ionpopdict[(Z, ion_stage)] = n_ion
-        dfcollion_thision = self.dfcollion.query(
-            "Z == @Z and ion_stage == @ion_stage", inplace=False
-        )
+        dfcollion_thision = self.dfcollion.query("Z == @Z and ion_stage == @ion_stage", inplace=False)
 
         for index, shell in dfcollion_thision.iterrows():
             assert shell.ionpot_ev >= self.engrid[0]
@@ -339,7 +291,7 @@ class SpencerFanoSolver:
     def calculate_n_e(self):
         # number density of free electrons [cm-^3]
         self._n_e = 0.0
-        for Z, ion_stage in self.ionpopdict.keys():
+        for Z, ion_stage in self.ionpopdict:
             charge = ion_stage - 1
             assert charge >= 0
             self._n_e += charge * self.ionpopdict[(Z, ion_stage)]
@@ -353,7 +305,7 @@ class SpencerFanoSolver:
     def get_n_ion_tot(self):
         # total number density of all nuclei [cm^-3]
         n_ion_tot = 0.0
-        for Z, ion_stage in self.ionpopdict.keys():
+        for Z, ion_stage in self.ionpopdict:
             n_ion_tot += self.ionpopdict[(Z, ion_stage)]
         return n_ion_tot
 
@@ -404,20 +356,14 @@ class SpencerFanoSolver:
 
         xs_excitation_vec_sum_alltrans = np.zeros(npts)
 
-        for transitionkey, (
+        for (
             levelnumberdensity,
             xsvec,
             epsilon_trans_ev,
-        ) in self.excitationlists[(Z, ion_stage)].items():
-            xs_excitation_vec_sum_alltrans += (
-                levelnumberdensity * epsilon_trans_ev * xsvec
-            )
+        ) in self.excitationlists[(Z, ion_stage)].values():
+            xs_excitation_vec_sum_alltrans += levelnumberdensity * epsilon_trans_ev * xsvec
 
-        return (
-            np.dot(xs_excitation_vec_sum_alltrans, self.yvec)
-            * deltaen
-            / self.depositionratedensity_ev
-        )
+        return np.dot(xs_excitation_vec_sum_alltrans, self.yvec) * deltaen / self.depositionratedensity_ev
 
     def calculate_N_e(self, energy_ev):
         # Kozma & Fransson equation 6.
@@ -430,30 +376,22 @@ class SpencerFanoSolver:
 
         deltaen = self.engrid[1] - self.engrid[0]
 
-        for Z, ion_stage in self.ionpopdict.keys():
+        for Z, ion_stage in self.ionpopdict:
             N_e_ion = 0.0
             n_ion = self.ionpopdict[(Z, ion_stage)]
 
             if self.excitationlists and (Z, ion_stage) in self.excitationlists:
-                for levelnumberdensity, xsvec, epsilon_trans_ev in self.excitationlists[
-                    (Z, ion_stage)
-                ].values():
+                for levelnumberdensity, xsvec, epsilon_trans_ev in self.excitationlists[(Z, ion_stage)].values():
                     if energy_ev + epsilon_trans_ev >= self.engrid[0]:
-                        i = self.get_energyindex_lteq(
-                            en_ev=energy_ev + epsilon_trans_ev
-                        )
-                        N_e_ion += (
-                            (levelnumberdensity / n_ion) * self.yvec[i] * xsvec[i]
-                        )
+                        i = self.get_energyindex_lteq(en_ev=energy_ev + epsilon_trans_ev)
+                        N_e_ion += (levelnumberdensity / n_ion) * self.yvec[i] * xsvec[i]
                         # enbelow = engrid[i]
                         # enabove = engrid[i + 1]
                         # x = (energy_ev - enbelow) / (enabove - enbelow)
                         # yvecinterp = (1 - x) * yvec[i] + x * yvec[i + 1]
                         # N_e_ion += (levelnumberdensity / n_ion) * yvecinterp * get_xs_excitation(energy_ev + epsilon_trans_ev, row)
 
-            dfcollion_thision = self.dfcollion.query(
-                "Z == @Z and ion_stage == @ion_stage", inplace=False
-            )
+            dfcollion_thision = self.dfcollion.query("Z == @Z and ion_stage == @ion_stage", inplace=False)
 
             for index, shell in dfcollion_thision.iterrows():
                 ionpot_ev = shell.ionpot_ev
@@ -461,9 +399,7 @@ class SpencerFanoSolver:
                 enlambda = min(self.engrid[-1] - energy_ev, energy_ev + ionpot_ev)
                 J = pynonthermal.collion.get_J(shell.Z, shell.ion_stage, ionpot_ev)
 
-                ar_xs_array = pynonthermal.collion.get_arxs_array_shell(
-                    self.engrid, shell
-                )
+                ar_xs_array = pynonthermal.collion.get_arxs_array_shell(self.engrid, shell)
 
                 # integral from ionpot to enlambda
                 integral1startindex = self.get_energyindex_lteq(en_ev=ionpot_ev)
@@ -476,9 +412,7 @@ class SpencerFanoSolver:
                         deltaen
                         * self.yvec[k]
                         * ar_xs_array[k]
-                        * pynonthermal.collion.Psecondary(
-                            e_p=self.engrid[k], epsilon=endash, ionpot_ev=ionpot_ev, J=J
-                        )
+                        * pynonthermal.collion.Psecondary(e_p=self.engrid[k], epsilon=endash, ionpot_ev=ionpot_ev, J=J)
                     )
 
                     # interpolate the y value
@@ -491,21 +425,17 @@ class SpencerFanoSolver:
                     #     e_p=energy_ev + endash, epsilon=endash, ionpot_ev=ionpot_ev, J=J)
 
                 # integral from 2E + I up to E_max
-                integral2startindex = self.get_energyindex_lteq(
-                    en_ev=2 * energy_ev + ionpot_ev
-                )
+                integral2startindex = self.get_energyindex_lteq(en_ev=2 * energy_ev + ionpot_ev)
                 N_e_ion += deltaen * sum(
-                    [
-                        self.yvec[j]
-                        * ar_xs_array[j]
-                        * pynonthermal.collion.Psecondary(
-                            e_p=self.engrid[j],
-                            epsilon=energy_ev + ionpot_ev,
-                            ionpot_ev=ionpot_ev,
-                            J=J,
-                        )
-                        for j in range(integral2startindex, len(self.engrid))
-                    ]
+                    self.yvec[j]
+                    * ar_xs_array[j]
+                    * pynonthermal.collion.Psecondary(
+                        e_p=self.engrid[j],
+                        epsilon=energy_ev + ionpot_ev,
+                        ionpot_ev=ionpot_ev,
+                        J=J,
+                    )
+                    for j in range(integral2startindex, len(self.engrid))
                 )
 
             N_e += n_ion * N_e_ion
@@ -516,7 +446,6 @@ class SpencerFanoSolver:
 
     def calculate_frac_heating(self):
         # Kozma & Fransson equation 8
-
         self._frac_heating = 0.0
         E_0 = self.engrid[0]
         n_e = self.get_n_e()
@@ -525,20 +454,10 @@ class SpencerFanoSolver:
         self._frac_heating += (
             deltaen
             / self.depositionratedensity_ev
-            * sum(
-                [
-                    electronlossfunction(en_ev, n_e) * self.yvec[i]
-                    for i, en_ev in enumerate(self.engrid)
-                ]
-            )
+            * sum(electronlossfunction(en_ev, n_e) * self.yvec[i] for i, en_ev in enumerate(self.engrid))
         )
 
-        frac_heating_E_0_part = (
-            E_0
-            * self.yvec[0]
-            * electronlossfunction(E_0, n_e)
-            / self.depositionratedensity_ev
-        )
+        frac_heating_E_0_part = E_0 * self.yvec[0] * electronlossfunction(E_0, n_e) / self.depositionratedensity_ev
 
         self._frac_heating += frac_heating_E_0_part
 
@@ -549,13 +468,9 @@ class SpencerFanoSolver:
         npts_integral = math.ceil(E_0 / deltaen) * 5
         # if self.verbose:
         #     print(f'N_e npts_integral: {npts_integral}')
-        arr_en, deltaen2 = np.linspace(
-            0.0, E_0, num=npts_integral, retstep=True, endpoint=True
-        )
+        arr_en, deltaen2 = np.linspace(0.0, E_0, num=npts_integral, retstep=True, endpoint=True)
         arr_en_N_e = [en_ev * self.calculate_N_e(en_ev) for en_ev in arr_en]
-        frac_heating_N_e += (
-            1.0 / self.depositionratedensity_ev * sum(arr_en_N_e) * deltaen2
-        )
+        frac_heating_N_e += 1.0 / self.depositionratedensity_ev * sum(arr_en_N_e) * deltaen2
 
         if self.verbose:
             print(f" frac_heating(E<EMIN): {frac_heating_N_e:.5f}")
@@ -578,13 +493,11 @@ class SpencerFanoSolver:
         if self.verbose:
             print(f"    n_e_nt: {self.get_n_e_nt():.2e} [/cm3]")
 
-        for Z, ion_stage in self.ionpopdict.keys():
+        for Z, ion_stage in self.ionpopdict:
             n_ion = self.ionpopdict[(Z, ion_stage)]
             n_ion_tot = self.get_n_ion_tot()
             X_ion = n_ion / n_ion_tot
-            dfcollion_thision = self.dfcollion.query(
-                "Z == @Z and ion_stage == @ion_stage", inplace=False
-            )
+            dfcollion_thision = self.dfcollion.query("Z == @Z and ion_stage == @ion_stage", inplace=False)
             # if dfcollion.empty:
             #     continue
             ionpot_valence = dfcollion_thision.ionpot_ev.min()
@@ -603,16 +516,10 @@ class SpencerFanoSolver:
             integralgamma = 0.0
             eta_over_ionpot_sum = 0.0
             for index, shell in dfcollion_thision.iterrows():
-                ar_xs_array = pynonthermal.collion.get_arxs_array_shell(
-                    self.engrid, shell
-                )
+                ar_xs_array = pynonthermal.collion.get_arxs_array_shell(self.engrid, shell)
 
                 frac_ionisation_shell = (
-                    n_ion
-                    * shell.ionpot_ev
-                    * np.dot(self.yvec, ar_xs_array)
-                    * deltaen
-                    / self.depositionratedensity_ev
+                    n_ion * shell.ionpot_ev * np.dot(self.yvec, ar_xs_array) * deltaen / self.depositionratedensity_ev
                 )
 
                 if self.verbose:
@@ -626,35 +533,25 @@ class SpencerFanoSolver:
 
                 if frac_ionisation_shell > 1:
                     frac_ionisation_shell = 0.0
-                    print(
-                        "WARNING: Ignoring invalid frac_ionisation_shell of"
-                        f" {frac_ionisation_shell}."
-                    )
+                    print("WARNING: Ignoring invalid frac_ionisation_shell of" f" {frac_ionisation_shell}.")
 
                 self._frac_ionisation_ion[(Z, ion_stage)] += frac_ionisation_shell
                 eta_over_ionpot_sum += frac_ionisation_shell / shell.ionpot_ev
 
             self._frac_ionisation_tot += self._frac_ionisation_ion[(Z, ion_stage)]
 
-            eff_ionpot = (
-                X_ion / eta_over_ionpot_sum if eta_over_ionpot_sum else float("inf")
-            )
+            eff_ionpot = X_ion / eta_over_ionpot_sum if eta_over_ionpot_sum else float("inf")
 
             # eff_ionpot_usevalence = (
             #     ionpot_valence * X_ion / self._frac_ionisation_ion[(Z, ion_stage)]
             #     if self._frac_ionisation_ion[(Z, ion_stage)] > 0. else float('inf'))
 
             if self.verbose:
-                print(
-                    "     frac_ionisation:"
-                    f" {self._frac_ionisation_ion[(Z, ion_stage)]:.4f}"
-                )
+                print("     frac_ionisation:" f" {self._frac_ionisation_ion[(Z, ion_stage)]:.4f}")
 
             if self.excitationlists:
                 if n_ion > 0.0:
-                    self._frac_excitation_ion[
-                        (Z, ion_stage)
-                    ] = self.calculate_nt_frac_excitation_ion(Z, ion_stage)
+                    self._frac_excitation_ion[(Z, ion_stage)] = self.calculate_nt_frac_excitation_ion(Z, ion_stage)
                 else:
                     self._frac_excitation_ion[(Z, ion_stage)] = 0.0
 
@@ -668,23 +565,15 @@ class SpencerFanoSolver:
                 self._frac_excitation_tot += self._frac_excitation_ion[(Z, ion_stage)]
 
                 if self.verbose:
-                    print(
-                        "     frac_excitation:"
-                        f" {self._frac_excitation_ion[(Z, ion_stage)]:.4f}"
-                    )
+                    print("     frac_excitation:" f" {self._frac_excitation_ion[(Z, ion_stage)]:.4f}")
             else:
                 self._frac_excitation_ion[(Z, ion_stage)] = 0.0
 
-            self._nt_ionisation_ratecoeff[(Z, ion_stage)] = (
-                self.depositionratedensity_ev / n_ion_tot / eff_ionpot
-            )
+            self._nt_ionisation_ratecoeff[(Z, ion_stage)] = self.depositionratedensity_ev / n_ion_tot / eff_ionpot
             if self.verbose:
                 print(f"          eff_ionpot: {eff_ionpot:.2f} [eV]")
                 # print(f'  eff_ionpot_usevalence: {eff_ionpot_usevalence:.2f} [eV]')
-                print(
-                    "ionisation ratecoeff:"
-                    f" {self._nt_ionisation_ratecoeff[(Z, ion_stage)]:.2e} [/s]"
-                )
+                print("ionisation ratecoeff:" f" {self._nt_ionisation_ratecoeff[(Z, ion_stage)]:.2e} [/s]")
 
                 # complicated eff_ionpot thing should match a simple integral of xs * vec * dE
                 # print(f'ionisation ratecoeff: {integralgamma:.2e} [/s]')
@@ -708,8 +597,7 @@ class SpencerFanoSolver:
         if self.verbose:
             print(f"         frac_heating: {frac_heating:.4f}")
             print(
-                "             frac_sum:"
-                f" {self._frac_excitation_tot + self._frac_ionisation_tot + frac_heating:.4f}"
+                "             frac_sum:" f" {self._frac_excitation_tot + self._frac_ionisation_tot + frac_heating:.4f}"
             )
 
     def get_n_e_nt(self):
@@ -756,46 +644,31 @@ class SpencerFanoSolver:
 
     def get_excitation_ratecoeff(self, Z, ion_stage, transitionkey):
         # integral in Kozma & Fransson equation 9
-        levelnumberdensity, xsvec, epsilon_trans_ev = self.excitationlists[
-            (Z, ion_stage)
-        ][transitionkey]
+        levelnumberdensity, xsvec, epsilon_trans_ev = self.excitationlists[(Z, ion_stage)][transitionkey]
 
         return np.dot(xsvec, self.yvec) * self.deltaen / self.depositionratedensity_ev
 
     def get_frac_sum(self):
-        return (
-            self.get_frac_heating()
-            + self.get_frac_excitation_tot()
-            + self.get_frac_ionisation_tot()
-        )
+        return self.get_frac_heating() + self.get_frac_excitation_tot() + self.get_frac_ionisation_tot()
 
     def get_d_etaheating_by_d_en_vec(self):
         assert self._solved
-        d_etaheating_by_d_en_vec = [
-            self.electronlossfunction(self.engrid[i])
-            * self.yvec[i]
-            / self.depositionratedensity_ev
+        return [
+            self.electronlossfunction(self.engrid[i]) * self.yvec[i] / self.depositionratedensity_ev
             for i in range(len(self.engrid))
         ]
-
-        return d_etaheating_by_d_en_vec
 
     def get_d_etaexcitation_by_d_en_vec(self):
         assert self._solved
         part_integrand = np.zeros(len(self.engrid))
 
-        for Z, ion_stage in self.excitationlists.keys():
-            for transitionkey, (
+        for Z, ion_stage in self.excitationlists:
+            for (
                 levelnumberdensity,
                 xsvec,
                 epsilon_trans_ev,
-            ) in self.excitationlists[(Z, ion_stage)].items():
-                part_integrand += (
-                    levelnumberdensity
-                    * epsilon_trans_ev
-                    * xsvec
-                    / self.depositionratedensity_ev
-                )
+            ) in self.excitationlists[(Z, ion_stage)].values():
+                part_integrand += levelnumberdensity * epsilon_trans_ev * xsvec / self.depositionratedensity_ev
 
         return self.yvec * part_integrand
 
@@ -803,24 +676,18 @@ class SpencerFanoSolver:
         assert self._solved
         part_integrand = np.zeros(len(self.engrid))
 
-        for Z, ion_stage in self.ionpopdict.keys():
+        for Z, ion_stage in self.ionpopdict:
             n_ion = self.ionpopdict[(Z, ion_stage)]
-            dfcollion_thision = self.dfcollion.query(
-                "Z == @Z and ion_stage == @ion_stage", inplace=False
-            )
+            dfcollion_thision = self.dfcollion.query("Z == @Z and ion_stage == @ion_stage", inplace=False)
 
             for index, shell in dfcollion_thision.iterrows():
                 xsvec = pynonthermal.collion.get_arxs_array_shell(self.engrid, shell)
 
-                part_integrand += (
-                    n_ion * shell.ionpot_ev * xsvec / self.depositionratedensity_ev
-                )
+                part_integrand += n_ion * shell.ionpot_ev * xsvec / self.depositionratedensity_ev
 
         return self.yvec * part_integrand
 
-    def plot_yspectrum(
-        self, en_y_on_d_en=False, xscalelog=False, outputfilename=None, axis=None
-    ):
+    def plot_yspectrum(self, en_y_on_d_en=False, xscalelog=False, outputfilename=None, axis=None):
         assert self._solved
         fs = 12
         if axis is None:
@@ -893,7 +760,7 @@ class SpencerFanoSolver:
 
         etaheat_int[0] += E_0 * self.yvec[0] * self.electronlossfunction(E_0)
 
-        etatot_int = etaion_int + etaexc_int + etaheat_int
+        # etatot_int = etaion_int + etaexc_int + etaheat_int
 
         # go below E_0
         deltaen = E_0 / 20.0
@@ -903,7 +770,7 @@ class SpencerFanoSolver:
         etaheat_int_low = np.zeros(len(engrid_low))
         etaion_int_low = np.zeros(len(engrid_low))
         etaexc_int_low = np.zeros(len(engrid_low))
-        x = 0
+
         for i in reversed(range(len(engrid_low))):
             en_ev = engrid_low[i]
             N_e = self.calculate_N_e(en_ev)
@@ -917,7 +784,7 @@ class SpencerFanoSolver:
             etaion_int_low[i] = etaion_int[0]  # cross sections start above E_0
             etaexc_int_low[i] = etaexc_int[0]
 
-        etatot_int_low = etaion_int_low + etaexc_int_low + etaheat_int_low
+        # etatot_int_low = etaion_int_low + etaexc_int_low + etaheat_int_low
         engridfull = np.append(engrid_low, self.engrid)
 
         # axes[0].plot(engridfull, np.append(etaion_int_low, etaion_int), marker="None", lw=1.5, color='C0', label='Ionisation')
@@ -955,9 +822,7 @@ class SpencerFanoSolver:
         if self.get_frac_excitation_tot() > 0.0:
             axis.plot(
                 engridfull,
-                np.append(np.zeros(npts_low), d_etaexc_by_d_en_vec)
-                * engridfull
-                / detaymax,
+                np.append(np.zeros(npts_low), d_etaexc_by_d_en_vec) * engridfull / detaymax,
                 marker="None",
                 lw=1.5,
                 color="C1",
@@ -976,12 +841,10 @@ class SpencerFanoSolver:
         )
 
         axis.set_ylim(bottom=0, top=1.0)
-        axis.legend(
-            loc="best", handlelength=2, frameon=False, numpoints=1, prop={"size": 10}
-        )
+        axis.legend(loc="best", handlelength=2, frameon=False, numpoints=1, prop={"size": 10})
         axis.set_ylabel(r"E d$\eta$ / dE [eV$^{-1}$]", fontsize=fs)
 
-        etatot_int = etaion_int + etaexc_int + etaheat_int
+        # etatot_int = etaion_int + etaexc_int + etaheat_int
 
         #    ax.annotate(modellabel, xy=(0.97, 0.95), xycoords='axes fraction', horizontalalignment='right',
         #                verticalalignment='top', fontsize=fs)
@@ -999,7 +862,7 @@ class SpencerFanoSolver:
             else:
                 plt.show()
 
-    def plot_spec_channels(self, outputfilename, xscalelog=False):
+    def plot_spec_channels(self, outputfilename: Path | str, xscalelog: bool = False):
         fig, axes = plt.subplots(
             nrows=2,
             ncols=1,
