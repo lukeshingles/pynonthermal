@@ -17,9 +17,10 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Intended Audience :: Science/Research",
 ]
-dynamic = ["version", "dependencies", "entry-points", "readme", "scripts"]
+dynamic = ["version", "dependencies"]
 requires-python = ">=3.8"
 license = { file = "LICENSE" }
+readme = {file = "README.md", content-type='text/markdown'}
 
 [project.urls]
 Repository = "https://www.github.com/lukeshingles/pynonthermal/"
@@ -141,8 +142,6 @@ unfixable = [
 "matplotlib.typing" = "mplt"
 "numpy.typing" = "npt"
 "typing" = "t"
-"polars" = "pl"
-"polars.selectors" = "cs"
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
@@ -163,15 +162,13 @@ license-files = ["LICENSE"]
 #where = ["."]
 
 [tool.setuptools.dynamic]
-readme = {file = ["README.md"]}
 dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools_scm]
-write_to = "_version.py"
+version_file = "_version.py"
 local_scheme = "no-local-version"
 
 [tool.vulture]
 exclude = [".*", "build/", ".eggs/"]
-#ignore_names = ["visit_*", "do_*"]
 paths = ["pynonthermal"]
 sort_by_size = true
