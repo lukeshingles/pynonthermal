@@ -1,9 +1,11 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 import pynonthermal
 
+pytestmark = pytest.mark.benchmark
 outputfolder = Path(__file__).absolute().parent / "output"
 
 
