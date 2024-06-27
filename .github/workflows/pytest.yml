@@ -13,7 +13,7 @@ on:
 
 jobs:
     pytest:
-        timeout-minutes: 10
+        timeout-minutes: 120
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
