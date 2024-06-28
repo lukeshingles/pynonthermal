@@ -177,7 +177,7 @@ def get_lotz_xs_ionisation(atomic_number, ion_stage, electron_binding, ionpot_ev
                 assert electron_loop == 8
                 # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
 
-        p = use3 if use2 < use3 else use2
+        p = max(use2, use3)
 
         if 0.5 * beta**2 * ME * CLIGHT**2 > p:
             part_sigma += (
