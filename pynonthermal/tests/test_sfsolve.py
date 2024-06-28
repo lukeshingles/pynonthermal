@@ -45,7 +45,7 @@ def test_iron():
         (26, 3, 0.7),
     ]
 
-    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=16000, npts=4096, verbose=True) as sf:
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=16000, npts=2048, verbose=True) as sf:
         for Z, ion_stage, n_ion in ions:
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
             sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion)
