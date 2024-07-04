@@ -10,15 +10,13 @@ authors = [
 description="A non-thermal electron deposition (Spencer-Fano equation) solver."
 classifiers = [
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Intended Audience :: Science/Research",
 ]
 dynamic = ["version", "dependencies"]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 readme = {file = "README.md", content-type='text/markdown'}
 
@@ -64,11 +62,11 @@ exclude=['**/node_modules','**/__pycache__','**/.*', 'build', 'dist']
 useLibraryCodeForTypes = false
 
 [tool.pytest.ini_options]
-addopts = " --durations=0  --typeguard-packages=pynonthermal"
+addopts = " --durations=0  --typeguard-packages=pynonthermal -n auto"
 
 [tool.ruff]
 line-length = 120
-target-version = "py39"
+target-version = "py310"
 fix = true
 show-fixes = true
 
@@ -106,6 +104,7 @@ ignore = [
     "N999",  # invalid-module-name
     "PD901",  # df is a bad variable name
     "PERF203", # try-except-in-loop
+    "PLC0414", # useless-import-alias
     #"PGH001",  # No builtin `eval()` allowed
     "PLR0911",  # too-many-return-statements
     "PLR0912",  # too-many-branches

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 import math
+import typing as t
 from pathlib import Path
+
+import numpy as np
+import numpy.typing as npt
 
 from pynonthermal.constants import EV
 from pynonthermal.constants import H
@@ -9,10 +13,10 @@ from pynonthermal.constants import QE
 
 DATADIR = Path(__file__).absolute().parent / "data"
 
-experiment_use_Latom_in_spencerfano = False
+experiment_use_Latom_in_spencerfano: bool = False
 
 
-def electronlossfunction(energy_ev, n_e_cgs):
+def electronlossfunction(energy_ev: float, n_e_cgs: float) -> float:
     # free-electron plasma loss rate (as in Kozma & Fransson 1992)
     # - dE / dX [eV / cm]
     # returns a positive number
@@ -37,7 +41,7 @@ def electronlossfunction(energy_ev, n_e_cgs):
     return lossfunc / EV  # return as [eV / cm]
 
 
-def get_n_tot(ions, ionpopdict):
+def get_n_tot(ions: t.Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], float]) -> float:
     # total number density of all nuclei [cm^-3]
     n_tot = 0.0
     for Z, ion_stage in ions:
@@ -45,7 +49,7 @@ def get_n_tot(ions, ionpopdict):
     return n_tot
 
 
-def get_Zbar(ions, ionpopdict):
+def get_Zbar(ions, ionpopdict) -> float:
     # number density-weighted average atomic number
     # i.e. protons per nucleus
     Zbar = 0.0
@@ -57,7 +61,7 @@ def get_Zbar(ions, ionpopdict):
     return Zbar
 
 
-def get_Zboundbar(ions, ionpopdict):
+def get_Zboundbar(ions, ionpopdict) -> float:
     # number density-weighted average number of bound electrons per nucleus
     Zboundbar = 0.0
     n_tot = get_n_tot(ions, ionpopdict)
@@ -68,7 +72,7 @@ def get_Zboundbar(ions, ionpopdict):
     return Zboundbar
 
 
-def get_energyindex_lteq(en_ev, engrid):
+def get_energyindex_lteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
     # find energy bin lower boundary is less than or equal to search value
     # assert en_ev >= engrid[0]
     deltaen = engrid[1] - engrid[0]
@@ -85,7 +89,7 @@ def get_energyindex_lteq(en_ev, engrid):
     return index
 
 
-def get_energyindex_gteq(en_ev, engrid):
+def get_energyindex_gteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
     # find energy bin lower boundary is greater than or equal to search value
     deltaen = engrid[1] - engrid[0]
 

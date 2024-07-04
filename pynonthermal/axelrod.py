@@ -76,7 +76,7 @@ def get_electronoccupancy(atomic_number, ion_stage, nt_shells):
     return q
 
 
-def get_mean_binding_energy(atomic_number, ion_stage, electron_binding, ionpot_ev):
+def get_mean_binding_energy(atomic_number: int, ion_stage: int, electron_binding, ionpot_ev: float) -> float:
     # LJS: this came from ARTIS and I'm not sure what this actually is - inverse binding energy? electrons per erg?
     n_z_binding, nt_shells = electron_binding.shape
     q = get_electronoccupancy(atomic_number, ion_stage, nt_shells)
@@ -109,7 +109,7 @@ def get_mean_binding_energy(atomic_number, ion_stage, electron_binding, ionpot_e
     return total
 
 
-def get_mean_binding_energy_alt(atomic_number, ion_stage, electron_binding, ionpot_ev):
+def get_mean_binding_energy_alt(atomic_number: int, ion_stage: int, electron_binding, ionpot_ev: float):
     # LJS: this should be mean binding energy [erg] per electron
     n_z_binding, nt_shells = electron_binding.shape
     q = get_electronoccupancy(atomic_number, ion_stage, nt_shells)
@@ -145,7 +145,7 @@ def get_mean_binding_energy_alt(atomic_number, ion_stage, electron_binding, ionp
     return total / ecount
 
 
-def get_lotz_xs_ionisation(atomic_number, ion_stage, electron_binding, ionpot_ev, en_ev):
+def get_lotz_xs_ionisation(atomic_number: int, ion_stage: int, electron_binding, ionpot_ev, en_ev):
     # Axelrod 1980 Eq 3.38
 
     en_erg = en_ev * EV

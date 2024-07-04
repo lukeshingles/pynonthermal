@@ -1,7 +1,8 @@
-artistools>=2021.4.23
-matplotlib>=3.3.4
+artistools>=2024.07.04
+matplotlib>=3.9.1
 numpy>=1.19.4
 pandas>=1.1
+polars>=1.0.0
 pytest>=6.2.2
 pytest-codspeed>=2.2.1
 pytest-cov>=2.10.1

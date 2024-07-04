@@ -1,52 +1,27 @@
 import math
+import typing as t
 
 import numpy as np
-import pandas as pd
+import numpy.typing as npt
 
 import pynonthermal
 from pynonthermal.constants import CLIGHT
 from pynonthermal.constants import EV
 from pynonthermal.constants import H
 from pynonthermal.constants import H_ionpot
-from pynonthermal.constants import K_B
 from pynonthermal.constants import ME
 from pynonthermal.constants import QE
 
 use_collstrengths = False
 
 
-def get_lte_pops(adata, Z, ion_stage, n_ion, temperature):
-    poplist = []
-
-    for _, ion in adata.iterrows():
-        if ion.Z == Z and ion.ion_stage == ion_stage:
-            Z = ion.Z
-            ion_stage = ion.ion_stage
-
-            ltepartfunc = ion.levels.eval("g * exp(-energy_ev / @K_B / @temperature)").sum()
-
-            for levelindex, level in ion.levels.iterrows():
-                ion_popfrac = 1.0 / ltepartfunc * level.g * math.exp(-level.energy_ev / K_B / temperature)
-                levelnumberdensity = n_ion * ion_popfrac
-
-                poprow = (
-                    levelindex,
-                    levelnumberdensity,
-                    levelnumberdensity,
-                    ion_popfrac,
-                )
-                poplist.append(poprow)
-
-    return pd.DataFrame(poplist, columns=["level", "n_LTE", "n_NLTE", "ion_popfrac"])
-
-
-def get_xs_excitation(en_ev, row):
+def get_xs_excitation(en_ev: float, row: dict[str, t.Any]) -> float:
     """Get the excitation cross section in cm^2 at energy en_ev [eV]."""
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
 
-    coll_str = row.collstr
-    epsilon_trans = row.epsilon_trans_ev * EV
-    epsilon_trans_ev = row.epsilon_trans_ev
+    coll_str = row["collstr"]
+    epsilon_trans = row["epsilon_trans_ev"] * EV
+    epsilon_trans_ev = row["epsilon_trans_ev"]
 
     if en_ev < epsilon_trans_ev:
         return 0.0
@@ -54,14 +29,14 @@ def get_xs_excitation(en_ev, row):
     if coll_str >= 0 and use_collstrengths:
         # collision strength is available, so use it
         # Li et al. 2012 equation 11
-        constantfactor = pow(H_ionpot, 2) / row.lower_g * coll_str * math.pi * A_naught_squared
+        constantfactor = pow(H_ionpot, 2) / row["lower_g"] * coll_str * math.pi * A_naught_squared
 
         return constantfactor * (en_ev * EV) ** -2
 
-    if not row.forbidden:
+    if not row["forbidden"]:
         nu_trans = epsilon_trans / H
-        g = row.upper_g / row.lower_g
-        fij = g * ME * pow(CLIGHT, 3) / (8 * pow(QE * nu_trans * math.pi, 2)) * row.A
+        g = row["upper_g"] / row["lower_g"]
+        fij = g * ME * pow(CLIGHT, 3) / (8 * pow(QE * nu_trans * math.pi, 2)) * row["A"]
         # permitted E1 electric dipole transitions
 
         g_bar = 0.2
@@ -81,15 +56,15 @@ def get_xs_excitation(en_ev, row):
     return 0.0
 
 
-def get_xs_excitation_vector(engrid, row):
+def get_xs_excitation_vector(engrid: npt.NDArray[np.float64], row: dict[str, t.Any]) -> npt.NDArray[np.float64]:
     """Get an array containing the excitation cross section in cm^2 at every energy in the array engrid (eV)."""
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
     npts = len(engrid)
     xs_excitation_vec = np.empty(npts)
 
-    coll_str = row.collstr
-    epsilon_trans = row.epsilon_trans_ev * EV
-    epsilon_trans_ev = row.epsilon_trans_ev
+    coll_str = row["collstr"]
+    epsilon_trans = row["epsilon_trans_ev"] * EV
+    epsilon_trans_ev = row["epsilon_trans_ev"]
 
     startindex = pynonthermal.get_energyindex_gteq(en_ev=epsilon_trans_ev, engrid=engrid)
     xs_excitation_vec[:startindex] = 0.0
@@ -97,14 +72,14 @@ def get_xs_excitation_vector(engrid, row):
     if coll_str >= 0 and use_collstrengths:
         # collision strength is available, so use it
         # Li et al. 2012 equation 11
-        constantfactor = pow(H_ionpot, 2) / row.lower_g * coll_str * math.pi * A_naught_squared
+        constantfactor = pow(H_ionpot, 2) / row["lower_g"] * coll_str * math.pi * A_naught_squared
 
         xs_excitation_vec[startindex:] = constantfactor * (engrid[startindex:] * EV) ** -2
 
-    elif not row.forbidden:
+    elif not row["forbidden"]:
         nu_trans = epsilon_trans / H
-        g = row.upper_g / row.lower_g
-        fij = g * ME * pow(CLIGHT, 3) / (8 * pow(QE * nu_trans * math.pi, 2)) * row.A
+        g = row["upper_g"] / row["lower_g"]
+        fij = g * ME * pow(CLIGHT, 3) / (8 * pow(QE * nu_trans * math.pi, 2)) * row["A"]
         # permitted E1 electric dipole transitions
 
         g_bar = 0.2
