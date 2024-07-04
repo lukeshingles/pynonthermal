@@ -528,8 +528,7 @@ class SpencerFanoSolver:
         if self.verbose:
             print(f"    n_e_nt: {self.get_n_e_nt():.2e} [/cm3]")
 
-        for Z, ion_stage in self.ionpopdict:
-            n_ion = self.ionpopdict[(Z, ion_stage)]
+        for (Z, ion_stage), n_ion in self.ionpopdict.items():
             n_ion_tot = self.get_n_ion_tot()
             X_ion = n_ion / n_ion_tot
             dfcollion_thision = self.dfcollion.query("Z == @Z and ion_stage == @ion_stage", inplace=False)
