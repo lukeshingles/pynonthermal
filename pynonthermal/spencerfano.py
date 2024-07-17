@@ -41,6 +41,7 @@ class SpencerFanoSolver:
     sourcevec: npt.NDArray[np.float64]
     E_init_ev: float
     sfmatrix: npt.NDArray[np.float64]
+    adata_polars: pd.DataFrame
 
     def __init__(
         self,
@@ -81,6 +82,8 @@ class SpencerFanoSolver:
         # E_init_ev is the deposition rate density that we assume when solving the SF equation.
         # The solution will be scaled to the true deposition rate later
         self.E_init_ev = np.dot(self.engrid, self.sourcevec) * self.deltaen
+
+        self.adata_polars = None
 
         if self.verbose:
             print(
@@ -163,15 +166,18 @@ class SpencerFanoSolver:
             )
 
     def add_ion_ltepopexcitation(self, Z, ion_stage, n_ion, temperature=3000, adata_polars=None):
-        if adata_polars is None:
+        if adata_polars is not None:
+            self.adata_polars = adata_polars
+
+        if self.adata_polars is None:
             # use ARTIS atomic data read by the artistools package to get the levels
-            adata_polars = at.atomic.get_levels_polars(
+            self.adata_polars = at.atomic.get_levels_polars(
                 Path(pynonthermal.DATADIR, "artis_files"),
                 get_transitions=True,
                 derived_transitions_columns=["epsilon_trans_ev", "lambda_angstroms", "lower_g", "upper_g"],
             )
 
-        ion = adata_polars.filter(pl.col("Z") == Z).filter(pl.col("ion_stage") == ion_stage)
+        ion = self.adata_polars.filter(pl.col("Z") == Z).filter(pl.col("ion_stage") == ion_stage)
 
         dfpops_thision = ion["levels"].item()
 
