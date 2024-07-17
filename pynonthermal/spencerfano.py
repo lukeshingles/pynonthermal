@@ -851,7 +851,11 @@ class SpencerFanoSolver:
         # axes[0].plot(engrid, np.log10(delta_E_y_on_dE), marker="None", lw=1.5, color='black', label='')
         # axes[0].set_ylabel(r'log d(E y(E)) / dE', fontsize=fs)
 
-        detaymax = max(d_etaion_by_d_en_vec * self.engrid)
+        detaymax = max(
+            *(d_etaion_by_d_en_vec * self.engrid),
+            *(d_etaexc_by_d_en_vec * self.engrid),
+            *(d_etaheat_by_d_en_vec * self.engrid),
+        )
         axis.plot(
             engridfull,
             np.append(np.zeros(npts_low), d_etaion_by_d_en_vec) * engridfull / detaymax,
