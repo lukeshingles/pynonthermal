@@ -76,8 +76,8 @@ def get_electronoccupancy(atomic_number, ion_stage, nt_shells):
     return q
 
 
-def get_mean_binding_energy(atomic_number: int, ion_stage: int, electron_binding, ionpot_ev: float) -> float:
-    # LJS: this came from ARTIS and I'm not sure what this actually is - inverse binding energy? electrons per erg?
+def get_sum_q_over_binding_energy(atomic_number: int, ion_stage: int, electron_binding, ionpot_ev: float) -> float:
+    # LJS: translated from artis nonthermal.cc
     n_z_binding, nt_shells = electron_binding.shape
     q = get_electronoccupancy(atomic_number, ion_stage, nt_shells)
 
@@ -85,64 +85,25 @@ def get_mean_binding_energy(atomic_number: int, ion_stage: int, electron_binding
     for electron_loop in range(nt_shells):
         electronsinshell = q[electron_loop]
         if (electronsinshell) > 0:
-            use2 = electron_binding[atomic_number - 1][electron_loop]
-            use3 = ionpot_ev * EV
-        if use2 <= 0:
-            use2 = electron_binding[atomic_number - 1][electron_loop - 1]
-            # to get total += electronsinshell/electron_binding[get_element(element)-1][electron_loop-1];
-            # set use3 = 0.
-            if electron_loop != 8:
-                # For some reason in the Lotz data, this is no energy for the M5 shell before Ni. So if the complaint
-                # is for 8 (corresponding to that shell) then just use the M4 value
-                print(
-                    "WARNING: I'm trying to use a binding energy when I have no data. "
-                    f"element {atomic_number} ion_stage {ion_stage}\n"
-                )
-                assert electron_loop == 8
-                # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
-        if use2 < use3:
-            total += electronsinshell / use3
-        else:
-            total += electronsinshell / use2
+            enbinding = electron_binding[atomic_number - 1][electron_loop]
+            ionpot = ionpot_ev * EV
+            if enbinding <= 0:
+                enbinding = electron_binding[atomic_number - 1][electron_loop - 1]
+                # to get total += electronsinshell/electron_binding[get_element(element)-1][electron_loop-1];
+                # set use3 = 0.
+                if electron_loop != 8:
+                    # For some reason in the Lotz data, this is no energy for the M5 shell before Ni. So if the complaint
+                    # is for 8 (corresponding to that shell) then just use the M4 value
+                    print(
+                        "WARNING: I'm trying to use a binding energy when I have no data. "
+                        f"element {atomic_number} ion_stage {ion_stage}\n"
+                    )
+                    assert electron_loop == 8
+                    # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
+            total += electronsinshell / max(enbinding, ionpot)
         # print("total total)
 
     return total
-
-
-def get_mean_binding_energy_alt(atomic_number: int, ion_stage: int, electron_binding, ionpot_ev: float):
-    # LJS: this should be mean binding energy [erg] per electron
-    n_z_binding, nt_shells = electron_binding.shape
-    q = get_electronoccupancy(atomic_number, ion_stage, nt_shells)
-
-    total = 0.0
-    ecount = 0
-    for electron_loop in range(nt_shells):
-        electronsinshell = q[electron_loop]
-        ecount += electronsinshell
-        if (electronsinshell) > 0:
-            use2 = electron_binding[atomic_number - 1][electron_loop]
-            use3 = ionpot_ev * EV
-        if use2 <= 0:
-            use2 = electron_binding[atomic_number - 1][electron_loop - 1]
-            # to get total += electronsinshell/electron_binding[get_element(element)-1][electron_loop-1];
-            # set use3 = 0.
-            if electron_loop != 8:
-                # For some reason in the Lotz data, this is no energy for the M5 shell before Ni. So if the complaint
-                # is for 8 (corresponding to that shell) then just use the M4 value
-                print(
-                    "WARNING: I'm trying to use a binding energy when I have no data. "
-                    f"element {atomic_number} ion_stage {ion_stage}\n"
-                )
-                assert electron_loop == 8
-                # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
-        if use2 < use3:
-            total += electronsinshell * use3
-        else:
-            total += electronsinshell * use2
-
-    assert ecount == (atomic_number - ion_stage + 1)
-
-    return total / ecount
 
 
 def get_lotz_xs_ionisation(atomic_number: int, ion_stage: int, electron_binding, ionpot_ev, en_ev):
@@ -151,6 +112,7 @@ def get_lotz_xs_ionisation(atomic_number: int, ion_stage: int, electron_binding,
     en_erg = en_ev * EV
     gamma = en_erg / (ME * CLIGHT**2) + 1
     beta = math.sqrt(1.0 - 1.0 / (gamma**2))
+    betasq = beta**2
     # beta = 0.99
     # print(f'{gamma=} {beta=}')
 
@@ -161,34 +123,34 @@ def get_lotz_xs_ionisation(atomic_number: int, ion_stage: int, electron_binding,
     for electron_loop in range(nt_shells):
         electronsinshell = q[electron_loop]
         if (electronsinshell) > 0:
-            use2 = electron_binding[atomic_number - 1][electron_loop]
-            use3 = ionpot_ev * EV
-        if use2 <= 0:
-            use2 = electron_binding[atomic_number - 1][electron_loop - 1]
-            # to get total += electronsinshell/electron_binding[get_element(element)-1][electron_loop-1];
-            # set use3 = 0.
-            if electron_loop != 8:
-                # For some reason in the Lotz data, this is no energy for the M5 shell before Ni. So if the complaint
-                # is for 8 (corresponding to that shell) then just use the M4 value
-                print(
-                    "WARNING: I'm trying to use a binding energy when I have no data. "
-                    f"element {atomic_number} ion_stage {ion_stage}\n"
+            enbinding = electron_binding[atomic_number - 1][electron_loop]
+            ionpot = ionpot_ev * EV
+            if enbinding <= 0:
+                enbinding = electron_binding[atomic_number - 1][electron_loop - 1]
+                # to get total += electronsinshell/electron_binding[get_element(element)-1][electron_loop-1];
+                # set use3 = 0.
+                if electron_loop != 8:
+                    # For some reason in the Lotz data, this is no energy for the M5 shell before Ni. So if the complaint
+                    # is for 8 (corresponding to that shell) then just use the M4 value
+                    print(
+                        "WARNING: I'm trying to use a binding energy when I have no data. "
+                        f"element {atomic_number} ion_stage {ion_stage}\n"
+                    )
+                    assert electron_loop == 8
+                    # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
+
+            p = max(enbinding, ionpot)
+
+            if 0.5 * betasq * ME * CLIGHT**2 > p:
+                part_sigma += (
+                    electronsinshell
+                    / p
+                    * (math.log(betasq * ME * CLIGHT**2 / 2.0 / p) - math.log10(1 - betasq) - betasq)
                 )
-                assert electron_loop == 8
-                # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
-
-        p = max(use2, use3)
-
-        if 0.5 * beta**2 * ME * CLIGHT**2 > p:
-            part_sigma += (
-                electronsinshell
-                / p
-                * (math.log(beta**2 * ME * CLIGHT**2 / 2.0 / p) - math.log10(1 - beta**2) - beta**2)
-            )
 
     Aconst = 1.33e-14 * EV * EV
     # me is electron mass
-    sigma = 2 * Aconst / (beta**2) / ME / (CLIGHT**2) * part_sigma
+    sigma = 2 * Aconst / betasq / ME / (CLIGHT**2) * part_sigma
     assert sigma >= 0
     return sigma
 
