@@ -41,7 +41,7 @@ class SpencerFanoSolver:
     sourcevec: npt.NDArray[np.float64]
     E_init_ev: float
     sfmatrix: npt.NDArray[np.float64]
-    adata_polars: pd.DataFrame
+    adata_polars: pd.DataFrame | None
 
     def __init__(
         self,
@@ -176,6 +176,8 @@ class SpencerFanoSolver:
                 get_transitions=True,
                 derived_transitions_columns=["epsilon_trans_ev", "lambda_angstroms", "lower_g", "upper_g"],
             )
+
+        assert self.adata_polars is not None
 
         ion = self.adata_polars.filter(pl.col("Z") == Z).filter(pl.col("ion_stage") == ion_stage)
 
@@ -732,6 +734,7 @@ class SpencerFanoSolver:
     ) -> None:
         assert self._solved
         fs = 12
+        fig = None
         if axis is None:
             fig, axis = plt.subplots(
                 nrows=1,
@@ -761,6 +764,7 @@ class SpencerFanoSolver:
         if axis is None:
             if outputfilename is not None:
                 print(f"Saving '{outputfilename}'")
+                assert fig is not None
                 fig.savefig(str(outputfilename))
                 plt.close()
             else:
@@ -769,6 +773,7 @@ class SpencerFanoSolver:
     def plot_channels(self, outputfilename=None, axis=None, xscalelog=False) -> None:
         assert self._solved
         fs = 12
+        fig = None
         if axis is None:
             fig, axis = plt.subplots(
                 nrows=1,
@@ -903,6 +908,7 @@ class SpencerFanoSolver:
         if axis is None:
             if outputfilename is not None:
                 print(f"Saving '{outputfilename}'")
+                assert fig is not None
                 fig.savefig(str(outputfilename))
                 plt.close()
             else:
