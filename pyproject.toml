@@ -13,6 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Intended Audience :: Science/Research",
 ]
 dynamic = ["version", "dependencies"]
@@ -48,7 +49,7 @@ implicit_reexport = true
 packages = "pynonthermal"
 plugins = 'numpy.typing.mypy_plugin'
 pretty = true
-python_version = '3.12'
+python_version = '3.13'
 scripts_are_modules = true
 strict_equality = true
 extra_checks = true

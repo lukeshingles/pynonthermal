@@ -14,7 +14,7 @@ on:
 jobs:
     codspeed-benchmarks:
         timeout-minutes: 1440
-        runs-on: ubuntu-22.04
+        runs-on: ubuntu-24.04
 
         name: codspeed benchmarks
         steps:
@@ -25,8 +25,6 @@ jobs:
 
             - name: Set up Python
               uses: actions/setup-python@v5
-              with:
-                  python-version-file: .python-version
 
             - name: Install pynonthermal
               run: |
