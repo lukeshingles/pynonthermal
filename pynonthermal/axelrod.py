@@ -1,6 +1,7 @@
 # functions related to Axelrod 1980 non-thermal treatment
 
 import math
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -13,100 +14,105 @@ from pynonthermal.constants import ME
 from pynonthermal.constants import QE
 
 
-def read_binding_energies(modelpath=None):
-    collionfilename = Path(pynonthermal.DATADIR, "binding_energies.txt")
+@lru_cache
+def get_binding_energies() -> np.ndarray:
+    collionfilepath = Path(pynonthermal.DATADIR, "binding_energies_lotz_tab1and2.txt")
 
-    with collionfilename.open() as f:
-        nt_shells, n_z_binding = (int(x) for x in f.readline().split())
-        electron_binding = np.zeros((n_z_binding, nt_shells))
+    with collionfilepath.open() as f:
+        line = f.readline()
+        while line.startswith("#"):
+            line = f.readline()
+        nt_shells, num_elements = (int(x) for x in line.split())
+        electron_binding = np.zeros((num_elements, nt_shells))
 
-        for i in range(n_z_binding):
-            electron_binding[i] = np.array([float(x) for x in f.readline().split()]) * EV
+        for i in range(num_elements):
+            line = f.readline()
+            while line.startswith("#"):
+                line = f.readline()
+            linesplit = line.split()
+            assert len(linesplit) == nt_shells + 1
+            assert int(linesplit[0]) == i + 1
+            electron_binding[i] = np.array([float(x) for x in linesplit[1:]]) * EV
 
     return electron_binding
 
 
-def get_electronoccupancy(atomic_number, ion_stage, nt_shells):
-    # adapted from ARTIS code
-    q = np.zeros(nt_shells)
+@lru_cache
+def get_shell_configs() -> np.ndarray:
+    shellfilepath = Path(pynonthermal.DATADIR, "electron_shell_occupancy.txt")
 
-    ioncharge = ion_stage - 1
-    nbound = atomic_number - ioncharge  # number of bound electrons
+    with shellfilepath.open() as f:
+        line = f.readline()
+        while line.startswith("#"):
+            line = f.readline()
+        nt_shells, num_elements = (int(x) for x in line.split())
+        shells_q = np.zeros((num_elements, nt_shells), dtype=int)
 
-    for _ in range(nbound):
-        if q[0] < 2:  # K 1s
-            q[0] += 1
-        elif q[1] < 2:  # L1 2s
-            q[1] += 1
-        elif q[2] < 2:  # L2 2p[1/2]
-            q[2] += 1
-        elif q[3] < 4:  # L3 2p[3/2]
-            q[3] += 1
-        elif q[4] < 2:  # M1 3s
-            q[4] += 1
-        elif q[5] < 2:  # M2 3p[1/2]
-            q[5] += 1
-        elif q[6] < 4:  # M3 3p[3/2]
-            q[6] += 1
-        elif ioncharge == 0:
-            if q[9] < 2:  # N1 4s
-                q[9] += 1
-            elif q[7] < 4:  # M4 3d[3/2]
-                q[7] += 1
-            elif q[8] < 6:  # M5 3d[5/2]
-                q[8] += 1
-            else:
-                print("Going beyond the 4s shell in NT calculation. Abort!\n")
-        elif ioncharge == 1:
-            if q[9] < 1:  # N1 4s
-                q[9] += 1
-            elif q[7] < 4:  # M4 3d[3/2]
-                q[7] += 1
-            elif q[8] < 6:  # M5 3d[5/2]
-                q[8] += 1
-            else:
-                print("Going beyond the 4s shell in NT calculation. Abort!\n")
-        elif ioncharge > 1:
-            if q[7] < 4:  # M4 3d[3/2]
-                q[7] += 1
-            elif q[8] < 6:  # M5 3d[5/2]
-                q[8] += 1
-            else:
-                print("Going beyond the 4s shell in NT calculation. Abort!\n")
-    return q
+        for i in range(num_elements):
+            line = f.readline()
+            while line.startswith("#"):
+                line = f.readline()
+            linesplit = line.split()
+            assert len(linesplit) == nt_shells + 1
+            assert int(linesplit[0]) == i + 1
+            shells_q[i, :] = np.array([int(x) for x in linesplit[1:]])
+
+    return shells_q
 
 
-def get_sum_q_over_binding_energy(atomic_number: int, ion_stage: int, electron_binding, ionpot_ev: float) -> float:
+def get_shell_occupancies(atomic_number: int, ion_stage: int, electron_binding, shells_q):
+    nbound = atomic_number - ion_stage + 1
+    element_shells_q_neutral = shells_q[atomic_number - 1]
+    shellcount = min(len(element_shells_q_neutral), len(electron_binding[atomic_number - 1]))
+    element_shells_q = np.zeros_like(element_shells_q_neutral)
+
+    electron_count = 0
+    for shellindex in range(shellcount):
+        electronsinshell_neutral = element_shells_q_neutral[shellindex]
+
+        electronsinshell = 0
+        if (electron_count + electronsinshell_neutral) <= nbound:
+            electronsinshell = electronsinshell_neutral
+        else:
+            electronsinshell = nbound - electron_count
+        assert electronsinshell <= electronsinshell_neutral
+        element_shells_q[shellindex] = electronsinshell
+        electron_count += electronsinshell
+        assert electron_count <= nbound
+
+    return element_shells_q
+
+
+def get_sum_q_over_binding_energy(atomic_number: int, ion_stage: int, ionpot_ev: float) -> float:
     # LJS: translated from artis nonthermal.cc
-    n_z_binding, nt_shells = electron_binding.shape
-    q = get_electronoccupancy(atomic_number, ion_stage, nt_shells)
+    electron_binding = get_binding_energies()
+    shells_q = get_shell_configs()
+    q = get_shell_occupancies(atomic_number, ion_stage, electron_binding, shells_q)
 
     total = 0.0
-    for electron_loop in range(nt_shells):
+    for electron_loop in range(q.size):
         electronsinshell = q[electron_loop]
         if (electronsinshell) > 0:
             enbinding = electron_binding[atomic_number - 1][electron_loop]
             ionpot = ionpot_ev * EV
             if enbinding <= 0:
                 enbinding = electron_binding[atomic_number - 1][electron_loop - 1]
-                # to get total += electronsinshell/electron_binding[get_element(element)-1][electron_loop-1];
-                # set use3 = 0.
-                if electron_loop != 8:
-                    # For some reason in the Lotz data, this is no energy for the M5 shell before Ni. So if the complaint
-                    # is for 8 (corresponding to that shell) then just use the M4 value
-                    print(
-                        "WARNING: I'm trying to use a binding energy when I have no data. "
-                        f"element {atomic_number} ion_stage {ion_stage}\n"
-                    )
-                    assert electron_loop == 8
-                    # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
+                assert enbinding > 0
+
             total += electronsinshell / max(enbinding, ionpot)
-        # print("total total)
 
     return total
 
 
-def get_lotz_xs_ionisation(atomic_number: int, ion_stage: int, electron_binding, ionpot_ev, en_ev):
+def get_workfn_ev(atomic_number: int, ion_stage: int, ionpot_ev: float, Zbar: float) -> float:
+    binding = get_sum_q_over_binding_energy(atomic_number, ion_stage, ionpot_ev)
+    Aconst = 1.33e-14 * EV * EV
+    oneoverW = Aconst * binding / Zbar / (2 * math.pi * pow(QE, 4))
+
+    return (1 / oneoverW) / EV
+
+
+def get_lotz_xs_ionisation(atomic_number: int, ion_stage: int, ionpot_ev, en_ev):
     # Axelrod 1980 Eq 3.38
 
     en_erg = en_ev * EV
@@ -115,29 +121,19 @@ def get_lotz_xs_ionisation(atomic_number: int, ion_stage: int, electron_binding,
     betasq = beta**2
     # beta = 0.99
     # print(f'{gamma=} {beta=}')
-
-    n_z_binding, nt_shells = electron_binding.shape
-    q = get_electronoccupancy(atomic_number, ion_stage, nt_shells)
+    electron_binding = get_binding_energies()
+    shells_q = get_shell_configs()
+    q = get_shell_occupancies(atomic_number, ion_stage, electron_binding, shells_q)
 
     part_sigma = 0.0
-    for electron_loop in range(nt_shells):
+    for electron_loop in range(q.size()):
         electronsinshell = q[electron_loop]
         if (electronsinshell) > 0:
             enbinding = electron_binding[atomic_number - 1][electron_loop]
             ionpot = ionpot_ev * EV
             if enbinding <= 0:
                 enbinding = electron_binding[atomic_number - 1][electron_loop - 1]
-                # to get total += electronsinshell/electron_binding[get_element(element)-1][electron_loop-1];
-                # set use3 = 0.
-                if electron_loop != 8:
-                    # For some reason in the Lotz data, this is no energy for the M5 shell before Ni. So if the complaint
-                    # is for 8 (corresponding to that shell) then just use the M4 value
-                    print(
-                        "WARNING: I'm trying to use a binding energy when I have no data. "
-                        f"element {atomic_number} ion_stage {ion_stage}\n"
-                    )
-                    assert electron_loop == 8
-                    # print("Z = %d, ion_stage = %d\n", get_element(element), get_ion_stage(element, ion));
+                assert enbinding > 0
 
             p = max(enbinding, ionpot)
 
