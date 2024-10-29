@@ -22,6 +22,36 @@ from pynonthermal.constants import K_B
 
 if t.TYPE_CHECKING:
     import pandas as pd
+SUBSHELLNAMES = [
+    "K ",
+    "L1",
+    "L2",
+    "L3",
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "M5",
+    "N1",
+    "N2",
+    "N3",
+    "N4",
+    "N5",
+    "N6",
+    "N7",
+    "O1",
+    "O2",
+    "O3",
+    "O4",
+    "O5",
+    "O6",
+    "O7",
+    "P1",
+    "P2",
+    "P3",
+    "P4",
+    "Q1",
+]
 
 
 class SpencerFanoSolver:
@@ -370,7 +400,7 @@ class SpencerFanoSolver:
             x_e = n_e / n_ion_tot
             print(f" n_ion_tot: {n_ion_tot:.2e} [/cm3]        (total ion density)")
             print(f"       n_e: {n_e:.2e} [/cm3]        (free electron density)")
-            print(f"       x_e: {x_e:.2e} [/cm3]        (electons per nucleus)")
+            print(f"       x_e: {x_e:.2e} [/cm3]        (electrons per nucleus)")
             print(f"deposition: {self.depositionratedensity_ev:7.2f}  [eV/s/cm3]")
 
         deltaen = self.engrid[1] - self.engrid[0]
@@ -567,8 +597,13 @@ class SpencerFanoSolver:
                 )
 
                 if self.verbose:
+                    if int(shell.n) < 0:
+                        strsubshell = SUBSHELLNAMES[-int(shell.l)]
+                        shellname = f"Lotz shell {strsubshell}"
+                    else:
+                        shellname = f"n {int(shell.n):d} l {int(shell.l):d}"
                     print(
-                        f"frac_ionisation_shell(n {int(shell.n):d} l {int(shell.l):d}):"
+                        f"frac_ionisation_shell({shellname}):"
                         f" {frac_ionisation_shell:.4f} (ionpot"
                         f" {shell.ionpot_ev:.2f} eV)"
                     )
@@ -576,8 +611,8 @@ class SpencerFanoSolver:
                 integralgamma += np.dot(self.yvec, ar_xs_array) * deltaen
 
                 if frac_ionisation_shell > 1:
-                    frac_ionisation_shell = 0.0
                     print("WARNING: Ignoring invalid frac_ionisation_shell of" f" {frac_ionisation_shell}.")
+                    # frac_ionisation_shell = 0.0
 
                 self._frac_ionisation_ion[(Z, ion_stage)] += frac_ionisation_shell
                 eta_over_ionpot_sum += frac_ionisation_shell / shell.ionpot_ev
@@ -627,7 +662,7 @@ class SpencerFanoSolver:
                 print("ionisation ratecoeff:" f" {self._nt_ionisation_ratecoeff[(Z, ion_stage)]:.2e} [/s]")
 
                 # complicated eff_ionpot thing should match a simple integral of xs * vec * dE
-                # print(f'ionisation ratecoeff: {integralgamma:.2e} [/s]')
+                # print(f"ionisation ratecoeff: {integralgamma:.2e} [/s]")
                 assert np.isclose(
                     self._nt_ionisation_ratecoeff[(Z, ion_stage)],
                     integralgamma,

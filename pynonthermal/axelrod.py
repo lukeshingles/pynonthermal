@@ -56,13 +56,14 @@ def get_shell_configs() -> np.ndarray:
             assert len(linesplit) == nt_shells + 1
             assert int(linesplit[0]) == i + 1
             shells_q[i, :] = np.array([int(x) for x in linesplit[1:]])
+            assert sum(shells_q[i]) == i + 1
 
     return shells_q
 
 
-def get_shell_occupancies(atomic_number: int, ion_stage: int, electron_binding, shells_q):
+def get_shell_occupancies(atomic_number: int, ion_stage: int, electron_binding, all_shells_q):
     nbound = atomic_number - ion_stage + 1
-    element_shells_q_neutral = shells_q[atomic_number - 1]
+    element_shells_q_neutral = all_shells_q[atomic_number - 1]
     shellcount = min(len(element_shells_q_neutral), len(electron_binding[atomic_number - 1]))
     element_shells_q = np.zeros_like(element_shells_q_neutral)
 
@@ -80,14 +81,16 @@ def get_shell_occupancies(atomic_number: int, ion_stage: int, electron_binding, 
         electron_count += electronsinshell
         assert electron_count <= nbound
 
+    assert sum(element_shells_q) == nbound
+
     return element_shells_q
 
 
 def get_sum_q_over_binding_energy(atomic_number: int, ion_stage: int, ionpot_ev: float) -> float:
     # LJS: translated from artis nonthermal.cc
     electron_binding = get_binding_energies()
-    shells_q = get_shell_configs()
-    q = get_shell_occupancies(atomic_number, ion_stage, electron_binding, shells_q)
+    all_shells_q = get_shell_configs()
+    q = get_shell_occupancies(atomic_number, ion_stage, electron_binding, all_shells_q)
 
     total = 0.0
     for electron_loop in range(q.size):
@@ -112,43 +115,40 @@ def get_workfn_ev(atomic_number: int, ion_stage: int, ionpot_ev: float, Zbar: fl
     return (1 / oneoverW) / EV
 
 
-def get_lotz_xs_ionisation(atomic_number: int, ion_stage: int, ionpot_ev, en_ev):
+def get_lotz_xs_ionisation(shell, en_ev: float) -> float:
     # Axelrod 1980 Eq 3.38
 
     en_erg = en_ev * EV
-    gamma = en_erg / (ME * CLIGHT**2) + 1
-    beta = math.sqrt(1.0 - 1.0 / (gamma**2))
+    # gamma = en_erg / (ME * CLIGHT**2) + 1
+    # beta = math.sqrt(1.0 - 1.0 / (gamma**2))
+
+    beta = math.sqrt(2 * en_erg / ME) / CLIGHT
     betasq = beta**2
     # beta = 0.99
     # print(f'{gamma=} {beta=}')
+    atomic_number = int(shell["Z"])
+    ion_stage = int(shell["ion_stage"])
+    ionpot_ev = shell["ionpot_ev"]
+    shellindex = -int(shell["l"])
+
     electron_binding = get_binding_energies()
-    shells_q = get_shell_configs()
-    q = get_shell_occupancies(atomic_number, ion_stage, electron_binding, shells_q)
+    all_shells_q = get_shell_configs()
+    electronsinshell = get_shell_occupancies(atomic_number, ion_stage, electron_binding, all_shells_q)[shellindex]
 
-    part_sigma = 0.0
-    for electron_loop in range(q.size()):
-        electronsinshell = q[electron_loop]
-        if (electronsinshell) > 0:
-            enbinding = electron_binding[atomic_number - 1][electron_loop]
-            ionpot = ionpot_ev * EV
-            if enbinding <= 0:
-                enbinding = electron_binding[atomic_number - 1][electron_loop - 1]
-                assert enbinding > 0
+    p = ionpot_ev * EV
 
-            p = max(enbinding, ionpot)
+    # if 0.5 * betasq * ME * CLIGHT**2 > p:
+    if en_erg > p:
+        part_sigma_shell = (
+            electronsinshell / p * (math.log(betasq * ME * CLIGHT**2 / 2.0 / p) - math.log10(1 - betasq) - betasq)
+        )
 
-            if 0.5 * betasq * ME * CLIGHT**2 > p:
-                part_sigma += (
-                    electronsinshell
-                    / p
-                    * (math.log(betasq * ME * CLIGHT**2 / 2.0 / p) - math.log10(1 - betasq) - betasq)
-                )
+        if part_sigma_shell > 0:
+            Aconst = 1.33e-14 * EV * EV
+            # me is electron mass
+            return 2 * Aconst / betasq / ME / (CLIGHT**2) * part_sigma_shell
 
-    Aconst = 1.33e-14 * EV * EV
-    # me is electron mass
-    sigma = 2 * Aconst / betasq / ME / (CLIGHT**2) * part_sigma
-    assert sigma >= 0
-    return sigma
+    return 0.0
 
 
 def get_Latom_axelrod(Zboundbar, en_ev):
