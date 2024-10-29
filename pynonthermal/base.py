@@ -13,8 +13,6 @@ from pynonthermal.constants import QE
 
 DATADIR = Path(__file__).absolute().parent / "data"
 
-experiment_use_Latom_in_spencerfano: bool = False
-
 
 def electronlossfunction(energy_ev: float, n_e_cgs: float) -> float:
     # free-electron plasma loss rate (as in Kozma & Fransson 1992)
@@ -80,13 +78,7 @@ def get_energyindex_lteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
 
     index = math.floor((en_ev - engrid[0]) / deltaen)
 
-    if index < 0:
-        return 0
-
-    if index > len(engrid) - 1:
-        return len(engrid) - 1
-
-    return index
+    return 0 if index < 0 else min(index, len(engrid) - 1)
 
 
 def get_energyindex_gteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
@@ -95,10 +87,4 @@ def get_energyindex_gteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
 
     index = math.ceil((en_ev - engrid[0]) / deltaen)
 
-    if index < 0:
-        return 0
-
-    if index > len(engrid) - 1:
-        return len(engrid) - 1
-
-    return index
+    return 0 if index < 0 else min(index, len(engrid) - 1)
