@@ -15,7 +15,9 @@ from scipy import linalg
 import pynonthermal
 import pynonthermal.collion
 import pynonthermal.excitation
+from pynonthermal.axelrod import get_workfn_ev
 from pynonthermal.base import electronlossfunction
+from pynonthermal.base import get_Zbar
 from pynonthermal.constants import K_B
 
 if t.TYPE_CHECKING:
@@ -613,7 +615,14 @@ class SpencerFanoSolver:
 
             self._nt_ionisation_ratecoeff[(Z, ion_stage)] = self.depositionratedensity_ev / n_ion_tot / eff_ionpot
             if self.verbose:
+                workfn_ev = get_workfn_ev(
+                    Z,
+                    ion_stage,
+                    ionpot_ev=ionpot_valence,
+                    Zbar=get_Zbar(ions=self.ionpopdict.keys(), ionpopdict=self.ionpopdict),
+                )
                 print(f"          eff_ionpot: {eff_ionpot:.2f} [eV]")
+                print(f"              workfn: {workfn_ev:.2f} [eV]")
                 # print(f'  eff_ionpot_usevalence: {eff_ionpot_usevalence:.2f} [eV]')
                 print("ionisation ratecoeff:" f" {self._nt_ionisation_ratecoeff[(Z, ion_stage)]:.2e} [/s]")
 
