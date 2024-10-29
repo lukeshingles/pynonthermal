@@ -654,7 +654,7 @@ class SpencerFanoSolver:
                     Z,
                     ion_stage,
                     ionpot_ev=ionpot_valence,
-                    Zbar=get_Zbar(ions=self.ionpopdict.keys(), ionpopdict=self.ionpopdict),
+                    Zbar=get_Zbar(ions=tuple(self.ionpopdict.keys()), ionpopdict=self.ionpopdict),
                 )
                 print(f"          eff_ionpot: {eff_ionpot:.2f} [eV]")
                 print(f"              workfn: {workfn_ev:.2f} [eV]")
