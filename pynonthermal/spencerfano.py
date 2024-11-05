@@ -353,7 +353,7 @@ class SpencerFanoSolver:
             print(
                 f"  including Z={Z} ion_stage"
                 f" {ion_stage} ({at.get_ionstring(Z, ion_stage)}) ionisation with n_ion"
-                f" {n_ion:.1e}"
+                f" {n_ion:.1e} [/cm3]"
             )
         assert n_ion > 0.0
         self.ionpopdict[(Z, ion_stage)] = n_ion
@@ -611,7 +611,7 @@ class SpencerFanoSolver:
                 integralgamma += np.dot(self.yvec, ar_xs_array) * deltaen
 
                 if frac_ionisation_shell > 1:
-                    print("WARNING: Ignoring invalid frac_ionisation_shell of" f" {frac_ionisation_shell}.")
+                    print(f"WARNING: Ignoring invalid frac_ionisation_shell of {frac_ionisation_shell}.")
                     # frac_ionisation_shell = 0.0
 
                 self._frac_ionisation_ion[(Z, ion_stage)] += frac_ionisation_shell
@@ -626,7 +626,7 @@ class SpencerFanoSolver:
             #     if self._frac_ionisation_ion[(Z, ion_stage)] > 0. else float('inf'))
 
             if self.verbose:
-                print("     frac_ionisation:" f" {self._frac_ionisation_ion[(Z, ion_stage)]:.4f}")
+                print(f"     frac_ionisation: {self._frac_ionisation_ion[(Z, ion_stage)]:.4f}")
 
             if self.excitationlists:
                 if n_ion > 0.0:
@@ -637,14 +637,13 @@ class SpencerFanoSolver:
                 if self._frac_excitation_ion[(Z, ion_stage)] > 1:
                     self._frac_excitation_ion[(Z, ion_stage)] = 0.0
                     print(
-                        "WARNING: Ignoring invalid frac_excitation_ion of"
-                        f" {self._frac_excitation_ion[(Z, ion_stage)]}."
+                        f"WARNING: Ignoring invalid frac_excitation_ion of {self._frac_excitation_ion[(Z, ion_stage)]}."
                     )
 
                 self._frac_excitation_tot += self._frac_excitation_ion[(Z, ion_stage)]
 
                 if self.verbose:
-                    print("     frac_excitation:" f" {self._frac_excitation_ion[(Z, ion_stage)]:.4f}")
+                    print(f"     frac_excitation: {self._frac_excitation_ion[(Z, ion_stage)]:.4f}")
             else:
                 self._frac_excitation_ion[(Z, ion_stage)] = 0.0
 
@@ -659,7 +658,7 @@ class SpencerFanoSolver:
                 print(f"          eff_ionpot: {eff_ionpot:.2f} [eV]")
                 print(f"              workfn: {workfn_ev:.2f} [eV]")
                 # print(f'  eff_ionpot_usevalence: {eff_ionpot_usevalence:.2f} [eV]')
-                print("ionisation ratecoeff:" f" {self._nt_ionisation_ratecoeff[(Z, ion_stage)]:.2e} [/s]")
+                print(f"ionisation ratecoeff: {self._nt_ionisation_ratecoeff[(Z, ion_stage)]:.2e} [/s]")
 
                 # complicated eff_ionpot thing should match a simple integral of xs * vec * dE
                 # print(f"ionisation ratecoeff: {integralgamma:.2e} [/s]")
@@ -682,9 +681,7 @@ class SpencerFanoSolver:
 
         if self.verbose:
             print(f"         frac_heating: {frac_heating:.4f}")
-            print(
-                "             frac_sum:" f" {self._frac_excitation_tot + self._frac_ionisation_tot + frac_heating:.4f}"
-            )
+            print(f"             frac_sum: {self._frac_excitation_tot + self._frac_ionisation_tot + frac_heating:.4f}")
 
     def get_n_e_nt(self):
         assert self._solved
