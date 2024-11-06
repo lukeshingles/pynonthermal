@@ -360,8 +360,8 @@ class SpencerFanoSolver:
         dfcollion_thision = self.dfcollion.query("Z == @Z and ion_stage == @ion_stage", inplace=False)
 
         for index, shell in dfcollion_thision.iterrows():
-            assert shell.ionpot_ev >= self.engrid[0]
-            self._add_ionisation_shell(n_ion, shell)
+            if shell.ionpot_ev >= self.engrid[0]:
+                self._add_ionisation_shell(n_ion, shell)
 
     def calculate_n_e(self):
         # number density of free electrons [cm-^3]
