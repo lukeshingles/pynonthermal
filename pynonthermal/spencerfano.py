@@ -90,7 +90,7 @@ class SpencerFanoSolver:
         self.excitationlists = {}
 
         self.verbose = verbose
-        self.engrid = np.linspace(emin_ev, emax_ev, num=npts, endpoint=True)
+        self.engrid = np.linspace(emin_ev, emax_ev, num=npts, endpoint=True, dtype=float)
         self.deltaen = self.engrid[1] - self.engrid[0]
 
         self.dfcollion = pynonthermal.collion.read_colliondata(
@@ -852,7 +852,7 @@ class SpencerFanoSolver:
 
         # go below E_0
         deltaen2 = E_0 / 20.0
-        engrid_low: npt.NDArray[np.float64] = np.arange(0.0, E_0, deltaen2)
+        engrid_low = np.arange(0.0, E_0, deltaen2, dtype=float)
         npts_low = len(engrid_low)
         d_etaheat_by_d_en_low = np.zeros(len(engrid_low))
         etaheat_int_low = np.zeros(len(engrid_low))
