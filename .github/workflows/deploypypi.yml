@@ -15,14 +15,12 @@ jobs:
                   fetch-depth: 0
 
             - uses: actions/setup-python@v5
-              with:
-                  cache: pip
 
             - name: Install dependencies
               run: |
-                  python3 -m pip install --upgrade pip
-                  python3 -m pip install -r requirements.txt
-                  python3 -m pip install --upgrade setuptools setuptools_scm[toml] wheel twine build
+                  python3 -m pip install uv
+                  python3 -m uv pip install .[dev]
+                  python3 -m uv pip install --upgrade setuptools setuptools_scm[toml] wheel twine build
 
             - name: Build
               run: |

@@ -19,16 +19,16 @@ jobs:
         steps:
             - name: Checkout Code
               uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
             - name: Set up Python
               uses: actions/setup-python@v5
-              with:
-                  cache: pip
 
             - name: Install dependencies
               run: |
-                  python3 -m pip install --upgrade pip wheel mypy
-                  python3 -m pip install -r requirements.txt
+                  python3 -m pip install uv
+                  python3 -m uv pip install .[dev]
 
             - name: Run pre-commit
               run: |
@@ -39,31 +39,28 @@ jobs:
         steps:
             - name: Checkout Code
               uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
             - name: Set up Python
               uses: actions/setup-python@v5
-              with:
-                  cache: pip
 
             - name: Install dependencies
               run: |
-                  python3 -m pip install --upgrade pip wheel mypy
-                  python3 -m pip install -r requirements.txt
+                  python3 -m pip install uv
+                  python3 -m uv pip install .[dev]
 
             - name: Run Ruff
               if: always()
               uses: astral-sh/ruff-action@v2
               with:
-                  version: 0.8.1
                   args: check --exit-non-zero-on-fix --no-fix
 
             - name: Run Ruff Format
               if: always()
               uses: astral-sh/ruff-action@v2
               with:
-                  version: 0.8.1
                   args: format --check
 
             - name: Run mypy
-              run: |
-                  mypy --install-types --non-interactive
+              run: mypy --install-types --non-interactive

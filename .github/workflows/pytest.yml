@@ -34,20 +34,18 @@ jobs:
             - name: Set up Python ${{ matrix.python-version }}
               uses: actions/setup-python@v5
               with:
-                  cache: pip
                   python-version: ${{ matrix.python-version }}
-                  check-latest: true
 
             - name: Install pynonthermal
               run: |
-                  python3 -m pip install --upgrade pip
-                  python3 -m pip install .
+                  python3 -m pip install uv
+                  python3 -m uv pip install --compile-bytecode .[dev]
 
             - name: Test with pytest
-              run: pytest --cov=./ --cov-report=xml
+              run: python3 -m pytest --cov=./ --cov-report=xml
 
             - name: Report coverage
-              run: coverage report
+              run: python3 -m coverage report
 
             - name: Upload coverage to Codecov
               uses: codecov/codecov-action@v4

@@ -4,10 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pynonthermal"
-authors = [
-    {name = "Luke J. Shingles", email = "luke.shingles@gmail.com"},
-]
-description="A non-thermal electron deposition (Spencer-Fano equation) solver."
+authors = [{ name = "Luke J. Shingles", email = "luke.shingles@gmail.com" }]
+description = "A non-thermal electron deposition (Spencer-Fano equation) solver."
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.10",
@@ -16,10 +14,31 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Intended Audience :: Science/Research",
 ]
-dynamic = ["version", "dependencies"]
+dynamic = ["version"]
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-readme = {file = "README.md", content-type='text/markdown'}
+readme = { file = "README.md", content-type = 'text/markdown' }
+dependencies = [
+    "artistools>=2024.07.04.2",
+    "matplotlib>=3.9.1",
+    "numpy>=1.19.4",
+    "pandas>=1.1",
+    "polars>=1.0.0",
+    "scipy>=1.5.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy[faster-cache]>=1.14.1",
+    "pre-commit>=4.0.1",
+    "pytest>=6.2.2",
+    "pytest-codspeed>=2.2.1",
+    "pytest-cov>=2.10.1",
+    "pytest-runner>=5.2",
+    "pytest-xdist[psutil]>=3.6.1",
+    "ruff>=0.8.6",
+    "typeguard>=4.1.5",
+]
 
 [project.urls]
 Repository = "https://www.github.com/lukeshingles/pynonthermal/"
@@ -35,12 +54,12 @@ disallow_untyped_calls = false
 disallow_untyped_defs = false
 error_summary = true
 enable_error_code = [
-  "comparison-overlap",
-  "ignore-without-code",
-  "redundant-expr",
-  "redundant-self",
-  "truthy-bool",
-  "unused-awaitable",
+    "comparison-overlap",
+    "ignore-without-code",
+    "redundant-expr",
+    "redundant-self",
+    "truthy-bool",
+    "unused-awaitable",
 ]
 exclude = "(build)|(dist)|(tests)|(data)"
 ignore_missing_imports = true
@@ -60,8 +79,15 @@ warn_unused_ignores = true
 
 [tool.pyright]
 deprecateTypingAliases = true
-enableTypeIgnoreComments = false  # leave these for mypy to interpret
-exclude=['**/node_modules','**/__pycache__','**/.*', 'build', 'dist', 'target']
+enableTypeIgnoreComments = false # leave these for mypy to interpret
+exclude = [
+    '**/node_modules',
+    '**/__pycache__',
+    '**/.*',
+    'build',
+    'dist',
+    'target',
+]
 reportAttributeAccessIssue = false
 reportCallIssue = true
 reportMissingImports = false
@@ -84,63 +110,63 @@ show-fixes = true
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "ARG001", # ignored because variables in df.eval() are not detected
+    "ARG001",  # ignored because variables in df.eval() are not detected
     "ANN",
-    "B005",  # strip-with-multi-characters
-    "B007",  # variable not used in loop body (but sometimes it is with DataFrame.eval)
-    "B905", # zip without explicit strict parameter
-    "C901",  # complex-structure
+    "B005",    # strip-with-multi-characters
+    "B007",    # variable not used in loop body (but sometimes it is with DataFrame.eval)
+    "B905",    # zip without explicit strict parameter
+    "C901",    # complex-structure
     "COM812",  # missing-trailing-comma
-    "CPY001", # missing-copyright-notice
-    "D100",  # undocumented-public-module
-    "D101",  # undocumented-public-class
-    "D102",  # undocumented-public-method
-    "D103",  # undocumented-public-function
-    "D104",  # undocumented-public-package
-    "D107",  # undocumented-public-init
-    "D203",  # one-blank-line-before-class
-    "D205",  # blank-line-after-summary
-    "D213",  # multi-line-summary-second-line
-    "D417",  # undocumented-param
-    "E501", # Line too long
-    "E741",  # mixed-case-variable-in-global-scope
+    "CPY001",  # missing-copyright-notice
+    "D100",    # undocumented-public-module
+    "D101",    # undocumented-public-class
+    "D102",    # undocumented-public-method
+    "D103",    # undocumented-public-function
+    "D104",    # undocumented-public-package
+    "D107",    # undocumented-public-init
+    "D203",    # one-blank-line-before-class
+    "D205",    # blank-line-after-summary
+    "D213",    # multi-line-summary-second-line
+    "D417",    # undocumented-param
+    "E501",    # Line too long
+    "E741",    # mixed-case-variable-in-global-scope
     "ERA001",  # commented-out-code
     "FBT",
     "FIX002",  # line contains TODO
-    "ISC001", # single-line-implicit-string-concatenation
-    "N802",  # Function name should be lowercase
-    "N803",  # Argument name should be lowercase
-    "N806",  # non-lowercase-variable-in-function
-    "N816",  # variable-name-too-short
-    "N999",  # invalid-module-name
-    "PD901",  # df is a bad variable name
+    "ISC001",  # single-line-implicit-string-concatenation
+    "N802",    # Function name should be lowercase
+    "N803",    # Argument name should be lowercase
+    "N806",    # non-lowercase-variable-in-function
+    "N816",    # variable-name-too-short
+    "N999",    # invalid-module-name
+    "PD901",   # df is a bad variable name
     "PERF203", # try-except-in-loop
     "PLC0414", # useless-import-alias
     #"PGH001",  # No builtin `eval()` allowed
-    "PLR0911",  # too-many-return-statements
-    "PLR0912",  # too-many-branches
-    "PLR0913",  # too-many-arguments
-    "PLR0915",  # too-many-statements
-    "PLR2004",  # magic-value-comparison
-    "PLW2901",  # redefined-loop-name
-    "PYI024", # Use `typing.NamedTuple` instead of `collections.namedtuple`
-    "S101",  # Use of assert detected
-    "S301",  # suspicious-pickle-usage
+    "PLR0911", # too-many-return-statements
+    "PLR0912", # too-many-branches
+    "PLR0913", # too-many-arguments
+    "PLR0915", # too-many-statements
+    "PLR2004", # magic-value-comparison
+    "PLW2901", # redefined-loop-name
+    "PYI024",  # Use `typing.NamedTuple` instead of `collections.namedtuple`
+    "S101",    # Use of assert detected
+    "S301",    # suspicious-pickle-usage
     #"S307",  # suspicious-eval-usage
-    "S311",  # suspicious-non-cryptographic-random-usage
-    "S603",  # subprocess-without-shell-equals-true
-    "S607",  # start-process-with-partial-path
-    "SLF001",  # private-member-access
-    "T201",  # print found
+    "S311",   # suspicious-non-cryptographic-random-usage
+    "S603",   # subprocess-without-shell-equals-true
+    "S607",   # start-process-with-partial-path
+    "SLF001", # private-member-access
+    "T201",   # print found
     "TD002",  # missing-todo-author
     "TD003",  # missing-todo-link
 ]
 fixable = ["ALL"]
 unfixable = [
-    "COM812",  # missing-trailing-comma
-    "ERA001",  # commented-out-code (will just delete it!)
-    "F401",  # unused-import
-    "F841",  # unused-variable
+    "COM812", # missing-trailing-comma
+    "ERA001", # commented-out-code (will just delete it!)
+    "F401",   # unused-import
+    "F841",   # unused-variable
     "SIM222", # expr-or-true
     "SIM223", # expr-and-false
 ]
@@ -164,12 +190,6 @@ order-by-type = false
 packages = ["pynonthermal"]
 include-package-data = true
 license-files = ["LICENSE"]
-
-#[tool.setuptools.packages.find]
-#where = ["."]
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools_scm]
 version_file = "_version.py"
