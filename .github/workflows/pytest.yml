@@ -1,6 +1,5 @@
 ---
-name: Installation and pytest
-
+name: Test and lint
 on:
     push:
     merge_group:
