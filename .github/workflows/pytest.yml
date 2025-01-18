@@ -12,6 +12,53 @@ on:
         types: [trigger_checks]
 
 jobs:
+    lint:
+        runs-on: macos-15
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+
+            - name: Setup uv
+              uses: astral-sh/setup-uv@v5
+
+            - name: Install dependencies
+              run: |
+                  uv sync --frozen
+                  source .venv/bin/activate
+                  uv pip install --compile-bytecode --editable .[dev]
+
+            - name: Run Ruff
+              if: always()
+              uses: astral-sh/ruff-action@v3
+              with:
+                  args: check --exit-non-zero-on-fix --no-fix
+
+            - name: Run Ruff Format
+              if: always()
+              uses: astral-sh/ruff-action@v3
+              with:
+                  args: format --check
+
+            - name: Run mypy
+              if: always()
+              run: uv run --frozen -- mypy --install-types --non-interactive
+
+            - name: Cache pre-commit
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/pre-commit
+                  key: pre-commit-3|${{ hashFiles('.pre-commit-config.yaml') }}
+
+            - name: Run pre-commit
+              run: |
+                  source .venv/bin/activate
+                  uv run --frozen -- pre-commit run --all-files --show-diff-on-failure --color=always
+
     pytest:
         timeout-minutes: 120
         runs-on: ${{ matrix.os }}
@@ -51,7 +98,7 @@ jobs:
               run: uv run --frozen -- python3 -m coverage report
 
             - name: Upload coverage to Codecov
-              uses: codecov/codecov-action@v4
+              uses: codecov/codecov-action@v5
               with:
                   token: ${{ secrets.CODECOV_TOKEN }}
                   files: ./coverage.xml
