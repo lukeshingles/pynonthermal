@@ -1053,16 +1053,16 @@ wheels = [
 
 [[package]]
 name = "polars"
-version = "1.18.0"
+version = "1.20.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9b/57/821f6b625e63516bf5f0ba428618dd013c43fd79b20e722c454a978cbefe/polars-1.18.0.tar.gz", hash = "sha256:5c2f119555ae8d822a5322509c6abd91601a8931115d2e4c3fff13fadf39e877", size = 4257494 }
+sdist = { url = "https://files.pythonhosted.org/packages/dd/8f/1005f24c8c413d8a393973fcb45e6085a2311bb513ee0c6674d438e99c31/polars-1.20.0.tar.gz", hash = "sha256:e8e9e3156fae02b58e276e5f2c16a5907a79b38617a9e2d731b533d87798f451", size = 4292434 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4e/df/289578844b299f97125178ad6db60dc1b494ec8d813d397118f2493c392a/polars-1.18.0-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:27a6c7e5d2d15afb5f06291433019411c9a28e59e49741442d11a6a945f21daa", size = 29067782 },
-    { url = "https://files.pythonhosted.org/packages/7b/79/cdc5d888a5f858f5c572d3a3a8fa65724d4426aa9edbfd6461d3dc85bc47/polars-1.18.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:6431563aee2dfa6787b0debbed3f565ebb4322da32317d95c8eac3e48330bc28", size = 25807696 },
-    { url = "https://files.pythonhosted.org/packages/f4/cd/cd49096ead3dd208495945021d3042dad01d0dd63702b6f4f4f7e3a3983b/polars-1.18.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a333ff578373e29e0cacc79c35afe42c0620813c9b0c832009ab8b330e421093", size = 32287987 },
-    { url = "https://files.pythonhosted.org/packages/66/28/7eb57b1f37f7c0206baf1877d0dcd082518ef3de34fe8621190b6da4801b/polars-1.18.0-cp39-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:3a3a65a3ad6b6b0bd61a33f215856cfdd3e3abc9942e69526b2b88c0ef8683a4", size = 29314336 },
-    { url = "https://files.pythonhosted.org/packages/09/9e/184f777b41bba086463771edf7dbd3ba13c071222117ab5c19c99e76bc66/polars-1.18.0-cp39-abi3-win_amd64.whl", hash = "sha256:a79ef2542454d9cace63e8fa528cf808b6377077173be522df9b8c0e792ce96a", size = 32356143 },
-    { url = "https://files.pythonhosted.org/packages/2c/dc/5b3345688bb14cda0ea23f42c96553aa75c4b8a6992f38cac0df6a44ec31/polars-1.18.0-cp39-abi3-win_arm64.whl", hash = "sha256:52b543da52f4f6a661a2fa3cdd4b499938bdb34eeae538ec3bcef6c8c41bfc33", size = 28631561 },
+    { url = "https://files.pythonhosted.org/packages/93/ef/74d56f82bc2e7911276ffad8f24e7ae6f7a102ecab3b2e88b87e84243356/polars-1.20.0-cp39-abi3-macosx_10_12_x86_64.whl", hash = "sha256:9a313e10ea80b99a0d32bfb942b2260b9658155287b0c2ac5876323acaff4f2c", size = 32143323 },
+    { url = "https://files.pythonhosted.org/packages/dd/e1/51c7b2bc3037af89f1c109b61a2d2f44c411212df63dd0e9c6683b66d98e/polars-1.20.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:4474bd004376599f7e4906bd350026cbbe805ba604121090578a97f63da15381", size = 28954418 },
+    { url = "https://files.pythonhosted.org/packages/2a/1a/862b8bf65182b261022292a1cd49728db876a1ef64ff377d6f7b17653886/polars-1.20.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4996e17cb6f57d9aeaf79f66c54ef2913cea7bd025410c076ef8c05d4f7d792a", size = 32850943 },
+    { url = "https://files.pythonhosted.org/packages/b7/33/1970863f0c1782a916299346d150c5bb8373d4e6827fabb8c37a0a2bcb8e/polars-1.20.0-cp39-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:d488ffb92d4934d9c326fa2d0fb2e9a4e3c2c625c59f4a77a77e4acd4d5a0d66", size = 29885148 },
+    { url = "https://files.pythonhosted.org/packages/bb/2d/b29112da3e98ba55e8ba77f08a90312004d2e4be0fd6401ff7d5d71eae0a/polars-1.20.0-cp39-abi3-win_amd64.whl", hash = "sha256:5ce417d2b6d4f3b8f422fcb3482039e8076182cceacbd880175fe970c6f99c84", size = 32947632 },
+    { url = "https://files.pythonhosted.org/packages/60/da/245e5852342cab10c48dc788f7b3d39a1f926f783ea124f196ad783ea6aa/polars-1.20.0-cp39-abi3-win_arm64.whl", hash = "sha256:f474f3d65450138cd2dbab2d9b6041b8646c30fad0b28e6d62457788f994bf62", size = 29141207 },
 ]
 
 [[package]]
@@ -1206,7 +1206,7 @@ requires-dist = [
     { name = "mypy", extras = ["faster-cache"], marker = "extra == 'dev'", specifier = ">=1.14.1" },
     { name = "numpy", specifier = ">=1.19.4" },
     { name = "pandas", specifier = ">=1.1" },
-    { name = "polars", specifier = ">=1.0.0,<1.19" },
+    { name = "polars", specifier = ">=1.20.0" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.0.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=6.2.2" },
     { name = "pytest-codspeed", marker = "extra == 'dev'", specifier = ">=2.2.1" },
