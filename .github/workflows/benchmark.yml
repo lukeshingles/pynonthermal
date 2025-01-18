@@ -26,13 +26,17 @@ jobs:
             - name: Set up Python
               uses: actions/setup-python@v5
 
+            - name: Setup uv
+              uses: astral-sh/setup-uv@v5
+
             - name: Install pynonthermal
               run: |
-                  python3 -m pip install --upgrade pip
-                  python3 -m pip install .
+                  uv sync --frozen
+                  source .venv/bin/activate
+                  uv pip install --compile-bytecode --editable .[dev]
 
             - name: Run benchmarks
               uses: CodSpeedHQ/action@v3
               with:
                   token: ${{ secrets.CODSPEED_TOKEN }}
-                  run: pytest --codspeed
+                  run: uv run --frozen -- python3 -m pytest --codspeed
