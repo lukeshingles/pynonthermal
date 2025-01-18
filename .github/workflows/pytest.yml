@@ -36,16 +36,19 @@ jobs:
               with:
                   python-version: ${{ matrix.python-version }}
 
+            - name: Setup uv
+              uses: astral-sh/setup-uv@v5
+
             - name: Install pynonthermal
               run: |
-                  python3 -m pip install uv
-                  python3 -m uv pip install --compile-bytecode .[dev]
+                  uv sync --frozen
+                  uv pip install --compile-bytecode --editable .[dev]
 
             - name: Test with pytest
-              run: python3 -m pytest --cov=./ --cov-report=xml
+              run: uv run --frozen -- python3 -m pytest --cov=./ --cov-report=xml
 
             - name: Report coverage
-              run: python3 -m coverage report
+              run: uv run --frozen -- python3 -m coverage report
 
             - name: Upload coverage to Codecov
               uses: codecov/codecov-action@v4
