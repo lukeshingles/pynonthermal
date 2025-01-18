@@ -12,28 +12,6 @@ on:
         types: [trigger_checks]
 
 jobs:
-    pre-commit:
-        runs-on: macos-15
-        env:
-            RUFF_OUTPUT_FORMAT: github
-        steps:
-            - name: Checkout Code
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
-
-            - name: Set up Python
-              uses: actions/setup-python@v5
-
-            - name: Install dependencies
-              run: |
-                  python3 -m pip install uv
-                  python3 -m uv pip install .[dev]
-
-            - name: Run pre-commit
-              run: |
-                  pre-commit run --all-files
-
     lint:
         runs-on: macos-15
         steps:
@@ -45,22 +23,38 @@ jobs:
             - name: Set up Python
               uses: actions/setup-python@v5
 
+            - name: Setup uv
+              uses: astral-sh/setup-uv@v5
+
             - name: Install dependencies
               run: |
-                  python3 -m pip install uv
-                  python3 -m uv pip install .[dev]
+                  uv sync --frozen
+                  source .venv/bin/activate
+                  uv pip install --compile-bytecode --editable .[dev]
 
             - name: Run Ruff
               if: always()
-              uses: astral-sh/ruff-action@v2
+              uses: astral-sh/ruff-action@v3
               with:
                   args: check --exit-non-zero-on-fix --no-fix
 
             - name: Run Ruff Format
               if: always()
-              uses: astral-sh/ruff-action@v2
+              uses: astral-sh/ruff-action@v3
               with:
                   args: format --check
 
             - name: Run mypy
-              run: mypy --install-types --non-interactive
+              if: always()
+              run: uv run --frozen -- mypy --install-types --non-interactive
+
+            - name: Cache pre-commit
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/pre-commit
+                  key: pre-commit-3|${{ hashFiles('.pre-commit-config.yaml') }}
+
+            - name: Run pre-commit
+              run: |
+                  source .venv/bin/activate
+                  uv run --frozen -- pre-commit run --all-files --show-diff-on-failure --color=always
