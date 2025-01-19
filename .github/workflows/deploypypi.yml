@@ -1,14 +1,19 @@
 ---
-name: Upload Package to PyPI
+name: Build and deploy to PyPI/testPyPI
 
 on:
+    push:
+    merge_group:
     release:
         types: [published, edited]
+    repository_dispatch:
+        types: [trigger_checks]
+    workflow_dispatch:
 
 jobs:
-    deploy:
-        runs-on: ubuntu-latest
-
+    build:
+        name: Build distributions
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
               with:
@@ -18,16 +23,57 @@ jobs:
 
             - name: Install dependencies
               run: |
-                  python3 -m pip install uv
-                  python3 -m uv pip install .[dev]
-                  python3 -m uv pip install --upgrade setuptools setuptools_scm[toml] wheel twine build
+                  python3 -m pip install --upgrade uv setuptools_scm[toml]
+                  echo "SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PYNONTHERMAL=$(python3 -m setuptools_scm --strip-dev)" >> $GITHUB_ENV
 
             - name: Build
               run: |
-                  python3 -m setuptools_scm
-                  python3 -m build --sdist --wheel --outdir dist/ .
-                  python3 -m twine check dist/*
+                  uv build --sdist --wheel
 
-            - name: Publish to PyPI
-              run: |
-                  python3 -m twine upload -r pypi -u __token__ -p ${{ secrets.PYPI_TOKEN }} --non-interactive dist/*
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: dist-sdist-wheel
+                  path: dist/*.tar.gz
+
+    testdeploy:
+        name: Test upload to TestPyPI
+        needs: [build]
+        runs-on: ubuntu-24.04
+        environment: test
+        permissions:
+            id-token: write
+        if: startsWith(github.ref , 'refs/tags/v') != true
+        steps:
+            - uses: actions/download-artifact@v4
+              with:
+                  pattern: dist-*
+                  path: dist
+                  merge-multiple: true
+
+            - name: Publish package to TestPyPI
+              uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                  skip-existing: true
+                  verbose: false
+                  repository-url: https://test.pypi.org/legacy/
+
+    deploy:
+        name: Upload to PyPI
+        needs: [build]
+        runs-on: ubuntu-24.04
+        environment: release
+        permissions:
+            id-token: write
+        if: startsWith(github.ref, 'refs/tags/v')
+        steps:
+            - uses: actions/download-artifact@v4
+              with:
+                  pattern: dist-*
+                  path: dist
+                  merge-multiple: true
+
+            - name: Publish package to PyPI
+              uses: pypa/gh-action-pypi-publish@release/v1
+              with:
+                  skip-existing: true
+                  verbose: false
