@@ -12,6 +12,7 @@ on:
 
 jobs:
     lint:
+        name: Format, lint, and type check
         runs-on: macos-15
         steps:
             - name: Checkout Code
@@ -29,7 +30,7 @@ jobs:
               run: |
                   uv sync --frozen
                   source .venv/bin/activate
-                  uv pip install --compile-bytecode --editable .[dev]
+                  uv pip install --compile-bytecode --editable .
 
             - name: Run Ruff
               if: always()
