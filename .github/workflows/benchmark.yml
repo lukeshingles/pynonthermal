@@ -33,7 +33,7 @@ jobs:
               run: |
                   uv sync --frozen
                   source .venv/bin/activate
-                  uv pip install --compile-bytecode --editable .[dev]
+                  uv pip install --compile-bytecode --editable .
 
             - name: Run benchmarks
               uses: CodSpeedHQ/action@v3
