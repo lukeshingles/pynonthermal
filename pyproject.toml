@@ -27,7 +27,7 @@ dependencies = [
     "scipy>=1.5.4",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "mypy[faster-cache]>=1.14.1",
     "pre-commit>=4.0.1",
@@ -106,6 +106,7 @@ line-length = 120
 target-version = "py310"
 fix = true
 show-fixes = true
+extend-exclude = ["_version.py"]
 
 [tool.ruff.lint]
 select = ["ALL"]
