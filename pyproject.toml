@@ -34,7 +34,6 @@ dev = [
     "pytest>=6.2.2",
     "pytest-codspeed>=2.2.1",
     "pytest-cov>=2.10.1",
-    "pytest-runner>=5.2",
     "pytest-xdist[psutil]>=3.6.1",
     "ruff>=0.8.6",
     "typeguard>=4.1.5",
