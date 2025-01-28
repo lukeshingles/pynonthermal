@@ -655,8 +655,8 @@ class SpencerFanoSolver:
                     ionpot_ev=ionpot_valence,
                     Zbar=get_Zbar(ions=tuple(self.ionpopdict.keys()), ionpopdict=self.ionpopdict),
                 )
-                print(f"          eff_ionpot: {eff_ionpot:.2f} [eV]")
-                print(f"              workfn: {workfn_ev:.2f} [eV]")
+                print(f"   workfn eff_ionpot: {eff_ionpot:8.2f} [eV]")
+                print(f"       approx workfn: {workfn_ev:8.2f} [eV] (without Spencer-Fano solution)")
                 # print(f'  eff_ionpot_usevalence: {eff_ionpot_usevalence:.2f} [eV]')
                 print(f"ionisation ratecoeff: {self._nt_ionisation_ratecoeff[(Z, ion_stage)]:.2e} [/s]")
 
