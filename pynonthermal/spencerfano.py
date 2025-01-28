@@ -363,17 +363,18 @@ class SpencerFanoSolver:
             if shell.ionpot_ev >= self.engrid[0]:
                 self._add_ionisation_shell(n_ion, shell)
 
-    def calculate_n_e(self):
+    def calculate_free_electron_density(self):
         # number density of free electrons [cm-^3]
-        self._n_e = 0.0
+        n_e = 0.0
         for Z, ion_stage in self.ionpopdict:
             charge = ion_stage - 1
             assert charge >= 0
-            self._n_e += charge * self.ionpopdict[(Z, ion_stage)]
+            n_e += charge * self.ionpopdict[(Z, ion_stage)]
+        return n_e
 
     def get_n_e(self):
         if not hasattr(self, "_n_e"):
-            self.calculate_n_e()
+            self._n_e = self.calculate_free_electron_density()
 
         return self._n_e
 
