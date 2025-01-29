@@ -1,4 +1,9 @@
 # pynonthermal
+[![DOI](https://zenodo.org/badge/359805556.svg)](https://zenodo.org/badge/latestdoi/359805556)
+[![PyPI - Version](https://img.shields.io/pypi/v/pynonthermal)](https://pypi.org/project/pynonthermal)
+[![License](https://img.shields.io/github/license/lukeshingles/pynonthermal)](https://github.com/lukeshingles/pynonthermal/blob/main/LICENSE)
+
+[![Supported Python versions](https://img.shields.io/pypi/pyversions/pynonthermal)](https://pypi.org/project/pynonthermal/)
 [![Build and test](https://github.com/lukeshingles/pynonthermal/actions/workflows/pytest.yml/badge.svg)](https://github.com/lukeshingles/pynonthermal/actions/workflows/pytest.yml)
 [![codecov](https://codecov.io/gh/lukeshingles/pynonthermal/branch/main/graph/badge.svg?token=574XDCYFIi)](https://codecov.io/gh/lukeshingles/pynonthermal)
 
@@ -18,21 +23,26 @@ The following plot shows the energy distribution of contributions to ionisation,
 ![Emission plot](https://raw.githubusercontent.com/lukeshingles/pynonthermal/main/docs/oxygen_channels.svg)
 
 ## Installation
-For the latest experimental version, pynonthermal can be installed with:
+The latest released version can be installed from PyPI:
 ```sh
-python3 -m pip install git+git://github.com/lukeshingles/pynonthermal.git
+pip install pynonthermal
 ```
 
-If this version crashes or causes problems, you can try dropping back to a released version.
+For development, pynonthermal can be installed into a uv project environment:
 ```sh
-python3 -m pip install pynonthermal
+git clone https://github.com/lukeshingles/pynonthermal.git
+cd pynonthermal
+uv sync --frozen
+source ./.venv/bin/activate
+uv pip install --editable .
+pre-commit install
 ```
 
 ## Usage
 See the [quickstart notebook](https://github.com/lukeshingles/pynonthermal/blob/main/quickstart.ipynb) [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/lukeshingles/pynonthermal/HEAD?filepath=quickstart.ipynb) for an example of how to set up the composition and use the solver to determine ionisation and heating rates.
 
-## Advanced Usage
-Advanced users will likely want to control the particular excitation transitions that are included in the solver. Individual excitation transitions can be added with:
+## Advanced Usage - Excitation cross sections
+Advanced users will likely want to control the particular excitation cross sections that are included in the solver. Individual excitation transitions can be added with:
 
 ```python
 SpencerFanoSolver.add_excitation(Z, ion_stage, n_level, xs_vec, epsilon_trans_ev, transitionkey=(lower, upper))
@@ -48,5 +58,3 @@ nt_exc = SpencerFanoSolver.get_excitation_ratecoeff(Z, ion_stage, transitionkey)
 Distributed under the MIT license. See ``LICENSE`` for more information.
 
 https://github.com/lukeshingles/pynonthermal
-
-
