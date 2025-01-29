@@ -17,7 +17,7 @@ wheels = [
 
 [[package]]
 name = "artistools"
-version = "2025.1.7"
+version = "2025.1.23"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argcomplete" },
@@ -39,14 +39,15 @@ dependencies = [
     { name = "rich" },
     { name = "scipy" },
     { name = "tqdm" },
+    { name = "typeguard" },
     { name = "typing-extensions" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f6/ae/90e5c538de3b2f87b27068b876f4f266855d73f323104636eef56ff6ee76/artistools-2025.1.7.tar.gz", hash = "sha256:9489b9930eedcb84f2566e7c2f41391ed9c82941ab106975a6e6b0f1a4951c11", size = 8140085 }
+sdist = { url = "https://files.pythonhosted.org/packages/e4/e6/1033d106aa532d279d31fbbc7cd17499b0098c1e4678aeb4f3dd64b24b8f/artistools-2025.1.23.tar.gz", hash = "sha256:6eed759528a80fbae87b956bb603352cb43fa8133f7d9913659ef62903f35a09", size = 8244373 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/56/da/914975969ae74f554ae99322e99effe1590348348551e239e9357bbb3a7a/artistools-2025.1.7-cp310-abi3-macosx_14_0_arm64.whl", hash = "sha256:7a4393770d97ac8284acd633d9d6a697c1b8dabce504a0f45c42e4f51ed0f5b2", size = 12368514 },
-    { url = "https://files.pythonhosted.org/packages/7a/02/66030f7b81fc17c8ea80ccaa36a42ce0cd37ace0c0bfd9e839e70519bd58/artistools-2025.1.7-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:50e40fb7780585e5f41105b3ba51924b492627756417a1ac814340e6cad53e46", size = 13359969 },
-    { url = "https://files.pythonhosted.org/packages/a8/26/8074d01ee4f0adbc3861ecacb5dcc56ca2469d6ed010cc116ff1a6cffaed/artistools-2025.1.7-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:1893ff63f960cd1c598d07b7b334998d72ea3ba4dea5a149178064aeb7cb839e", size = 13435470 },
+    { url = "https://files.pythonhosted.org/packages/1a/c9/922feaede29a0ab9d4eac24b4805a8eafcd94dfeec43f4251b3e70c68525/artistools-2025.1.23-cp310-abi3-macosx_15_0_arm64.whl", hash = "sha256:2e7c50f889348eb714ab927a5102158d8cdece01693754c2cfe9f7fef53679f1", size = 12513313 },
+    { url = "https://files.pythonhosted.org/packages/12/66/94e1bb993d885592428ff1b4f541b291b0e141561be0183327413d646a9c/artistools-2025.1.23-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3bad00f6187af452392a09fe665cb014ed9e125d24849ae4041b142ea36f195a", size = 13068058 },
+    { url = "https://files.pythonhosted.org/packages/d6/a5/e6842cef1d8b329e7ce2b145c151d34b6e1e65f6c32592bc4294609601b0/artistools-2025.1.23-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f7f9144eb69a9d4193df71979d10aa17a72ed1bc2b63d8e65e388a8ade139af5", size = 13436030 },
 ]
 
 [[package]]
