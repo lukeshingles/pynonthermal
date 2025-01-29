@@ -13,7 +13,7 @@ When high-energy leptons (electron and positrons) are injected into a plasma, th
 
 The numerical details of the solver are similar to the Spencer-Fano solver in the [ARTIS](https://github.com/artis-mcrt/artis) radiative transfer code ([Shingles et al. 2020](https://ui.adsabs.harvard.edu/abs/2020MNRAS.492.2029S/abstract)), which itself is an independent implementation of the [Kozma & Fransson (1992)](https://ui.adsabs.harvard.edu/abs/1992ApJ...390..602K/abstract) solution to the [Spencer & Fano (1945)](https://ui.adsabs.harvard.edu/abs/1954PhRv...93.1172S/abstract) equation. A similar solver is also applied in the [CMFGEN code](https://kookaburra.phyast.pitt.edu/hillier/web/CMFGEN.htm).
 
-The impact ionisation cross sections are formula fits from [Arnaud & Rothenflug (1985)](https://ui.adsabs.harvard.edu/abs/1985A%26AS...60..425A/abstract) and [Arnaud & Raymond (1992)](https://ui.adsabs.harvard.edu/abs/1992ApJ...398..394A/abstract).
+The impact ionisation cross sections are formula fits from [Arnaud & Rothenflug (1985)](https://ui.adsabs.harvard.edu/abs/1985A%26AS...60..425A/abstract) and [Arnaud & Raymond (1992)](https://ui.adsabs.harvard.edu/abs/1992ApJ...398..394A/abstract) for Z=1 to 28 (H to Ni). Heavier elements use the approximation of [Axelrod (1980)](https://ui.adsabs.harvard.edu/abs/1980PhDT.........1A/abstract) Eq 3.38 ([Lotz 1967](https://doi.org/10.1007/BF01325928)).
 
 If the internal set of levels and transitions are applied (e.g., using ```add_ion_ltepopexcitation()```), these are imported from the [CMFGEN](https://kookaburra.phyast.pitt.edu/hillier/web/CMFGEN.htm) atomic data compilation. See the individual source files for atomic data references.
 

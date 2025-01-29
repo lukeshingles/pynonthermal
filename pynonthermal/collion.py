@@ -110,6 +110,7 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pd.DataFram
                     if electron_count >= nbound:
                         break
 
+    # Append Lotz approximate cross sections to the Arnaud/Rothenflug data
     dfcollion = pd.concat([dfcollion, pd.DataFrame(new_rows)]).reset_index(drop=True)
     dfcollion["ion_stage"] = dfcollion["Z"] - dfcollion["nelec"] + 1
     dfcollion = dfcollion.sort_values(["Z", "ion_stage", "ionpot_ev", "n", "l"]).reset_index(drop=True)
