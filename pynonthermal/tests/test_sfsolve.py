@@ -9,7 +9,7 @@ pytestmark = pytest.mark.benchmark
 outputfolder = Path(__file__).absolute().parent / "output"
 
 
-def test_helium():
+def test_helium() -> None:
     # KF1992 Figure 3. Pure-Helium Plasma
     x_e = 1e-4
     ions = [
@@ -38,7 +38,7 @@ def test_helium():
         sf.plot_spec_channels(outputfilename=outputfolder / "spec_channels.pdf", xscalelog=True)
 
 
-def test_iron():
+def test_iron() -> None:
     ions = [
         # Z ion_stage numberdensity
         (26, 2, 0.3),

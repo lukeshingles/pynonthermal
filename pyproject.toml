@@ -30,12 +30,15 @@ dependencies = [
 dev = [
     "mypy[faster-cache]>=1.14.1",
     "pre-commit>=4.0.1",
+    "pandas-stubs>=2.2.3.241126",
+    "pyright>=1.1.387",
     "pytest>=6.2.2",
     "pytest-codspeed>=2.2.1",
     "pytest-cov>=2.10.1",
     "pytest-xdist[psutil]>=3.6.1",
     "ruff>=0.8.6",
     "typeguard>=4.1.5",
+    "types-PyYAML>=6.0.12.20250326",
 ]
 
 [project.urls]
@@ -45,11 +48,11 @@ Repository = "https://www.github.com/lukeshingles/pynonthermal/"
 check_untyped_defs = true
 disallow_any_explicit = false
 disallow_any_generics = false
-disallow_any_unimported = false
-disallow_incomplete_defs = false
-disallow_subclassing_any = false
-disallow_untyped_calls = false
-disallow_untyped_defs = false
+disallow_any_unimported = true
+disallow_incomplete_defs = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
 error_summary = true
 enable_error_code = [
     "comparison-overlap",
@@ -71,7 +74,7 @@ scripts_are_modules = true
 strict_equality = true
 extra_checks = true
 warn_redundant_casts = true
-warn_unreachable = false
+warn_unreachable = true
 warn_unused_configs = true
 warn_unused_ignores = true
 
@@ -89,13 +92,14 @@ exclude = [
 ]
 reportAttributeAccessIssue = true
 reportCallIssue = true
-reportMissingImports = false
+reportMissingImports = true
 reportPossiblyUnboundVariable = true
 reportUnecessaryTypeIgnoreComment = true
 reportUnknownVariableType = false
 typeCheckingMode = "standard"
 useLibraryCodeForTypes = true
 targetVersion = "3.13"
+extraPaths = ["../artistools/"]
 
 [tool.pytest.ini_options]
 addopts = " --durations=0  --typeguard-packages=pynonthermal -n auto"

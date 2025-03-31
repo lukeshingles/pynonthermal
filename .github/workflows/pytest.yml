@@ -34,19 +34,21 @@ jobs:
 
             - name: Run Ruff
               if: always()
-              uses: astral-sh/ruff-action@v3
-              with:
-                  args: check --exit-non-zero-on-fix --no-fix
+              run: |
+                  uv run --frozen -- ruff --version
+                  uv run --frozen -- ruff check --exit-non-zero-on-fix --no-fix
 
             - name: Run Ruff Format
               if: always()
-              uses: astral-sh/ruff-action@v3
-              with:
-                  args: format --check
+              run: uv run --frozen -- ruff format --check --exit-non-zero-on-format
 
             - name: Run mypy
               if: always()
-              run: uv run --frozen -- mypy --install-types --non-interactive
+              run: uv run --frozen -- mypy
+
+            - name: Run pyright
+              if: always()
+              run: uv run --frozen -- pyright
 
             - name: Cache pre-commit
               uses: actions/cache@v4
@@ -89,7 +91,7 @@ jobs:
             - name: Install pynonthermal
               run: |
                   uv sync --frozen
-                  uv pip install --compile-bytecode --editable .[dev]
+                  uv pip install --compile-bytecode --editable .
 
             - name: Test with pytest
               run: uv run --frozen -- python3 -m pytest --cov=./ --cov-report=xml

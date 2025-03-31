@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import math
-import typing as t
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -39,7 +39,7 @@ def electronlossfunction(energy_ev: float, n_e_cgs: float) -> float:
     return lossfunc / EV  # return as [eV / cm]
 
 
-def get_n_tot(ions: t.Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], float]) -> float:
+def get_n_tot(ions: Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], float]) -> float:
     # total number density of all nuclei [cm^-3]
     n_tot = 0.0
     for Z, ion_stage in ions:
@@ -47,7 +47,7 @@ def get_n_tot(ions: t.Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int
     return n_tot
 
 
-def get_Zbar(ions, ionpopdict) -> float:
+def get_Zbar(ions: Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], float]) -> float:
     # number density-weighted average atomic number
     # i.e. protons per nucleus
     Zbar = 0.0
@@ -59,7 +59,7 @@ def get_Zbar(ions, ionpopdict) -> float:
     return Zbar
 
 
-def get_Zboundbar(ions, ionpopdict) -> float:
+def get_Zboundbar(ions: Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], float]) -> float:
     # number density-weighted average number of bound electrons per nucleus
     Zboundbar = 0.0
     n_tot = get_n_tot(ions, ionpopdict)

@@ -6,15 +6,15 @@ from math import atan
 from pathlib import Path
 
 import artistools as at
+import matplotlib.axes as mplax
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 import polars as pl
 from scipy import linalg
 
 import pynonthermal
-import pynonthermal.collion
-import pynonthermal.excitation
 from pynonthermal.axelrod import get_workfn_ev
 from pynonthermal.base import electronlossfunction
 from pynonthermal.base import get_Zbar
@@ -64,16 +64,21 @@ class SpencerFanoSolver:
     """
 
     _solved: bool
+    _frac_heating: float
+    _frac_ionisation_tot: float
+    _frac_excitation_tot: float
     ionpopdict: dict[tuple[int, int], float]
-    excitationlists: dict[tuple[int, int], dict]
+    excitationlists: dict[tuple[int, int], dict[t.Any, tuple[float, npt.NDArray[np.float64], float]]]
     verbose: bool
+    _n_e: float
     engrid: npt.NDArray[np.float64]
     deltaen: npt.NDArray[np.float64]
     dfcollion: pd.DataFrame
     sourcevec: npt.NDArray[np.float64]
     E_init_ev: float
     sfmatrix: npt.NDArray[np.float64]
-    adata_polars: pd.DataFrame | None
+    adata_polars: pl.DataFrame | None
+    yvec: npt.NDArray[np.float64]
 
     def __init__(
         self,
@@ -129,20 +134,20 @@ class SpencerFanoSolver:
 
         self.sfmatrix = np.zeros((npts, npts))
 
-    def __enter__(self):
+    def __enter__(self) -> t.Self:
         """Enter the context manager."""
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_traceback):
+    def __exit__(self, *args: object) -> None:
         """Exit the context manager."""
 
-    def get_energyindex_lteq(self, en_ev):
+    def get_energyindex_lteq(self, en_ev: float) -> int:
         return pynonthermal.get_energyindex_lteq(en_ev, engrid=self.engrid)
 
-    def get_energyindex_gteq(self, en_ev):
+    def get_energyindex_gteq(self, en_ev: float) -> int:
         return pynonthermal.get_energyindex_gteq(en_ev, engrid=self.engrid)
 
-    def electronlossfunction(self, en_ev):
+    def electronlossfunction(self, en_ev: float) -> float:
         return electronlossfunction(en_ev, self.get_n_e())
 
     def add_excitation(
@@ -152,7 +157,7 @@ class SpencerFanoSolver:
         levelnumberdensity: float,
         xs_vec: npt.NDArray[np.float64],
         epsilon_trans_ev: float,
-        transitionkey=None,
+        transitionkey: t.Any | None = None,
     ) -> None:
         """Add a bound-bound non-thermal collisional excitation to the solver.
 
@@ -197,7 +202,9 @@ class SpencerFanoSolver:
                 vec_xs_excitation_levelnumberdensity_deltae[stopindex] * delta_en_actual / self.deltaen
             )
 
-    def add_ion_ltepopexcitation(self, Z, ion_stage, n_ion, temperature=3000, adata_polars=None):
+    def add_ion_ltepopexcitation(
+        self, Z: int, ion_stage: int, n_ion: float, temperature: float = 3000, adata_polars: pl.DataFrame | None = None
+    ) -> None:
         if adata_polars is not None:
             self.adata_polars = adata_polars
 
@@ -273,7 +280,7 @@ class SpencerFanoSolver:
                         transitionkey=(transition["lower"], transition["upper"]),
                     )
 
-    def _add_ionisation_shell(self, n_ion, shell):
+    def _add_ionisation_shell(self, n_ion: float, shell: pd.Series) -> None:
         assert not self._solved
         # this code has been optimised and is now an almost unreadable form, but it contains the terms
         # related to ionisation cross sections
@@ -343,7 +350,7 @@ class SpencerFanoSolver:
                     int_eps_lower2 = atan((epsilon_lower2 - ionpot_ev) / J)
                     self.sfmatrix[i, j] -= prefactors[j] * (int_eps_uppers[j] - int_eps_lower2)
 
-    def add_ionisation(self, Z, ion_stage, n_ion):
+    def add_ionisation(self, Z: int, ion_stage: int, n_ion: float) -> None:
         assert not self._solved
         assert (Z, ion_stage) not in self.ionpopdict  # can't add same ion twice
         if n_ion == 0.0:
@@ -363,7 +370,7 @@ class SpencerFanoSolver:
             if shell.ionpot_ev >= self.engrid[0]:
                 self._add_ionisation_shell(n_ion, shell)
 
-    def calculate_free_electron_density(self):
+    def calculate_free_electron_density(self) -> float:
         # number density of free electrons [cm-^3]
         n_e = 0.0
         for Z, ion_stage in self.ionpopdict:
@@ -372,20 +379,20 @@ class SpencerFanoSolver:
             n_e += charge * self.ionpopdict[(Z, ion_stage)]
         return n_e
 
-    def get_n_e(self):
+    def get_n_e(self) -> float:
         if not hasattr(self, "_n_e"):
             self._n_e = self.calculate_free_electron_density()
 
         return self._n_e
 
-    def get_n_ion_tot(self):
+    def get_n_ion_tot(self) -> float:
         # total number density of all nuclei [cm^-3]
         n_ion_tot = 0.0
         for Z, ion_stage in self.ionpopdict:
             n_ion_tot += self.ionpopdict[(Z, ion_stage)]
         return n_ion_tot
 
-    def solve(self, depositionratedensity_ev, override_n_e=None):
+    def solve(self, depositionratedensity_ev: float, override_n_e: float | None = None) -> None:
         assert not self._solved
 
         self.depositionratedensity_ev = depositionratedensity_ev
@@ -418,11 +425,11 @@ class SpencerFanoSolver:
 
         lu_and_piv = linalg.lu_factor(self.sfmatrix, overwrite_a=False)
         yvec_reference = linalg.lu_solve(lu_and_piv, constvec, trans=0)
-        self.yvec = yvec_reference * self.depositionratedensity_ev / self.E_init_ev
+        self.yvec = np.array(yvec_reference * self.depositionratedensity_ev / self.E_init_ev, dtype=np.float64)
         self._solved = True
         del self.sfmatrix  # this can take up a lot of memory
 
-    def calculate_nt_frac_excitation_ion(self, Z, ion_stage):
+    def calculate_nt_frac_excitation_ion(self, Z: int, ion_stage: int) -> float:
         if (Z, ion_stage) not in self.excitationlists:
             return 0.0
 
@@ -441,7 +448,7 @@ class SpencerFanoSolver:
 
         return np.dot(xs_excitation_vec_sum_alltrans, self.yvec) * deltaen / self.depositionratedensity_ev
 
-    def calculate_N_e(self, energy_ev):
+    def calculate_N_e(self, energy_ev: float) -> float:
         # Kozma & Fransson equation 6.
         # Something related to a number of electrons, needed to calculate the heating fraction in equation 3
         # not valid for energy > E_0
@@ -520,7 +527,7 @@ class SpencerFanoSolver:
 
         return N_e
 
-    def calculate_frac_heating(self):
+    def calculate_frac_heating(self) -> float:
         # Kozma & Fransson equation 8
         self._frac_heating = 0.0
         E_0 = self.engrid[0]
@@ -555,14 +562,14 @@ class SpencerFanoSolver:
 
         return self._frac_heating
 
-    def analyse_ntspectrum(self):
+    def analyse_ntspectrum(self) -> None:
         assert self._solved
 
         deltaen = self.engrid[1] - self.engrid[0]
 
         self._frac_ionisation_tot = 0.0
         self._frac_excitation_tot = 0.0
-        self._frac_ionisation_ion = {}
+        self._frac_ionisation_ion: dict[tuple[int, int], float] = {}
         self._frac_excitation_ion = {}
         self._nt_ionisation_ratecoeff = {}
 
@@ -684,7 +691,7 @@ class SpencerFanoSolver:
             print(f"         frac_heating: {frac_heating:.4f}")
             print(f"             frac_sum: {self._frac_excitation_tot + self._frac_ionisation_tot + frac_heating:.4f}")
 
-    def get_n_e_nt(self):
+    def get_n_e_nt(self) -> float:
         assert self._solved
         n_e_nt = 0.0
         for i, en in enumerate(self.engrid):
@@ -694,21 +701,21 @@ class SpencerFanoSolver:
 
         return n_e_nt
 
-    def get_frac_heating(self):
+    def get_frac_heating(self) -> float:
         assert self._solved
         if not hasattr(self, "_frac_heating"):
             self.calculate_frac_heating()
 
         return self._frac_heating
 
-    def get_frac_excitation_tot(self):
+    def get_frac_excitation_tot(self) -> float:
         assert self._solved
         if not hasattr(self, "_frac_excitation_tot"):
             self.analyse_ntspectrum()
 
         return self._frac_excitation_tot
 
-    def get_frac_ionisation_tot(self):
+    def get_frac_ionisation_tot(self) -> float:
         assert self._solved
         if not hasattr(self, "_frac_ionisation_tot"):
             self.analyse_ntspectrum()
@@ -722,27 +729,27 @@ class SpencerFanoSolver:
 
         return self._frac_excitation_ion[(Z, ion_stage)]
 
-    def get_ionisation_ratecoeff(self, Z: int, ion_stage: int):
+    def get_ionisation_ratecoeff(self, Z: int, ion_stage: int) -> float:
         assert self._solved
         return self._nt_ionisation_ratecoeff[(Z, ion_stage)]
 
-    def get_excitation_ratecoeff(self, Z: int, ion_stage: int, transitionkey: t.Any):
+    def get_excitation_ratecoeff(self, Z: int, ion_stage: int, transitionkey: t.Any) -> float:
         # integral in Kozma & Fransson equation 9
         levelnumberdensity, xsvec, epsilon_trans_ev = self.excitationlists[(Z, ion_stage)][transitionkey]
 
         return np.dot(xsvec, self.yvec) * self.deltaen / self.depositionratedensity_ev
 
-    def get_frac_sum(self):
+    def get_frac_sum(self) -> float:
         return self.get_frac_heating() + self.get_frac_excitation_tot() + self.get_frac_ionisation_tot()
 
-    def get_d_etaheating_by_d_en_vec(self):
+    def get_d_etaheating_by_d_en_vec(self) -> list[float]:
         assert self._solved
         return [
             self.electronlossfunction(self.engrid[i]) * self.yvec[i] / self.depositionratedensity_ev
             for i in range(len(self.engrid))
         ]
 
-    def get_d_etaexcitation_by_d_en_vec(self):
+    def get_d_etaexcitation_by_d_en_vec(self) -> npt.NDArray[np.floating]:
         assert self._solved
         part_integrand = np.zeros(len(self.engrid))
 
@@ -756,7 +763,7 @@ class SpencerFanoSolver:
 
         return self.yvec * part_integrand
 
-    def get_d_etaion_by_d_en_vec(self):
+    def get_d_etaion_by_d_en_vec(self) -> npt.NDArray[np.floating]:
         assert self._solved
         part_integrand = np.zeros(len(self.engrid))
 
@@ -772,37 +779,43 @@ class SpencerFanoSolver:
         return self.yvec * part_integrand
 
     def plot_yspectrum(
-        self, en_y_on_d_en: bool = False, xscalelog: bool = False, outputfilename: Path | str | None = None, axis=None
+        self,
+        en_y_on_d_en: bool = False,
+        xscalelog: bool = False,
+        outputfilename: Path | str | None = None,
+        axis: mplax.Axes | None = None,
     ) -> None:
         assert self._solved
         fs = 12
         fig = None
         if axis is None:
-            fig, axis = plt.subplots(
+            fig, ax = plt.subplots(
                 nrows=1,
                 ncols=1,
                 sharex=True,
                 figsize=(5, 4),
                 tight_layout={"pad": 0.5, "w_pad": 0.3, "h_pad": 0.3},
             )
+        else:
+            ax = axis
 
         if en_y_on_d_en:
             arr_y = np.log10(self.yvec * self.engrid)
-            axis.set_ylabel(r"log d(E y)/dE", fontsize=fs)
+            ax.set_ylabel(r"log d(E y)/dE", fontsize=fs)
         else:
             arr_y = np.log10(self.yvec)
-            axis.set_ylabel(r"log y [y (e$^-$ / cm$^2$ / s / eV)]", fontsize=fs)
+            ax.set_ylabel(r"log y [y (e$^-$ / cm$^2$ / s / eV)]", fontsize=fs)
 
-        axis.plot(self.engrid, arr_y, marker="None", lw=1.5, color="black")
+        ax.plot(self.engrid, arr_y, marker="None", lw=1.5, color="black")
         # axes[0].plot(engrid, np.log10(yvec), marker="None", lw=1.5, color='black')
         # axes[0].set_ylabel(r'log y(E) [s$^{-1}$ cm$^{-2}$ eV$^{-1}$]', fontsize=fs)
         # axes[0].set_ylim(bottom=15.5, top=19.)
 
         if xscalelog:
-            axis.set_xscale("log")
-        axis.set_xlim(left=min(1.0, self.engrid[0]))
-        axis.set_xlim(right=self.engrid[-1] * 1.0)
-        axis.set_xlabel(r"Electron energy [eV]", fontsize=fs)
+            ax.set_xscale("log")
+        ax.set_xlim(left=min(1.0, self.engrid[0]))
+        ax.set_xlim(right=self.engrid[-1] * 1.0)
+        ax.set_xlabel(r"Electron energy [eV]", fontsize=fs)
         if axis is None:
             if outputfilename is not None:
                 print(f"Saving '{outputfilename}'")
@@ -812,18 +825,22 @@ class SpencerFanoSolver:
             else:
                 plt.show()
 
-    def plot_channels(self, outputfilename=None, axis=None, xscalelog=False) -> None:
+    def plot_channels(
+        self, outputfilename: Path | str | None = None, axis: mplax.Axes | None = None, xscalelog: bool = False
+    ) -> None:
         assert self._solved
         fs = 12
         fig = None
         if axis is None:
-            fig, axis = plt.subplots(
+            fig, ax = plt.subplots(
                 nrows=1,
                 ncols=1,
                 sharex=True,
                 figsize=(5, 4),
                 tight_layout={"pad": 0.5, "w_pad": 0.3, "h_pad": 0.3},
             )
+        else:
+            ax = axis
 
         npts = len(self.engrid)
         E_0: float = self.engrid[0]
@@ -903,7 +920,7 @@ class SpencerFanoSolver:
             *(d_etaexc_by_d_en_vec * self.engrid),
             *(d_etaheat_by_d_en_vec * self.engrid),
         )
-        axis.plot(
+        ax.plot(
             engridfull,
             np.append(np.zeros(npts_low), d_etaion_by_d_en_vec) * engridfull / detaymax,
             marker="None",
@@ -913,7 +930,7 @@ class SpencerFanoSolver:
         )
 
         if self.get_frac_excitation_tot() > 0.0:
-            axis.plot(
+            ax.plot(
                 engridfull,
                 np.append(np.zeros(npts_low), d_etaexc_by_d_en_vec) * engridfull / detaymax,
                 marker="None",
@@ -924,7 +941,7 @@ class SpencerFanoSolver:
 
         # axis.plot(engridfull, np.append(d_etaheat_by_d_en_low, d_etaheat_by_d_en_vec) * engridfull / detaymax,
         #           marker="None", lw=1.5, color='C2', label='Heating')
-        axis.plot(
+        ax.plot(
             self.engrid,
             d_etaheat_by_d_en_vec * self.engrid / detaymax,
             marker="None",
@@ -933,20 +950,20 @@ class SpencerFanoSolver:
             label="Heating",
         )
 
-        axis.set_ylim(bottom=0, top=1.0)
-        axis.legend(loc="best", handlelength=2, frameon=False, numpoints=1, prop={"size": 10})
-        axis.set_ylabel(r"E d$\eta$ / dE [eV$^{-1}$]", fontsize=fs)
+        ax.set_ylim(bottom=0, top=1.0)
+        ax.legend(loc="best", handlelength=2, frameon=False, numpoints=1, prop={"size": 10})
+        ax.set_ylabel(r"E d$\eta$ / dE [eV$^{-1}$]", fontsize=fs)
 
         # etatot_int = etaion_int + etaexc_int + etaheat_int
 
         #    ax.annotate(modellabel, xy=(0.97, 0.95), xycoords='axes fraction', horizontalalignment='right',
         #                verticalalignment='top', fontsize=fs)
         if xscalelog:
-            axis.set_xscale("log")
+            ax.set_xscale("log")
         # ax.set_yscale('log')
-        axis.set_xlim(left=min(1.0, self.engrid[0]))
-        axis.set_xlim(right=self.engrid[-1] * 1.0)
-        axis.set_xlabel(r"Electron energy [eV]", fontsize=fs)
+        ax.set_xlim(left=min(1.0, self.engrid[0]))
+        ax.set_xlim(right=self.engrid[-1] * 1.0)
+        ax.set_xlabel(r"Electron energy [eV]", fontsize=fs)
         if axis is None:
             if outputfilename is not None:
                 print(f"Saving '{outputfilename}'")
@@ -956,7 +973,7 @@ class SpencerFanoSolver:
             else:
                 plt.show()
 
-    def plot_spec_channels(self, outputfilename: Path | str, xscalelog: bool = False) -> None:
+    def plot_spec_channels(self, outputfilename: Path | str | None, xscalelog: bool = False) -> None:
         fig, axes = plt.subplots(
             nrows=2,
             ncols=1,

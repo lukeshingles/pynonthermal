@@ -23,7 +23,7 @@ repos:
             args: [--fix=lf]
           - id: name-tests-test
             args: [--pytest-test-first]
-          #   - id: trailing-whitespace
+        #   - id: trailing-whitespace
 
     - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
       rev: 0.2.3
@@ -34,25 +34,19 @@ repos:
       rev: v0.11.2
       hooks:
           - id: ruff
-            args: [--fix, --exit-non-zero-on-fix]
-
-    - repo: https://github.com/astral-sh/ruff-pre-commit
-      rev: v0.11.2
-      hooks:
+            args: [--fix]
           - id: ruff-format
 
-    - repo: https://github.com/pre-commit/mirrors-mypy
-      rev: v1.15.0
+    - repo: local
       hooks:
           - id: mypy
-            additional_dependencies: [numpy, pandas]
+            name: mypy
+            entry: mypy
             types: [python]
-            require_serial: true
+            language: python
 
-    # - repo: local
-    #   hooks:
-    #       - id: mypy
-    #         name: mypy
-    #         entry: mypy
-    #         types: [python]
-    #         language: python
+          - id: pyright
+            name: pyright
+            entry: pyright
+            types: [python]
+            language: system

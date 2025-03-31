@@ -155,7 +155,7 @@ def get_lotz_xs_ionisation(shell: pd.Series, en_ev: float) -> float:
     return 0.0
 
 
-def get_Latom_axelrod(Zboundbar, en_ev):
+def get_Latom_axelrod(Zboundbar: float, en_ev: float) -> float:
     # Axelrod 1980 Eq 3.21
     # Latom is 1/N * dE/dX where E is in erg
     # should be units of erg cm^2
@@ -191,7 +191,7 @@ def get_Latom_axelrod(Zboundbar, en_ev):
     )
 
 
-def get_Lelec_axelrod(en_ev, n_e, n_e_tot, n_tot):
+def get_Lelec_axelrod(en_ev: float, n_e: float, n_e_tot: float, n_tot: float) -> float:
     # - 1/N * dE / dX [erg cm^2]
     # returns a positive number
 
@@ -218,7 +218,7 @@ def get_Lelec_axelrod(en_ev, n_e, n_e_tot, n_tot):
     )
 
 
-def electronlossfunction_axelrod(en_ev, n_e, n_e_tot):
+def electronlossfunction_axelrod(en_ev: float, n_e: float, n_e_tot: float) -> float:
     # - dE / dX [erg / cm]
     # returns a positive number
 
