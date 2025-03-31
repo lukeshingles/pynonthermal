@@ -97,12 +97,6 @@ def get_xs_excitation_vector(engrid: npt.NDArray[np.float64], row: dict[str, t.A
         g_bar = A * np.log(U) + B
 
         xs_excitation_vec[startindex:] = constantfactor * g_bar / U
-        for j, energy_ev in enumerate(engrid):
-            energy = energy_ev * EV
-            if energy >= epsilon_trans:
-                U = energy / epsilon_trans
-                g_bar = A * math.log(U) + B
-                xs_excitation_vec[j] = constantfactor * g_bar / U
     else:
         xs_excitation_vec[startindex:] = 0.0
 
