@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
 import polars as pl
 
 import pynonthermal
@@ -39,31 +38,24 @@ def get_nist_ionization_energies_ev() -> dict[tuple[int, int], float]:
 
 
 def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFrame:
-    dfcollion: pl.DataFrame
-    dtypes = {
-        "Z": "Int64[pyarrow]",
-        "nelec": "Int64[pyarrow]",
-        "n": "Int64[pyarrow]",
-        "l": "Int64[pyarrow]",
-        "ionpot_ev": "Float64[pyarrow]",
-        "A": "Float64[pyarrow]",
-        "B": "Float64[pyarrow]",
-        "C": "Float64[pyarrow]",
-        "D": "Float64[pyarrow]",
-    }
-    columns = list(dtypes.keys())
-    with Path(pynonthermal.DATADIR, collionfilename).open() as collionfile:
-        _expectedrowcount = int(collionfile.readline().strip())  # can ignore this line
-        dfcollion = pl.from_pandas(
-            pd.read_csv(
-                collionfile,
-                sep=r"\s+",
-                header=None,
-                names=columns,
-                dtype=dtypes,
-                dtype_backend="pyarrow",
-            )
-        )
+    dfcollion = pl.read_csv(
+        Path(pynonthermal.DATADIR, collionfilename),
+        separator=" ",
+        has_header=False,
+        skip_lines=1,
+        truncate_ragged_lines=True,
+        schema={
+            "Z": pl.Int64,
+            "nelec": pl.Int64,
+            "n": pl.Int64,
+            "l": pl.Int64,
+            "ionpot_ev": pl.Float64,
+            "A": pl.Float64,
+            "B": pl.Float64,
+            "C": pl.Float64,
+            "D": pl.Float64,
+        },
+    )
 
     elements_electron_binding = get_binding_energies()
     all_shells_q = get_shell_configs()
@@ -116,13 +108,11 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFram
                         break
 
     # Append Lotz approximate cross sections to the Arnaud/Rothenflug data
-    dfcollion = (
+    return (
         pl.concat([dfcollion, pl.DataFrame(new_rows)])
         .with_columns(ion_stage=pl.col("Z") - pl.col("nelec") + 1)
         .sort(by=["Z", "ion_stage", "ionpot_ev", "n", "l"])
     )
-
-    return dfcollion
 
 
 def Psecondary(e_p: float, ionpot_ev: float, J: float, e_s: float = -1, epsilon: float = -1) -> float:
