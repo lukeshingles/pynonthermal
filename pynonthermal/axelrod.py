@@ -39,7 +39,7 @@ def get_binding_energies() -> npt.NDArray[np.float64]:
 
 
 @lru_cache
-def get_shell_configs() -> npt.NDArray[np.integer]:
+def get_shell_configs() -> npt.NDArray[np.int64]:
     shellfilepath = Path(pynonthermal.DATADIR, "electron_shell_occupancy.txt")
 
     with shellfilepath.open() as f:
@@ -63,8 +63,8 @@ def get_shell_configs() -> npt.NDArray[np.integer]:
 
 
 def get_shell_occupancies(
-    atomic_number: int, ion_stage: int, electron_binding: npt.NDArray[np.float64], all_shells_q: npt.NDArray[np.integer]
-) -> npt.NDArray[np.integer]:
+    atomic_number: int, ion_stage: int, electron_binding: npt.NDArray[np.float64], all_shells_q: npt.NDArray[np.int64]
+) -> npt.NDArray[np.int64]:
     nbound = atomic_number - ion_stage + 1
     element_shells_q_neutral = all_shells_q[atomic_number - 1]
     shellcount = min(len(element_shells_q_neutral), len(electron_binding[atomic_number - 1]))

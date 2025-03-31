@@ -25,7 +25,7 @@ def get_nist_ionization_energies_ev() -> dict[tuple[int, int], float]:
         usecols=["At. num", "Ion Charge", "Ionization Energy (a) (eV)"],
     )
 
-    dictioniz = {}
+    dictioniz: dict[tuple[int, int], float] = {}
     for atomic_number, ion_charge, ioniz_ev in dfnist[
         ["At. num", "Ion Charge", "Ionization Energy (a) (eV)"]
     ].itertuples(index=False):
@@ -96,7 +96,7 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFram
                         assert enbinding > 0
 
                     p = max(ionpot, enbinding)
-                    collionrow = {
+                    collionrow: dict[str, int | float] = {
                         "Z": Z,
                         "nelec": Z - ionstage + 1,
                         "n": -1,

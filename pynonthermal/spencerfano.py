@@ -64,6 +64,9 @@ class SpencerFanoSolver:
     _frac_heating: float
     _frac_ionisation_tot: float
     _frac_excitation_tot: float
+    _frac_ionisation_ion: dict[tuple[int, int], float]
+    _frac_excitation_ion: dict[tuple[int, int], float]
+    _nt_ionisation_ratecoeff: dict[tuple[int, int], float]
     ionpopdict: dict[tuple[int, int], float]
     excitationlists: dict[tuple[int, int], dict[t.Any, tuple[float, npt.NDArray[np.float64], float]]]
     verbose: bool
@@ -420,8 +423,9 @@ class SpencerFanoSolver:
             en = self.engrid[i]
             self.sfmatrix[i, i] += electronlossfunction(en, n_e)
 
-        lu_and_piv = linalg.lu_factor(self.sfmatrix, overwrite_a=False)
-        yvec_reference = linalg.lu_solve(lu_and_piv, constvec, trans=0)
+        yvec_reference = np.array(
+            linalg.lu_solve(linalg.lu_factor(self.sfmatrix, overwrite_a=False), constvec, trans=0), dtype=np.float64
+        )
         self.yvec = np.array(yvec_reference * self.depositionratedensity_ev / self.E_init_ev, dtype=np.float64)
         self._solved = True
         del self.sfmatrix  # this can take up a lot of memory
@@ -535,13 +539,13 @@ class SpencerFanoSolver:
         # if self.verbose:
         #     print(f"            frac_heating E_0 * y * l(E_0) part: {frac_heating_E_0_part:.5f}")
 
-        frac_heating_N_e = 0.0
+        frac_heating_N_e: float = 0.0
         npts_integral = math.ceil(E_0 / deltaen) * 5
         # if self.verbose:
         #     print(f'N_e npts_integral: {npts_integral}')
-        arr_en, deltaen2 = np.linspace(0.0, E_0, num=npts_integral, retstep=True, endpoint=True)
-        arr_en_N_e = [en_ev * self.calculate_N_e(en_ev) for en_ev in arr_en]
-        frac_heating_N_e += 1.0 / self.depositionratedensity_ev * sum(arr_en_N_e) * deltaen2
+        arr_en, deltaen2 = np.linspace(0.0, E_0, num=npts_integral, retstep=True, endpoint=True, dtype=np.float64)
+        arr_en_N_e = np.array([en_ev * self.calculate_N_e(en_ev) for en_ev in arr_en], dtype=np.float64)
+        frac_heating_N_e += float(1.0 / self.depositionratedensity_ev * sum(arr_en_N_e) * deltaen2)
 
         if self.verbose:
             print(f" frac_heating(E<EMIN): {frac_heating_N_e:.5f}")
@@ -557,7 +561,7 @@ class SpencerFanoSolver:
 
         self._frac_ionisation_tot = 0.0
         self._frac_excitation_tot = 0.0
-        self._frac_ionisation_ion: dict[tuple[int, int], float] = {}
+        self._frac_ionisation_ion = {}
         self._frac_excitation_ion = {}
         self._nt_ionisation_ratecoeff = {}
 
@@ -742,7 +746,7 @@ class SpencerFanoSolver:
             for i in range(len(self.engrid))
         ]
 
-    def get_d_etaexcitation_by_d_en_vec(self) -> npt.NDArray[np.floating]:
+    def get_d_etaexcitation_by_d_en_vec(self) -> npt.NDArray[np.float64]:
         assert self._solved
         part_integrand = np.zeros(len(self.engrid))
 
@@ -756,7 +760,7 @@ class SpencerFanoSolver:
 
         return self.yvec * part_integrand
 
-    def get_d_etaion_by_d_en_vec(self) -> npt.NDArray[np.floating]:
+    def get_d_etaion_by_d_en_vec(self) -> npt.NDArray[np.float64]:
         assert self._solved
         part_integrand = np.zeros(len(self.engrid))
 
@@ -836,7 +840,7 @@ class SpencerFanoSolver:
             ax = axis
 
         npts = len(self.engrid)
-        E_0: float = self.engrid[0]
+        E_0 = self.engrid[0]
 
         # E_init_ev = np.dot(engrid, sourcevec) * deltaen
         # d_etasource_by_d_en_vec = engrid * sourcevec / E_init_ev

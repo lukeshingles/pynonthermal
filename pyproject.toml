@@ -45,7 +45,7 @@ Repository = "https://www.github.com/lukeshingles/pynonthermal/"
 [tool.mypy]
 check_untyped_defs = true
 disallow_any_explicit = false
-disallow_any_generics = false
+disallow_any_generics = true
 disallow_any_unimported = true
 disallow_incomplete_defs = true
 disallow_subclassing_any = true
@@ -93,7 +93,7 @@ reportCallIssue = true
 reportMissingImports = true
 reportPossiblyUnboundVariable = true
 reportUnecessaryTypeIgnoreComment = true
-reportUnknownVariableType = false
+reportUnknownVariableType = true
 typeCheckingMode = "standard"
 useLibraryCodeForTypes = true
 targetVersion = "3.13"

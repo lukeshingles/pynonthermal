@@ -20,8 +20,9 @@ def get_xs_excitation(en_ev: float, row: dict[str, t.Any]) -> float:
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
 
     coll_str = row["collstr"]
-    epsilon_trans = row["epsilon_trans_ev"] * EV
     epsilon_trans_ev = row["epsilon_trans_ev"]
+    assert isinstance(epsilon_trans_ev, float)
+    epsilon_trans = epsilon_trans_ev * EV
 
     if en_ev < epsilon_trans_ev:
         return 0.0
@@ -36,7 +37,7 @@ def get_xs_excitation(en_ev: float, row: dict[str, t.Any]) -> float:
     if not row["forbidden"]:
         nu_trans = epsilon_trans / H
         g = row["upper_g"] / row["lower_g"]
-        fij = g * ME * pow(CLIGHT, 3) / (8 * pow(QE * nu_trans * math.pi, 2)) * row["A"]
+        fij: float = g * ME * pow(CLIGHT, 3) / (8 * pow(QE * nu_trans * math.pi, 2)) * row["A"]
         # permitted E1 electric dipole transitions
 
         g_bar = 0.2
@@ -63,8 +64,9 @@ def get_xs_excitation_vector(engrid: npt.NDArray[np.float64], row: dict[str, t.A
     xs_excitation_vec = np.empty(npts)
 
     coll_str = row["collstr"]
-    epsilon_trans = row["epsilon_trans_ev"] * EV
     epsilon_trans_ev = row["epsilon_trans_ev"]
+    assert isinstance(epsilon_trans_ev, float)
+    epsilon_trans = epsilon_trans_ev * EV
 
     startindex = pynonthermal.get_energyindex_gteq(en_ev=epsilon_trans_ev, engrid=engrid)
     xs_excitation_vec[:startindex] = 0.0
