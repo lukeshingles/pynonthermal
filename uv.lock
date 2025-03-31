@@ -17,7 +17,7 @@ wheels = [
 
 [[package]]
 name = "artistools"
-version = "2025.3.12"
+version = "2025.3.31"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argcomplete" },
@@ -30,7 +30,6 @@ dependencies = [
     { name = "pandas" },
     { name = "polars" },
     { name = "pyarrow" },
-    { name = "pynonthermal" },
     { name = "pypdf" },
     { name = "pyyaml" },
     { name = "rich" },
@@ -40,11 +39,11 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b7/35/54ce6b982e7f3b316fb7eb2854bfd4dc2cb35ae285181d2bd2485fc2557e/artistools-2025.3.12.tar.gz", hash = "sha256:de1c80facca1703ca7890f365eabcc86b42cf112b1ff2de6d10c045bfbd9f2da", size = 8246530 }
+sdist = { url = "https://files.pythonhosted.org/packages/76/fb/76c41cd57750a4d67f83f6f0ec75054468d5a497bc99d1002452fe503cf8/artistools-2025.3.31.tar.gz", hash = "sha256:3db45ed4c354c86e71cbae7b9b41b9eb3774f1eaf66de79753b51168cdba0088", size = 8225250 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/cf/46bea29674e41285f8eee63cf4d0bb6557821b32ecada9420cdbb60518de/artistools-2025.3.12-cp310-abi3-macosx_15_0_arm64.whl", hash = "sha256:3eb48a596f88b70fa4b303b9837e7a0a4829a11d599d18639b14b136053b4cf7", size = 12399051 },
-    { url = "https://files.pythonhosted.org/packages/26/26/465703d6942155b7805e25f5f05c14971ef10bf1b3952ca0376546785260/artistools-2025.3.12-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0bd52b06d064ab1cbaf90ec2f33ae2e73528759d4c4e54e1ee2c6e737b3634fa", size = 12941040 },
-    { url = "https://files.pythonhosted.org/packages/5f/3b/d1f4e76cd0b135ee0ea82ea1e414d4584881b3321c765271e41f6700be2e/artistools-2025.3.12-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c7e5b029814b3a75c5cf1e26dd331c3afe00fbeb5fe520e8b8613dc24fdf1252", size = 13286745 },
+    { url = "https://files.pythonhosted.org/packages/39/3c/d4e484f7c4942897603d13282ab2976afea148a9d514a676efa1dabbee5f/artistools-2025.3.31-cp310-abi3-macosx_15_0_arm64.whl", hash = "sha256:3381b5049f37aec97f2a45bfd3386ff45d9a2ec571f86100b224628aa8c69d7e", size = 12399668 },
+    { url = "https://files.pythonhosted.org/packages/07/fc/fbd4184b988fcb0dccf89ab13bfbdaef000a9ad9eed399025b0a42f7091a/artistools-2025.3.31-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:7e60442745fafd37179393f28a69de319fba6dca1819cf2d174c56bee2a4f72e", size = 12943025 },
+    { url = "https://files.pythonhosted.org/packages/e4/5f/4999b041c81f697bf5d7464ff437de8f86569ac28bc048e2b9781ee957d7/artistools-2025.3.31-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:25395672c6574dacd2ba66676530f53eb7d6f0d42334383b84ef0ef65ab6e368", size = 13293109 },
 ]
 
 [[package]]
