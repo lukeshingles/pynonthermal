@@ -1,4 +1,3 @@
-import contextlib
 import math
 from functools import lru_cache
 from math import atan
@@ -19,20 +18,24 @@ from pynonthermal.constants import EV
 @lru_cache
 def get_nist_ionization_energies_ev() -> dict[tuple[int, int], float]:
     """Get a dictionary where dictioniz[(atomic_number, ion_sage)] = ionization_energy_ev."""
-    dfnist = pd.read_csv(
-        Path(pynonthermal.DATADIR / "nist_ionization.txt.zst"),
-        sep="\t",
-        usecols=["At. num", "Ion Charge", "Ionization Energy (a) (eV)"],
+    dfnist = (
+        pl.read_csv(
+            Path(pynonthermal.DATADIR / "nist_ionization.txt.zst"),
+            separator="\t",
+            infer_schema_length=50,
+            columns=["At. num", "Ion Charge", "Ionization Energy (a) (eV)"],
+            ignore_errors=True,
+        )
+        .rename({"At. num": "Z", "Ionization Energy (a) (eV)": "ioniz_ev"})
+        .with_columns(ion_stage=pl.col("Ion Charge").cast(pl.Int64) + 1)
+        .drop("Ion Charge")
+        .drop_nulls()
     )
 
-    dictioniz: dict[tuple[int, int], float] = {}
-    for atomic_number, ion_charge, ioniz_ev in dfnist[
-        ["At. num", "Ion Charge", "Ionization Energy (a) (eV)"]
-    ].itertuples(index=False):
-        with contextlib.suppress(ValueError):
-            ion_stage = int(ion_charge) + 1
-            dictioniz[(int(atomic_number), ion_stage)] = ioniz_ev
-    return dictioniz
+    return {
+        (atomic_number, ion_stage): ioniz_ev
+        for atomic_number, ion_stage, ioniz_ev in dfnist.select(["Z", "ion_stage", "ioniz_ev"]).iter_rows(named=False)
+    }
 
 
 def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFrame:
