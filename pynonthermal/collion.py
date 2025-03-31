@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import polars as pl
 
 import pynonthermal
 from pynonthermal.axelrod import get_binding_energies
@@ -34,29 +35,31 @@ def get_nist_ionization_energies_ev() -> dict[tuple[int, int], float]:
     return dictioniz
 
 
-def read_colliondata(collionfilename: str | Path = "collion.txt") -> pd.DataFrame:
-    dfcollion: pd.DataFrame
+def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFrame:
+    dfcollion: pl.DataFrame
     dtypes = {
-        "Z": int,
-        "nelec": int,
-        "n": int,
-        "l": int,
-        "ionpot_ev": float,
-        "A": float,
-        "B": float,
-        "C": float,
-        "D": float,
+        "Z": "Int64[pyarrow]",
+        "nelec": "Int64[pyarrow]",
+        "n": "Int64[pyarrow]",
+        "l": "Int64[pyarrow]",
+        "ionpot_ev": "Float64[pyarrow]",
+        "A": "Float64[pyarrow]",
+        "B": "Float64[pyarrow]",
+        "C": "Float64[pyarrow]",
+        "D": "Float64[pyarrow]",
     }
     columns = list(dtypes.keys())
     with Path(pynonthermal.DATADIR, collionfilename).open() as collionfile:
         _expectedrowcount = int(collionfile.readline().strip())  # can ignore this line
-        dfcollion = pd.read_csv(
-            collionfile,
-            sep=r"\s+",
-            header=None,
-            names=columns,
-            dtype=dtypes,
-            # nrows=1,
+        dfcollion = pl.from_pandas(
+            pd.read_csv(
+                collionfile,
+                sep=r"\s+",
+                header=None,
+                names=columns,
+                dtype=dtypes,
+                dtype_backend="pyarrow",
+            )
         )
 
     elements_electron_binding = get_binding_energies()
@@ -64,9 +67,8 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pd.DataFram
     new_rows = []
     for Z in range(1, len(elements_electron_binding)):
         for ionstage in range(1, 6):
-            any_data_matched = any(
-                collionrow["Z"] == Z and collionrow["nelec"] == Z - ionstage + 1
-                for _, collionrow in dfcollion.iterrows()
+            any_data_matched = (
+                dfcollion.filter(pl.col("Z") == Z).filter(pl.col("nelec") == (Z - ionstage + 1)).height > 0
             )
 
             if not any_data_matched:
@@ -111,9 +113,11 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pd.DataFram
                         break
 
     # Append Lotz approximate cross sections to the Arnaud/Rothenflug data
-    dfcollion = pd.concat([dfcollion, pd.DataFrame(new_rows)]).reset_index(drop=True)
-    dfcollion["ion_stage"] = dfcollion["Z"] - dfcollion["nelec"] + 1
-    dfcollion = dfcollion.sort_values(["Z", "ion_stage", "ionpot_ev", "n", "l"]).reset_index(drop=True)
+    dfcollion = (
+        pl.concat([dfcollion, pl.DataFrame(new_rows)])
+        .with_columns(ion_stage=pl.col("Z") - pl.col("nelec") + 1)
+        .sort(by=["Z", "ion_stage", "ionpot_ev", "n", "l"])
+    )
 
     return dfcollion
 
@@ -174,18 +178,20 @@ def ar_xs(energy_ev: float, ionpot_ev: float, A: float, B: float, C: float, D: f
     )
 
 
-def get_arxs_array_shell(arr_enev: npt.NDArray[np.float64], shell: pd.Series) -> npt.NDArray[np.float64]:
-    if shell.n < 0:
-        return np.array([get_lotz_xs_ionisation(shell=shell, en_ev=en_ev) for en_ev in arr_enev])
-    return np.array([ar_xs(energy_ev, shell.ionpot_ev, shell.A, shell.B, shell.C, shell.D) for energy_ev in arr_enev])
+def get_arxs_array_shell(arr_enev: npt.NDArray[np.float64], shell: dict[str, int | float]) -> npt.NDArray[np.float64]:
+    if shell["n"] < 0:
+        return np.array([get_lotz_xs_ionisation(shell, en_ev=en_ev) for en_ev in arr_enev])
+    return np.array(
+        [ar_xs(energy_ev, shell["ionpot_ev"], shell["A"], shell["B"], shell["C"], shell["D"]) for energy_ev in arr_enev]
+    )
 
 
 def get_arxs_array_ion(
-    arr_enev: npt.NDArray[np.float64], dfcollion: pd.DataFrame, Z: int, ion_stage: int
+    arr_enev: npt.NDArray[np.float64], dfcollion: pl.DataFrame, Z: int, ion_stage: int
 ) -> npt.NDArray[np.float64]:
     ar_xs_array = np.zeros(len(arr_enev))
-    dfcollion_thision = dfcollion.query("Z == @Z and ion_stage == @ion_stage")
-    for index, shell in dfcollion_thision.iterrows():
+    dfcollion_thision = dfcollion.filter(pl.col("Z") == Z).filter(pl.col("ion_stage") == ion_stage)
+    for shell in dfcollion_thision.iter_rows(named=True):
         ar_xs_array += get_arxs_array_shell(arr_enev, shell)
 
     return ar_xs_array

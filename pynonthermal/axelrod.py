@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
 
 import pynonthermal
 from pynonthermal.constants import CLIGHT
@@ -119,7 +118,7 @@ def get_workfn_ev(atomic_number: int, ion_stage: int, ionpot_ev: float, Zbar: fl
     return (1 / oneoverW) / EV
 
 
-def get_lotz_xs_ionisation(shell: pd.Series, en_ev: float) -> float:
+def get_lotz_xs_ionisation(shell: dict[str, int | float], en_ev: float) -> float:
     # Axelrod 1980 Eq 3.38
 
     en_erg = en_ev * EV

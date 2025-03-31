@@ -21,7 +21,6 @@ dependencies = [
     "artistools>=2024.07.04.2",
     "matplotlib>=3.9.1",
     "numpy>=1.19.4",
-    "pandas>=2.2",
     "polars>=1.20.0",
     "scipy>=1.5.4",
 ]
@@ -30,7 +29,6 @@ dependencies = [
 dev = [
     "mypy[faster-cache]>=1.14.1",
     "pre-commit>=4.0.1",
-    "pandas-stubs>=2.2.3.241126",
     "pyright>=1.1.387",
     "pytest>=6.2.2",
     "pytest-codspeed>=2.2.1",

@@ -10,7 +10,6 @@ import matplotlib.axes as mplax
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-import pandas as pd
 import polars as pl
 from scipy import linalg
 
@@ -20,8 +19,6 @@ from pynonthermal.base import electronlossfunction
 from pynonthermal.base import get_Zbar
 from pynonthermal.constants import K_B
 
-if t.TYPE_CHECKING:
-    import pandas as pd
 SUBSHELLNAMES = [
     "K ",
     "L1",
@@ -73,7 +70,7 @@ class SpencerFanoSolver:
     _n_e: float
     engrid: npt.NDArray[np.float64]
     deltaen: npt.NDArray[np.float64]
-    dfcollion: pd.DataFrame
+    dfcollion: pl.DataFrame
     sourcevec: npt.NDArray[np.float64]
     E_init_ev: float
     sfmatrix: npt.NDArray[np.float64]
@@ -280,13 +277,13 @@ class SpencerFanoSolver:
                         transitionkey=(transition["lower"], transition["upper"]),
                     )
 
-    def _add_ionisation_shell(self, n_ion: float, shell: pd.Series) -> None:
+    def _add_ionisation_shell(self, n_ion: float, shell: dict[str, int | float]) -> None:
         assert not self._solved
         # this code has been optimised and is now an almost unreadable form, but it contains the terms
         # related to ionisation cross sections
         deltaen = self.engrid[1] - self.engrid[0]
-        ionpot_ev = shell.ionpot_ev
-        J = pynonthermal.collion.get_J(int(shell.Z), int(shell.ion_stage), ionpot_ev)
+        ionpot_ev = shell["ionpot_ev"]
+        J = pynonthermal.collion.get_J(int(shell["Z"]), int(shell["ion_stage"]), ionpot_ev)
         npts = len(self.engrid)
 
         ar_xs_array = pynonthermal.collion.get_arxs_array_shell(self.engrid, shell)
@@ -364,10 +361,10 @@ class SpencerFanoSolver:
             )
         assert n_ion > 0.0
         self.ionpopdict[(Z, ion_stage)] = n_ion
-        dfcollion_thision = self.dfcollion.query("Z == @Z and ion_stage == @ion_stage", inplace=False)
+        dfcollion_thision = self.dfcollion.filter(pl.col("Z") == Z).filter(pl.col("ion_stage") == ion_stage)
 
-        for index, shell in dfcollion_thision.iterrows():
-            if shell.ionpot_ev >= self.engrid[0]:
+        for shell in dfcollion_thision.iter_rows(named=True):
+            if shell["ionpot_ev"] >= self.engrid[0]:
                 self._add_ionisation_shell(n_ion, shell)
 
     def calculate_free_electron_density(self) -> float:
@@ -474,13 +471,13 @@ class SpencerFanoSolver:
                         # yvecinterp = (1 - x) * yvec[i] + x * yvec[i + 1]
                         # N_e_ion += (levelnumberdensity / n_ion) * yvecinterp * get_xs_excitation(energy_ev + epsilon_trans_ev, row)
 
-            dfcollion_thision = self.dfcollion.query("Z == @Z and ion_stage == @ion_stage", inplace=False)
+            dfcollion_thision = self.dfcollion.filter(pl.col("Z") == Z).filter(pl.col("ion_stage") == ion_stage)
 
-            for _index, shell in dfcollion_thision.iterrows():
-                ionpot_ev = shell.ionpot_ev
+            for shell in dfcollion_thision.iter_rows(named=True):
+                ionpot_ev = shell["ionpot_ev"]
 
                 enlambda = min(self.engrid[-1] - energy_ev, energy_ev + ionpot_ev)
-                J = pynonthermal.collion.get_J(int(shell.Z), int(shell.ion_stage), ionpot_ev)
+                J = pynonthermal.collion.get_J(int(shell["Z"]), int(shell["ion_stage"]), ionpot_ev)
 
                 ar_xs_array = pynonthermal.collion.get_arxs_array_shell(self.engrid, shell)
 
@@ -497,15 +494,6 @@ class SpencerFanoSolver:
                         * ar_xs_array[k]
                         * pynonthermal.collion.Psecondary(e_p=self.engrid[k], epsilon=endash, ionpot_ev=ionpot_ev, J=J)
                     )
-
-                    # interpolate the y value
-                    # xs = ar_xs(energy_ev + endash, shell.ionpot_ev, shell.A, shell.B, shell.C, shell.D)
-                    # enbelow = engrid[k]
-                    # enabove = engrid[k + 1]
-                    # x = (energy_ev - enbelow) / (enabove - enbelow)
-                    # yvecinterp = (1 - x) * yvec[k] + x * yvec[k + 1]
-                    # N_e_ion += deltaen * yvecinterp * xs * Psecondary(
-                    #     e_p=energy_ev + endash, epsilon=endash, ionpot_ev=ionpot_ev, J=J)
 
                 # integral from 2E + I up to E_max
                 integral2startindex = self.get_energyindex_lteq(en_ev=2 * energy_ev + ionpot_ev)
@@ -579,10 +567,11 @@ class SpencerFanoSolver:
         for (Z, ion_stage), n_ion in self.ionpopdict.items():
             n_ion_tot = self.get_n_ion_tot()
             X_ion = n_ion / n_ion_tot
-            dfcollion_thision = self.dfcollion.query("Z == @Z and ion_stage == @ion_stage", inplace=False)
+            dfcollion_thision = self.dfcollion.filter(pl.col("Z") == Z).filter(pl.col("ion_stage") == ion_stage)
             # if dfcollion.empty:
             #     continue
-            ionpot_valence = dfcollion_thision.ionpot_ev.min()
+            ionpot_valence = dfcollion_thision["ionpot_ev"].min()
+            assert isinstance(ionpot_valence, float)
 
             if self.verbose:
                 print(
@@ -597,23 +586,27 @@ class SpencerFanoSolver:
             self._frac_ionisation_ion[(Z, ion_stage)] = 0.0
             integralgamma = 0.0
             eta_over_ionpot_sum = 0.0
-            for index, shell in dfcollion_thision.iterrows():
+            for shell in dfcollion_thision.iter_rows(named=True):
                 ar_xs_array = pynonthermal.collion.get_arxs_array_shell(self.engrid, shell)
 
                 frac_ionisation_shell = (
-                    n_ion * shell.ionpot_ev * np.dot(self.yvec, ar_xs_array) * deltaen / self.depositionratedensity_ev
+                    n_ion
+                    * shell["ionpot_ev"]
+                    * np.dot(self.yvec, ar_xs_array)
+                    * deltaen
+                    / self.depositionratedensity_ev
                 )
 
                 if self.verbose:
-                    if int(shell.n) < 0:
-                        strsubshell = SUBSHELLNAMES[-int(shell.l)]
+                    if int(shell["n"]) < 0:
+                        strsubshell = SUBSHELLNAMES[-int(shell["l"])]
                         shellname = f"Lotz shell {strsubshell}"
                     else:
-                        shellname = f"n {int(shell.n):d} l {int(shell.l):d}"
+                        shellname = f"n {int(shell['n']):d} l {int(shell['l']):d}"
                     print(
                         f"frac_ionisation_shell({shellname}):"
                         f" {frac_ionisation_shell:.4f} (ionpot"
-                        f" {shell.ionpot_ev:.2f} eV)"
+                        f" {shell['ionpot_ev']:.2f} eV)"
                     )
 
                 integralgamma += np.dot(self.yvec, ar_xs_array) * deltaen
@@ -623,7 +616,7 @@ class SpencerFanoSolver:
                     # frac_ionisation_shell = 0.0
 
                 self._frac_ionisation_ion[(Z, ion_stage)] += frac_ionisation_shell
-                eta_over_ionpot_sum += frac_ionisation_shell / shell.ionpot_ev
+                eta_over_ionpot_sum += frac_ionisation_shell / shell["ionpot_ev"]
 
             self._frac_ionisation_tot += self._frac_ionisation_ion[(Z, ion_stage)]
 
@@ -769,12 +762,12 @@ class SpencerFanoSolver:
 
         for Z, ion_stage in self.ionpopdict:
             n_ion = self.ionpopdict[(Z, ion_stage)]
-            dfcollion_thision = self.dfcollion.query("Z == @Z and ion_stage == @ion_stage", inplace=False)
+            dfcollion_thision = self.dfcollion.filter(pl.col("Z") == Z).filter(pl.col("ion_stage") == ion_stage)
 
-            for index, shell in dfcollion_thision.iterrows():
+            for shell in dfcollion_thision.iter_rows(named=True):
                 xsvec = pynonthermal.collion.get_arxs_array_shell(self.engrid, shell)
 
-                part_integrand += n_ion * shell.ionpot_ev * xsvec / self.depositionratedensity_ev
+                part_integrand += n_ion * shell["ionpot_ev"] * xsvec / self.depositionratedensity_ev
 
         return self.yvec * part_integrand
 
