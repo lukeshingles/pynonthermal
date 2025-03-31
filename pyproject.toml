@@ -8,14 +8,13 @@ authors = [{ name = "Luke J. Shingles", email = "luke.shingles@gmail.com" }]
 description = "A non-thermal electron deposition (Spencer-Fano equation) solver."
 classifiers = [
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Intended Audience :: Science/Research",
 ]
 dynamic = ["version"]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { file = "LICENSE" }
 readme = { file = "README.md", content-type = 'text/markdown' }
 dependencies = [
@@ -96,14 +95,14 @@ reportUnecessaryTypeIgnoreComment = true
 reportUnknownVariableType = false
 typeCheckingMode = "standard"
 useLibraryCodeForTypes = true
-targetVersion = "3.10"
+targetVersion = "3.13"
 
 [tool.pytest.ini_options]
 addopts = " --durations=0  --typeguard-packages=pynonthermal -n auto"
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 fix = true
 show-fixes = true
 extend-exclude = ["_version.py"]
