@@ -43,7 +43,7 @@ dev = [
 Repository = "https://www.github.com/lukeshingles/pynonthermal/"
 
 [tool.mypy]
-check_untyped_defs = false
+check_untyped_defs = true
 disallow_any_explicit = false
 disallow_any_generics = false
 disallow_any_unimported = false
@@ -86,15 +86,16 @@ exclude = [
     'build',
     'dist',
     'target',
+    '_version.py',
 ]
-reportAttributeAccessIssue = false
+reportAttributeAccessIssue = true
 reportCallIssue = true
 reportMissingImports = false
-reportPossiblyUnboundVariable = false
+reportPossiblyUnboundVariable = true
 reportUnecessaryTypeIgnoreComment = true
 reportUnknownVariableType = false
 typeCheckingMode = "standard"
-useLibraryCodeForTypes = false
+useLibraryCodeForTypes = true
 targetVersion = "3.10"
 
 [tool.pytest.ini_options]

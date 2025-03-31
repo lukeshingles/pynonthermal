@@ -5,6 +5,8 @@ from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
+import pandas as pd
 
 import pynonthermal
 from pynonthermal.constants import CLIGHT
@@ -15,7 +17,7 @@ from pynonthermal.constants import QE
 
 
 @lru_cache
-def get_binding_energies() -> np.ndarray:
+def get_binding_energies() -> npt.NDArray[np.float64]:
     collionfilepath = Path(pynonthermal.DATADIR, "binding_energies_lotz_tab1and2.txt")
 
     with collionfilepath.open() as f:
@@ -38,7 +40,7 @@ def get_binding_energies() -> np.ndarray:
 
 
 @lru_cache
-def get_shell_configs() -> np.ndarray:
+def get_shell_configs() -> npt.NDArray[np.integer]:
     shellfilepath = Path(pynonthermal.DATADIR, "electron_shell_occupancy.txt")
 
     with shellfilepath.open() as f:
@@ -61,7 +63,9 @@ def get_shell_configs() -> np.ndarray:
     return shells_q
 
 
-def get_shell_occupancies(atomic_number: int, ion_stage: int, electron_binding, all_shells_q):
+def get_shell_occupancies(
+    atomic_number: int, ion_stage: int, electron_binding: npt.NDArray[np.float64], all_shells_q: npt.NDArray[np.integer]
+) -> npt.NDArray[np.integer]:
     nbound = atomic_number - ion_stage + 1
     element_shells_q_neutral = all_shells_q[atomic_number - 1]
     shellcount = min(len(element_shells_q_neutral), len(electron_binding[atomic_number - 1]))
@@ -115,7 +119,7 @@ def get_workfn_ev(atomic_number: int, ion_stage: int, ionpot_ev: float, Zbar: fl
     return (1 / oneoverW) / EV
 
 
-def get_lotz_xs_ionisation(shell, en_ev: float) -> float:
+def get_lotz_xs_ionisation(shell: pd.Series, en_ev: float) -> float:
     # Axelrod 1980 Eq 3.38
 
     en_erg = en_ev * EV
