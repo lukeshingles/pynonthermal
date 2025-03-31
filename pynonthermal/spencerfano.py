@@ -219,6 +219,9 @@ class SpencerFanoSolver:
         assert self.adata_polars is not None
 
         ion = self.adata_polars.filter(pl.col("Z") == Z).filter(pl.col("ion_stage") == ion_stage)
+        if ion.is_empty():
+            msg = f"ERROR: No excitation data for Z={Z} ion_stage {ion_stage} in internal database."
+            raise AssertionError(msg)
 
         dfpops_thision = ion["levels"].item()
 
