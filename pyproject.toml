@@ -60,10 +60,11 @@ enable_error_code = [
     "truthy-bool",
     "unused-awaitable",
 ]
-exclude = "(build)|(dist)|(tests)|(data)"
+exclude = "(build)|(dist)|(tests)|(data)|(.venv)|(venv)|(_version.py)"
 ignore_missing_imports = true
 implicit_optional = false
-implicit_reexport = true
+implicit_reexport = false
+local_partial_types = true
 packages = "pynonthermal"
 plugins = 'numpy.typing.mypy_plugin'
 pretty = true
@@ -83,21 +84,20 @@ exclude = [
     '**/node_modules',
     '**/__pycache__',
     '**/.*',
+    '.venv',
     'build',
     'dist',
     'target',
     '_version.py',
 ]
-reportAttributeAccessIssue = true
-reportCallIssue = true
-reportMissingImports = true
-reportPossiblyUnboundVariable = true
-reportUnecessaryTypeIgnoreComment = true
-reportUnknownVariableType = true
-typeCheckingMode = "standard"
-useLibraryCodeForTypes = true
-targetVersion = "3.13"
 extraPaths = ["../artistools/"]
+reportMissingTypeStubs = false
+reportUnecessaryTypeIgnoreComment = true
+reportUnknownMemberType = false
+reportUnusedVariable = true
+targetVersion = "3.13"
+typeCheckingMode = "strict"
+useLibraryCodeForTypes = true
 
 [tool.pytest.ini_options]
 addopts = " --durations=0  --typeguard-packages=pynonthermal -n auto"

@@ -235,8 +235,8 @@ class SpencerFanoSolver:
 
         lzdftransitions = ion["transitions"].item().filter((pl.col("collstr") >= 0).or_(pl.col("forbidden") == 0))
 
-        maxnlevelslower = None
-        maxnlevelsupper = None
+        maxnlevelslower: int | None = None
+        maxnlevelsupper: int | None = None
 
         # find the highest ground multiplet level
         # groundlevelnoj = ion.levels.iloc[0].levelname.split('[')[0]
@@ -246,9 +246,9 @@ class SpencerFanoSolver:
         maxnlevelslower = 5
         maxnlevelsupper = 250
 
-        if maxnlevelslower is not None:
+        if maxnlevelslower is not None:  # pyright: ignore [reportUnnecessaryComparison]
             lzdftransitions = lzdftransitions.filter(pl.col("lower") < maxnlevelslower)
-        if maxnlevelsupper is not None:
+        if maxnlevelsupper is not None:  # pyright: ignore [reportUnnecessaryComparison]
             lzdftransitions = lzdftransitions.filter(pl.col("upper") < maxnlevelsupper)
 
         lzdftransitions = lzdftransitions.filter(pl.col("epsilon_trans_ev") >= self.engrid[0])
@@ -735,7 +735,7 @@ class SpencerFanoSolver:
 
     def get_excitation_ratecoeff(self, Z: int, ion_stage: int, transitionkey: t.Any) -> float:
         # integral in Kozma & Fransson equation 9
-        levelnumberdensity, xsvec, epsilon_trans_ev = self.excitationlists[(Z, ion_stage)][transitionkey]
+        _levelnumberdensity, xsvec, _epsilon_trans_ev = self.excitationlists[(Z, ion_stage)][transitionkey]
 
         return np.dot(xsvec, self.yvec) * self.deltaen / self.depositionratedensity_ev
 

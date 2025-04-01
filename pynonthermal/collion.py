@@ -59,7 +59,7 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFram
 
     elements_electron_binding = get_binding_energies()
     all_shells_q = get_shell_configs()
-    new_rows = []
+    new_rows: list[dict[str, int | float]] = []
     for Z in range(1, len(elements_electron_binding)):
         for ionstage in range(1, 6):
             any_data_matched = (
