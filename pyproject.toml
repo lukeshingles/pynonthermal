@@ -192,6 +192,7 @@ order-by-type = false
 packages = ["pynonthermal"]
 include-package-data = true
 license-files = ["LICENSE"]
+exclude-package-data = { "pynonthermal" = [".*", ".venv", "venv"] }
 
 [tool.setuptools_scm]
 version_file = "_version.py"
