@@ -3,6 +3,7 @@
   "extends": [
     "config:recommended"
   ],
+  "labels": ["dependencies"],
   "bumpVersion": "minor",
   "pre-commit": {
     "enabled": true
@@ -11,11 +12,11 @@
     "enabled": true,
     "automerge": true,
     "schedule": [
-      "on wednesday"
+      "* 9 * * 2"
     ]
   },
   "rangeStrategy": "update-lockfile",
   "schedule": [
-    "on wednesday"
+    "* 9 * * 2"
   ]
 }
