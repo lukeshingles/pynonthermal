@@ -190,7 +190,7 @@ def get_Latom_axelrod(Zboundbar: float, en_ev: float) -> float:
     )
 
 
-def get_Lelec_axelrod(en_ev: float, n_e: float, n_e_tot: float, n_tot: float) -> float:
+def get_Lelec_axelrod(en_ev: float, n_e: float, n_tot: float) -> float:
     # - 1/N * dE / dX [erg cm^2]
     # returns a positive number
 
@@ -217,8 +217,8 @@ def get_Lelec_axelrod(en_ev: float, n_e: float, n_e_tot: float, n_tot: float) ->
     )
 
 
-def electronlossfunction_axelrod(en_ev: float, n_e: float, n_e_tot: float) -> float:
+def electronlossfunction_axelrod(en_ev: float, n_e: float) -> float:
     # - dE / dX [erg / cm]
     # returns a positive number
 
-    return get_Lelec_axelrod(en_ev, n_e=n_e, n_e_tot=n_e_tot, n_tot=1)
+    return get_Lelec_axelrod(en_ev, n_e=n_e, n_tot=1)

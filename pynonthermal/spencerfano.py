@@ -87,7 +87,7 @@ class SpencerFanoSolver:
         npts: int = 4000,
         verbose: bool = False,
         use_ar1985: bool = False,
-    ):
+    ) -> None:
         self._solved = False
         self.ionpopdict = {}  # key is (Z, ion_stage) value is number density
 

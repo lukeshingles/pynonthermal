@@ -112,11 +112,7 @@ extend-exclude = ["_version.py"]
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "ARG001",  # ignored because variables in df.eval() are not detected
-    "ANN",
-    "B005",    # strip-with-multi-characters
-    "B007",    # variable not used in loop body (but sometimes it is with DataFrame.eval)
-    "B905",    # zip without explicit strict parameter
+    "ANN401",  # any-type
     "C901",    # complex-structure
     "COM812",  # missing-trailing-comma
     "CPY001",  # missing-copyright-notice
@@ -135,33 +131,20 @@ ignore = [
     "ERA001",  # commented-out-code
     "FBT",
     "FIX002",  # line contains TODO
-    "ISC001",  # single-line-implicit-string-concatenation
     "N802",    # Function name should be lowercase
     "N803",    # Argument name should be lowercase
     "N806",    # non-lowercase-variable-in-function
     "N816",    # variable-name-too-short
-    "N999",    # invalid-module-name
-    "PD901",   # df is a bad variable name
-    "PERF203", # try-except-in-loop
     "PLC0414", # useless-import-alias
-    #"PGH001",  # No builtin `eval()` allowed
     "PLR0911", # too-many-return-statements
     "PLR0912", # too-many-branches
     "PLR0913", # too-many-arguments
     "PLR0915", # too-many-statements
     "PLR2004", # magic-value-comparison
-    "PLW2901", # redefined-loop-name
-    "PYI024",  # Use `typing.NamedTuple` instead of `collections.namedtuple`
     "S101",    # Use of assert detected
-    "S301",    # suspicious-pickle-usage
-    #"S307",  # suspicious-eval-usage
-    "S311",   # suspicious-non-cryptographic-random-usage
-    "S603",   # subprocess-without-shell-equals-true
-    "S607",   # start-process-with-partial-path
-    "SLF001", # private-member-access
-    "T201",   # print found
-    "TD002",  # missing-todo-author
-    "TD003",  # missing-todo-link
+    "T201",    # print found
+    "TD002",   # missing-todo-author
+    "TD003",   # missing-todo-link
 ]
 fixable = ["ALL"]
 unfixable = [
