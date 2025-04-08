@@ -66,6 +66,7 @@ class SpencerFanoSolver:
     _frac_excitation_tot: float
     _frac_ionisation_ion: dict[tuple[int, int], float]
     _frac_excitation_ion: dict[tuple[int, int], float]
+    _eff_ionpot: dict[tuple[int, int], float]
     _nt_ionisation_ratecoeff: dict[tuple[int, int], float]
     ionpopdict: dict[tuple[int, int], float]
     excitationlists: dict[tuple[int, int], dict[t.Any, tuple[float, npt.NDArray[np.float64], float]]]
@@ -567,6 +568,7 @@ class SpencerFanoSolver:
         self._frac_ionisation_ion = {}
         self._frac_excitation_ion = {}
         self._nt_ionisation_ratecoeff = {}
+        self._eff_ionpot = {}
 
         if self.verbose:
             print(f"    n_e_nt: {self.get_n_e_nt():.2e} [/cm3]")
@@ -627,7 +629,8 @@ class SpencerFanoSolver:
 
             self._frac_ionisation_tot += self._frac_ionisation_ion[(Z, ion_stage)]
 
-            eff_ionpot = X_ion / eta_over_ionpot_sum if eta_over_ionpot_sum else float("inf")
+            eff_ionpot = float(X_ion / eta_over_ionpot_sum) if eta_over_ionpot_sum else float("inf")
+            self._eff_ionpot[(Z, ion_stage)] = eff_ionpot
 
             # eff_ionpot_usevalence = (
             #     ionpot_valence * X_ion / self._frac_ionisation_ion[(Z, ion_stage)]
@@ -728,6 +731,13 @@ class SpencerFanoSolver:
             self.analyse_ntspectrum()
 
         return self._frac_excitation_ion[(Z, ion_stage)]
+
+    def get_eff_ionpot(self, Z: int, ion_stage: int) -> float:
+        assert self._solved
+        if not hasattr(self, "_eff_ionpot"):
+            self.analyse_ntspectrum()
+
+        return self._eff_ionpot[(Z, ion_stage)]
 
     def get_ionisation_ratecoeff(self, Z: int, ion_stage: int) -> float:
         assert self._solved
