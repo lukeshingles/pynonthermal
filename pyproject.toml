@@ -90,7 +90,6 @@ exclude = [
     'target',
     '_version.py',
 ]
-extraPaths = ["../artistools/"]
 reportMissingTypeStubs = false
 reportUnecessaryTypeIgnoreComment = true
 reportUnknownMemberType = false
