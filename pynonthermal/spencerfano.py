@@ -190,7 +190,7 @@ class SpencerFanoSolver:
         xsstartindex = self.get_energyindex_lteq(en_ev=epsilon_trans_ev)
 
         for i, en in enumerate(self.engrid):
-            stopindex = self.get_energyindex_lteq(en_ev=en + epsilon_trans_ev)
+            stopindex = self.get_energyindex_lteq(en_ev=float(en + epsilon_trans_ev))
 
             startindex = max(i, xsstartindex)
             # for j in range(startindex, stopindex):
@@ -340,7 +340,7 @@ class SpencerFanoSolver:
                     self.sfmatrix[i, j] += prefactors[j] * (int_eps_uppers[j] - int_eps_lowers1[j - i])
 
             if 2 * en + ionpot_ev < self.engrid[-1] + (self.engrid[1] - self.engrid[0]):
-                secondintegralstartindex = self.get_energyindex_lteq(2 * en + ionpot_ev)
+                secondintegralstartindex = self.get_energyindex_lteq(float(2 * en + ionpot_ev))
             else:
                 secondintegralstartindex = npts + 1
 
@@ -533,7 +533,7 @@ class SpencerFanoSolver:
         self._frac_heating += (
             deltaen
             / self.depositionratedensity_ev
-            * sum(electronlossfunction(en_ev, n_e) * self.yvec[i] for i, en_ev in enumerate(self.engrid))
+            * sum(electronlossfunction(float(en_ev), n_e) * self.yvec[i] for i, en_ev in enumerate(self.engrid))
         )
 
         frac_heating_E_0_part = E_0 * self.yvec[0] * electronlossfunction(E_0, n_e) / self.depositionratedensity_ev
@@ -926,9 +926,11 @@ class SpencerFanoSolver:
         # axes[0].set_ylabel(r'log d(E y(E)) / dE', fontsize=fs)
 
         detaymax = max(
-            *(d_etaion_by_d_en_vec * self.engrid),
-            *(d_etaexc_by_d_en_vec * self.engrid),
-            *(d_etaheat_by_d_en_vec * self.engrid),
+            [
+                float(np.max(d_etaion_by_d_en_vec * self.engrid)),
+                float(np.max(d_etaexc_by_d_en_vec * self.engrid)),
+                float(np.max(d_etaheat_by_d_en_vec * self.engrid)),
+            ]
         )
         ax.plot(
             engridfull,
@@ -953,7 +955,7 @@ class SpencerFanoSolver:
         #           marker="None", lw=1.5, color='C2', label='Heating')
         ax.plot(
             self.engrid,
-            d_etaheat_by_d_en_vec * self.engrid / detaymax,
+            (np.array(d_etaheat_by_d_en_vec) * self.engrid) / detaymax,
             marker="None",
             lw=1.5,
             color="C2",

@@ -84,8 +84,6 @@ def get_xs_excitation_vector(engrid: npt.NDArray[np.float64], row: dict[str, t.A
         fij = g * ME * pow(CLIGHT, 3) / (8 * pow(QE * nu_trans * math.pi, 2)) * row["A"]
         # permitted E1 electric dipole transitions
 
-        g_bar = 0.2
-
         A = 0.28
         B = 0.15
 
@@ -94,6 +92,7 @@ def get_xs_excitation_vector(engrid: npt.NDArray[np.float64], row: dict[str, t.A
         constantfactor = prefactor * A_naught_squared * pow(H_ionpot / epsilon_trans, 2) * fij
 
         U = engrid[startindex:] / epsilon_trans_ev
+        # g_bar = 0.2
         g_bar = A * np.log(U) + B
 
         xs_excitation_vec[startindex:] = constantfactor * g_bar / U
