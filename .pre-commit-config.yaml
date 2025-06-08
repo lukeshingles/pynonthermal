@@ -25,6 +25,12 @@ repos:
             args: [--pytest-test-first]
         #   - id: trailing-whitespace
 
+    - repo: https://github.com/astral-sh/uv-pre-commit
+      rev: 0.7.12
+      hooks:
+          - id: uv-lock
+          - id: uv-sync
+            args: [--locked, --all-extras]
     - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
       rev: 0.2.3
       hooks:
@@ -41,12 +47,16 @@ repos:
       hooks:
           - id: mypy
             name: mypy
-            entry: mypy
+            entry: uv run --frozen -- mypy
             types: [python]
             language: python
+            pass_filenames: false
+            require_serial: true
 
           - id: pyright
             name: pyright
-            entry: pyright
+            entry: uv run --frozen -- pyright
             types: [python]
             language: system
+            pass_filenames: false
+            require_serial: true
