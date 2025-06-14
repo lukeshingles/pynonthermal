@@ -27,7 +27,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "mypy[faster-cache]>=1.14.1",
+    "mypy>=1.16.0",
     "pre-commit>=4.0.1",
     "pyright>=1.1.387",
     "pytest>=6.2.2",
@@ -67,7 +67,6 @@ implicit_reexport = false
 local_partial_types = true
 packages = "pynonthermal"
 pretty = true
-python_version = '3.13'
 scripts_are_modules = true
 strict_equality = true
 extra_checks = true
@@ -93,7 +92,7 @@ reportMissingTypeStubs = false
 reportUnecessaryTypeIgnoreComment = true
 reportUnknownMemberType = false
 reportUnusedVariable = true
-targetVersion = "3.13"
+targetVersion = "3.12"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
 
@@ -102,7 +101,6 @@ addopts = " --durations=0  --typeguard-packages=pynonthermal -n auto"
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
 fix = true
 show-fixes = true
 extend-exclude = ["_version.py"]
