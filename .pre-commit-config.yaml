@@ -25,19 +25,19 @@ repos:
             args: [--pytest-test-first]
         #   - id: trailing-whitespace
 
-    - repo: https://github.com/astral-sh/uv-pre-commit
-      rev: 0.7.12
-      hooks:
-          - id: uv-lock
-          - id: uv-sync
-            args: [--locked, --all-extras]
     - repo: https://github.com/jumanjihouse/pre-commit-hook-yamlfmt
       rev: 0.2.3
       hooks:
           - id: yamlfmt
 
+    - repo: https://github.com/astral-sh/uv-pre-commit
+      rev: 0.8.5
+      hooks:
+          - id: uv-sync
+            args: [--locked, --all-extras]
+
     - repo: https://github.com/astral-sh/ruff-pre-commit
-      rev: v0.11.13
+      rev: v0.12.7
       hooks:
           - id: ruff-check
             args: [--fix]
@@ -45,14 +45,6 @@ repos:
 
     - repo: local
       hooks:
-          - id: mypy
-            name: mypy
-            entry: uv run --frozen -- mypy
-            types: [python]
-            language: python
-            pass_filenames: false
-            require_serial: true
-
           - id: pyright
             name: pyright
             entry: uv run --frozen -- pyright
@@ -60,3 +52,11 @@ repos:
             language: system
             pass_filenames: false
             require_serial: true
+
+          - id: ty-check
+            name: ty-check
+            language: python
+            entry: uv run --frozen -- ty check
+            pass_filenames: false
+            args: [--python=.venv/]
+            additional_dependencies: [ty]
