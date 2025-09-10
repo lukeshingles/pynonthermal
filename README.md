@@ -35,7 +35,7 @@ cd pynonthermal
 uv sync --frozen
 source ./.venv/bin/activate
 uv pip install --editable .
-pre-commit install
+prek install
 ```
 
 ## Usage

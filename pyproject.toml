@@ -30,7 +30,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "mypy>=1.16.0",
-    "pre-commit>=4.0.1",
+    "prek>=0.1.6",
     "pyright>=1.1.387",
     "pytest>=6.2.2",
     "pytest-codspeed>=2.2.1",
