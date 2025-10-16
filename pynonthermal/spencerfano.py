@@ -211,7 +211,7 @@ class SpencerFanoSolver:
 
         if self.adata_polars is None:
             # use ARTIS atomic data read by the artistools package to get the levels
-            self.adata_polars = at.atomic.get_levels_polars(
+            self.adata_polars = at.atomic.get_levels(
                 Path(pynonthermal.DATADIR, "artis_files"),
                 get_transitions=True,
                 derived_transitions_columns=["epsilon_trans_ev", "lambda_angstroms", "lower_g", "upper_g"],
