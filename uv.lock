@@ -1076,7 +1076,7 @@ dev = [
     { name = "prek", specifier = ">=0.2.9" },
     { name = "pyright", specifier = ">=1.1.406" },
     { name = "pytest", specifier = ">=6.2.2" },
-    { name = "pytest-codspeed", specifier = ">=2.2.1" },
+    { name = "pytest-codspeed", specifier = ">=4.1.1" },
     { name = "pytest-cov", specifier = ">=2.10.1" },
     { name = "pytest-xdist", extras = ["psutil"], specifier = ">=3.6.1" },
     { name = "ruff", specifier = ">=0.14.0" },
