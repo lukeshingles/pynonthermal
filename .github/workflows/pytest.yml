@@ -56,7 +56,7 @@ jobs:
               run: uv run -- mypy
 
             - name: Cache prek
-              uses: actions/cache@v4
+              uses: actions/cache@v5
               with:
                   path: ~/.cache/prek
                   key: prek-3-${{ runner.os }}--${{ hashFiles('.pre-commit-config.yaml') }}-${{ github.run_id }}
