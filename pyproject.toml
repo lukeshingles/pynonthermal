@@ -98,6 +98,7 @@ reportUnusedVariable = true
 targetVersion = "3.12"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
+extraPaths = ["../artistools"]
 
 [tool.pytest.ini_options]
 addopts = " --durations=0  --typeguard-packages=pynonthermal -n auto"
