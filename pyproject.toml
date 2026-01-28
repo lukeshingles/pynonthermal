@@ -92,10 +92,10 @@ exclude = [
     '_version.py',
 ]
 reportMissingTypeStubs = false
-reportUnecessaryTypeIgnoreComment = true
+reportUnnecessaryTypeIgnoreComment = true
 reportUnknownMemberType = false
 reportUnusedVariable = true
-targetVersion = "3.12"
+pythonVersion = "3.12"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
 extraPaths = ["../artistools"]
