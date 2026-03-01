@@ -46,7 +46,7 @@ jobs:
             id-token: write
         if: startsWith(github.ref , 'refs/tags/v') != true
         steps:
-            - uses: actions/download-artifact@v7
+            - uses: actions/download-artifact@v8
               with:
                   pattern: dist-*
                   path: dist
@@ -68,7 +68,7 @@ jobs:
             id-token: write
         if: startsWith(github.ref, 'refs/tags/v')
         steps:
-            - uses: actions/download-artifact@v7
+            - uses: actions/download-artifact@v8
               with:
                   pattern: dist-*
                   path: dist
