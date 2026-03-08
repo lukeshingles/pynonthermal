@@ -182,6 +182,6 @@ version_file = "_version.py"
 local_scheme = "no-local-version"
 
 [tool.vulture]
-exclude = [".*", "build/", ".eggs/"]
+exclude = [".*", "build/", ".eggs/", ".venv", "venv"]
 paths = ["pynonthermal"]
 sort_by_size = true
