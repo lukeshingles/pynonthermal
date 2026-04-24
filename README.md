@@ -17,6 +17,9 @@ The impact ionisation cross sections are formula fits from [Arnaud & Rothenflug 
 
 If the internal set of levels and transitions are applied (e.g., using ```add_ion_ltepopexcitation()```), these are imported from the [CMFGEN](https://kookaburra.phyast.pitt.edu/hillier/web/CMFGEN.htm) atomic data compilation. See the individual source files for atomic data references.
 
+## Citing pynonthermal
+If you make use of pynonthermal, please cite the code according to the [Zenodo record](https://zenodo.org/badge/latestdoi/359805556).
+
 ## Example output
 The following plot shows the energy distribution of contributions to ionisation, excitation, and heating for a pure oxygen plasma (electron fraction 1e-2), reproducing figure 2 of KF92. The area under each curve gives the fraction of deposited energy going into that particular channel.
 
@@ -41,19 +44,19 @@ prek install
 ## Usage
 See the [quickstart notebook](https://github.com/lukeshingles/pynonthermal/blob/main/quickstart.ipynb) [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/lukeshingles/pynonthermal/HEAD?filepath=quickstart.ipynb) for an example of how to set up the composition and use the solver to determine ionisation and heating rates.
 
-## Advanced Usage - Excitation cross sections
-Advanced users will likely want to control the particular excitation cross sections that are included in the solver. Individual excitation transitions can be added with:
+## Advanced Usage - Custom excitation cross sections
+It is possible to supply your own excitation cross section table to the solver. Add the excitation with:
 
 ```python
-SpencerFanoSolver.add_excitation(Z, ion_stage, n_level, xs_vec, epsilon_trans_ev, transitionkey=(lower, upper))
+sf.add_excitation(Z, ion_stage, n_level, xs_vec, epsilon_trans_ev, transitionkey=(lower, upper))
 ```
 Z is the atomic number. ion_stage is the one more than the ion charge (e.g., Fe I or ion stage 1 has charge zero). The argument xs_vec is a numpy array of cross sections [cm<sup>2</sup>] defined at every energy in the sf.engrid array [eV]. The transition key can be almost anything that is unique within the ion and is used to refer back to the level pair when requesting the excitation rate coefficient.
 
 ```python
-nt_exc = SpencerFanoSolver.get_excitation_ratecoeff(Z, ion_stage, transitionkey)
+nt_exc = sf.get_excitation_ratecoeff(Z, ion_stage, transitionkey)
 ```
 
-## Meta
+## Licence
 
 Distributed under the MIT license. See ``LICENSE`` for more information.
 
