@@ -19,7 +19,6 @@ license = { file = "LICENSE" }
 readme = { file = "README.md", content-type = 'text/markdown' }
 dependencies = [
     "artistools>=2026.4.20",
-    "ipykernel>=7.2.0",
     "matplotlib>=3.10.7",
     "matplotlib-inline>=0.1.7",
     "numpy>=2.3.4",
