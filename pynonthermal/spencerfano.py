@@ -171,7 +171,7 @@ class SpencerFanoSolver:
         transitionkey:
             any key to uniquely identify the transition so that the rate coefficient can be retrieved later
         """
-        assert not self._solved
+        assert not self._solved, "Can't add excitation after solving the Spencer-Fano equation"
         assert len(xs_vec) == len(self.engrid)
 
         if (Z, ion_stage) not in self.excitationlists:
@@ -223,6 +223,10 @@ class SpencerFanoSolver:
         if ion.is_empty():
             msg = f"ERROR: No excitation data for Z={Z} ion_stage {ion_stage} in internal database."
             raise AssertionError(msg)
+
+        assert (Z, ion_stage) not in self.ionpopdict or math.isclose(
+            self.ionpopdict[(Z, ion_stage)], n_ion, rel_tol=1e-6
+        ), "Can't add the same ion twice with different populations"
 
         dfpops_thision = ion["levels"].item()
 
@@ -285,7 +289,7 @@ class SpencerFanoSolver:
                     )
 
     def _add_ionisation_shell(self, n_ion: float, shell: dict[str, int | float]) -> None:
-        assert not self._solved
+        assert not self._solved, "Can't add ionisation after solving the Spencer-Fano equation"
         # this code has been optimised and is now an almost unreadable form, but it contains the terms
         # related to ionisation cross sections
         deltaen = self.engrid[1] - self.engrid[0]
@@ -355,8 +359,8 @@ class SpencerFanoSolver:
                     self.sfmatrix[i, j] -= prefactors[j] * (int_eps_uppers[j] - int_eps_lower2)
 
     def add_ionisation(self, Z: int, ion_stage: int, n_ion: float) -> None:
-        assert not self._solved
-        assert (Z, ion_stage) not in self.ionpopdict  # can't add same ion twice
+        assert not self._solved, "Can't add ionisation after solving the Spencer-Fano equation"
+        assert (Z, ion_stage) not in self.ionpopdict, "Can't add the same ion twice"
         if n_ion == 0.0:
             return
 
@@ -397,7 +401,7 @@ class SpencerFanoSolver:
         return n_ion_tot
 
     def solve(self, depositionratedensity_ev: float, override_n_e: float | None = None) -> None:
-        assert not self._solved
+        self.reset_solution_analysis()
 
         self.depositionratedensity_ev = depositionratedensity_ev
         if override_n_e is not None:
@@ -423,16 +427,18 @@ class SpencerFanoSolver:
             for j in range(i, npts):
                 constvec[i] += self.sourcevec[j] * deltaen
 
+        sfmatrix_with_electronloss = self.sfmatrix.copy()
         for i in range(npts):
-            en = self.engrid[i]
-            self.sfmatrix[i, i] += electronlossfunction(en, n_e)
+            sfmatrix_with_electronloss[i, i] += electronlossfunction(self.engrid[i], n_e)
 
         yvec_reference = np.array(
-            linalg.lu_solve(linalg.lu_factor(self.sfmatrix, overwrite_a=False), constvec, trans=0), dtype=np.float64
+            linalg.lu_solve(
+                linalg.lu_factor(sfmatrix_with_electronloss, overwrite_a=False), constvec, trans=0
+            ),  # zuban: ignore[no-untyped-call]
+            dtype=np.float64,
         )
         self.yvec = np.array(yvec_reference * self.depositionratedensity_ev / self.E_init_ev, dtype=np.float64)
         self._solved = True
-        del self.sfmatrix  # this can take up a lot of memory
 
     def calculate_nt_frac_excitation_ion(self, Z: int, ion_stage: int) -> float:
         if (Z, ion_stage) not in self.excitationlists:
@@ -549,7 +555,7 @@ class SpencerFanoSolver:
         #     print(f'N_e npts_integral: {npts_integral}')
         arr_en, deltaen2 = np.linspace(0.0, E_0, num=npts_integral, retstep=True, endpoint=True, dtype=np.float64)
         arr_en_N_e = np.array([en_ev * self.calculate_N_e(en_ev) for en_ev in arr_en], dtype=np.float64)
-        frac_heating_N_e += float(1.0 / self.depositionratedensity_ev * sum(arr_en_N_e) * deltaen2)
+        frac_heating_N_e += float(1.0 / self.depositionratedensity_ev * arr_en_N_e.sum() * deltaen2)
 
         if self.verbose:
             print(f" frac_heating(E<EMIN): {frac_heating_N_e:.5f}")
@@ -558,17 +564,19 @@ class SpencerFanoSolver:
 
         return self._frac_heating
 
-    def analyse_ntspectrum(self) -> None:
-        assert self._solved
-
-        deltaen = self.engrid[1] - self.engrid[0]
-
+    def reset_solution_analysis(self) -> None:
         self._frac_ionisation_tot = 0.0
         self._frac_excitation_tot = 0.0
         self._frac_ionisation_ion = {}
         self._frac_excitation_ion = {}
         self._nt_ionisation_ratecoeff = {}
         self._eff_ionpot = {}
+
+    def analyse_ntspectrum(self) -> None:
+        assert self._solved
+        self.reset_solution_analysis()
+
+        deltaen = self.engrid[1] - self.engrid[0]
 
         if self.verbose:
             print(f"    n_e_nt: {self.get_n_e_nt():.2e} [/cm3]")
