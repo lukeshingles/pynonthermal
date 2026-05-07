@@ -91,12 +91,7 @@ class SpencerFanoSolver:
     ) -> None:
         self._solved = False
         self._n_e = 0.0
-        self._frac_heating = 0.0
-        self._frac_excitation_tot = 0.0
-        self._frac_ionisation_tot = 0.0
-        self._frac_excitation_ion = {}
-        self._frac_ionisation_ion = {}
-        self._eff_ionpot = {}
+        self.reset_solution_analysis()
 
         self.ionpopdict = {}  # key is (Z, ion_stage) value is number density
 
@@ -573,6 +568,7 @@ class SpencerFanoSolver:
         return self._frac_heating
 
     def reset_solution_analysis(self) -> None:
+        self._frac_heating = 0.0
         self._frac_ionisation_tot = 0.0
         self._frac_excitation_tot = 0.0
         self._frac_ionisation_ion = {}
