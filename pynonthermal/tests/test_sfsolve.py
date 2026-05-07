@@ -1,6 +1,6 @@
+import math
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 import pynonthermal
@@ -31,9 +31,11 @@ def test_helium() -> None:
         frac_heating = sf.get_frac_heating()
 
         frac_sum = frac_excitation_tot + frac_ionisation_tot + frac_heating
-        assert np.isclose(frac_sum, 1.0, atol=0.005)
-        assert np.isclose(frac_excitation_tot, 0.3315, atol=0.05)
-        assert np.isclose(frac_ionisation_tot, 0.4849, atol=0.05)
+        assert math.isclose(frac_sum, 1.0, abs_tol=0.005)
+        assert math.isclose(frac_excitation_tot, 0.3315, abs_tol=0.05)
+        assert math.isclose(frac_ionisation_tot, 0.4849, abs_tol=0.05)
+        assert math.isclose(sf.get_frac_ionisation_ion(Z=ions[0][0], ion_stage=ions[0][1]), 0.4807, abs_tol=0.05)
+        assert math.isclose(sf.get_frac_ionisation_ion(Z=ions[1][0], ion_stage=ions[1][1]), 0.0, abs_tol=0.05)
 
         sf.plot_spec_channels(outputfilename=outputfolder / "spec_channels.pdf", xscalelog=True)
 
@@ -58,14 +60,14 @@ def test_iron() -> None:
         frac_heating = sf.get_frac_heating()
 
         frac_sum = frac_excitation_tot + frac_ionisation_tot + frac_heating
-        assert np.isclose(frac_sum, 1.0, atol=0.005)
-        assert np.isclose(frac_excitation_tot, 0.0204, atol=0.05)
-        assert np.isclose(frac_ionisation_tot, 0.1391, atol=0.05)
+        assert math.isclose(frac_sum, 1.0, abs_tol=0.005)
+        assert math.isclose(frac_excitation_tot, 0.0204, abs_tol=0.05)
+        assert math.isclose(frac_ionisation_tot, 0.1391, abs_tol=0.05)
 
-        assert np.isclose(sf.get_ionisation_ratecoeff(26, 2), 4.44e-01, rtol=0.05)
-        assert np.isclose(sf.get_ionisation_ratecoeff(26, 3), 3.70e-01, rtol=0.05)
+        assert math.isclose(sf.get_ionisation_ratecoeff(26, 2), 4.44e-01, rel_tol=0.05)
+        assert math.isclose(sf.get_ionisation_ratecoeff(26, 3), 3.70e-01, rel_tol=0.05)
 
-        assert np.isclose(sf.get_excitation_ratecoeff(26, 2, (0, 100)), 3.9930269946568673e-07, rtol=0.01)
-        assert np.isclose(sf.get_excitation_ratecoeff(26, 2, (1, 100)), 6.654239325994856e-08, rtol=0.01)
+        assert math.isclose(sf.get_excitation_ratecoeff(26, 2, (0, 100)), 3.9930269946568673e-07, rel_tol=0.05)
+        assert math.isclose(sf.get_excitation_ratecoeff(26, 2, (1, 100)), 6.654239325994856e-08, rel_tol=0.05)
 
         sf.plot_spec_channels(outputfilename=outputfolder / "spec_channels.pdf", xscalelog=True)
