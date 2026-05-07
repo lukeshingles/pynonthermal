@@ -23,6 +23,8 @@ def test_helium() -> None:
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
             sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion)
 
+        # call solve twice to test that it can be called multiple times without error
+        sf.solve(depositionratedensity_ev=1000)
         sf.solve(depositionratedensity_ev=100)
 
         sf.analyse_ntspectrum()
