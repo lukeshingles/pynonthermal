@@ -404,6 +404,7 @@ class SpencerFanoSolver:
         return n_ion_tot
 
     def solve(self, depositionratedensity_ev: float, override_n_e: float | None = None) -> None:
+        self._solved = False
         self.reset_solution_analysis()
 
         self.depositionratedensity_ev = depositionratedensity_ev
