@@ -57,11 +57,12 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFram
         },
     )
 
+    nist_ionisation_energies_ev = get_nist_ionization_energies_ev()
     elements_electron_binding = get_binding_energies()
     all_shells_q = get_shell_configs()
     new_rows: list[dict[str, int | float]] = []
     for Z in range(1, len(elements_electron_binding)):
-        for ionstage in range(1, 6):
+        for ionstage in range(1, Z + 1):
             any_data_matched = (
                 dfcollion.filter(pl.col("Z") == Z).filter(pl.col("nelec") == (Z - ionstage + 1)).height > 0
             )
@@ -73,8 +74,11 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFram
                     continue
 
                 # ion_shells_q = get_shell_occupancies(Z, ionstage, elements_electron_binding, all_shells_q)
-                ion_shells_q = all_shells_q[Z - 1]
-                ionpot = get_nist_ionization_energies_ev()[(Z, ionstage)] * EV
+                try:
+                    ion_shells_q = all_shells_q[Z - 1]
+                    ionpot = nist_ionisation_energies_ev[(Z, ionstage)] * EV
+                except (KeyError, IndexError):
+                    continue
 
                 electron_count = 0
                 for shellindex in range(len(ion_shells_q)):
