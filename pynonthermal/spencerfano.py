@@ -90,6 +90,14 @@ class SpencerFanoSolver:
         use_ar1985: bool = False,
     ) -> None:
         self._solved = False
+        self._n_e = 0.0
+        self._frac_heating = 0.0
+        self._frac_excitation_tot = 0.0
+        self._frac_ionisation_tot = 0.0
+        self._frac_excitation_ion = {}
+        self._frac_ionisation_ion = {}
+        self._eff_ionpot = {}
+
         self.ionpopdict = {}  # key is (Z, ion_stage) value is number density
 
         # key is (Z, ion_stage) value is {levelkey : (levelnumberdensity, xs_vec, epsilon_trans_ev)}
@@ -388,7 +396,7 @@ class SpencerFanoSolver:
         return n_e
 
     def get_n_e(self) -> float:
-        if not hasattr(self, "_n_e"):
+        if self._n_e <= 0.0:
             self._n_e = self.calculate_free_electron_density()
 
         return self._n_e
@@ -714,35 +722,35 @@ class SpencerFanoSolver:
 
     def get_frac_heating(self) -> float:
         assert self._solved
-        if not hasattr(self, "_frac_heating"):
+        if self._frac_heating <= 0.0:
             self.calculate_frac_heating()
 
         return self._frac_heating
 
     def get_frac_excitation_tot(self) -> float:
         assert self._solved
-        if not hasattr(self, "_frac_excitation_tot"):
+        if self._frac_excitation_tot <= 0.0:
             self.analyse_ntspectrum()
 
         return self._frac_excitation_tot
 
     def get_frac_ionisation_tot(self) -> float:
         assert self._solved
-        if not hasattr(self, "_frac_ionisation_tot"):
+        if self._frac_ionisation_tot <= 0.0:
             self.analyse_ntspectrum()
 
         return self._frac_ionisation_tot
 
     def get_frac_ionisation_ion(self, Z: int, ion_stage: int) -> float:
         assert self._solved
-        if not hasattr(self, "_frac_excitation_ion"):
+        if (Z, ion_stage) not in self._frac_ionisation_ion:
             self.analyse_ntspectrum()
 
-        return self._frac_excitation_ion[(Z, ion_stage)]
+        return self._frac_ionisation_ion[(Z, ion_stage)]
 
     def get_eff_ionpot(self, Z: int, ion_stage: int) -> float:
         assert self._solved
-        if not hasattr(self, "_eff_ionpot"):
+        if (Z, ion_stage) not in self._eff_ionpot:
             self.analyse_ntspectrum()
 
         return self._eff_ionpot[(Z, ion_stage)]
