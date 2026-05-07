@@ -47,9 +47,13 @@ jobs:
               if: always()
               run: uv run -- ty check
 
-            - name: Run pyright
+            - name: Run pyrefly
               if: always()
-              run: uv run -- pyright --warnings
+              run: uv run -- pyrefly check
+
+            - name: Run basedpyright
+              if: always()
+              run: uv run -- basedpyright --warnings
 
             - name: Run mypy
               if: always()

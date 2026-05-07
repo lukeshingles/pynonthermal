@@ -45,18 +45,15 @@ repos:
 
     - repo: local
       hooks:
-          - id: pyright
-            name: pyright
-            entry: uv run --frozen -- pyright
-            types: [python]
-            language: system
-            pass_filenames: false
-            require_serial: true
-
           - id: ty-check
             name: ty-check
-            language: python
+            language: system
             entry: uv run --frozen -- ty check
             pass_filenames: false
             args: [--python=.venv/]
-            additional_dependencies: [ty]
+
+          - id: pyrefly
+            name: pyrefly
+            entry: uv run --frozen -- pyrefly check
+            language: system
+            pass_filenames: false
