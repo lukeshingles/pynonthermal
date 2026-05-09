@@ -135,7 +135,6 @@ ignore = [
     "D104",    # undocumented-public-package
     "D107",    # undocumented-public-init
     "D203",    # one-blank-line-before-class
-    "D205",    # blank-line-after-summary
     "D213",    # multi-line-summary-second-line
     "D417",    # undocumented-param
     "E501",    # Line too long
@@ -147,8 +146,6 @@ ignore = [
     "N803",    # Argument name should be lowercase
     "N806",    # non-lowercase-variable-in-function
     "N816",    # variable-name-too-short
-    "PLC0414", # useless-import-alias
-    "PLR0911", # too-many-return-statements
     "PLR0912", # too-many-branches
     "PLR0913", # too-many-arguments
     "PLR0915", # too-many-statements
