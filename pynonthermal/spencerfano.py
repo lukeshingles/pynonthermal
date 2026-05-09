@@ -107,8 +107,12 @@ class SpencerFanoSolver:
         )
 
         self.sourcevec = np.zeros(self.engrid.shape)
-        # source_spread_pts = math.ceil(npts / 10.)
-        source_spread_pts = math.ceil(npts * 0.1)
+        # 0.3% of the energy range, so 0.1 keV for 3 KeV Emax to match Kozma & Fransson 1992
+        source_spread_pts = math.ceil(npts / 30.0)
+        if source_spread_pts < 1:
+            msg = "source_spread_pts must be at least 1"
+            raise ValueError(msg)
+
         for s in range(npts):
             # spread the source over some energy width
             if s < npts - source_spread_pts:
