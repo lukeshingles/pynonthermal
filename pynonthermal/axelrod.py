@@ -122,8 +122,6 @@ def get_lotz_xs_ionisation(shell: dict[str, int | float], en_ev: float) -> float
     # Axelrod 1980 Eq 3.38
 
     en_erg = en_ev * EV
-    # gamma = en_erg / (ME * CLIGHT**2) + 1
-    # beta = math.sqrt(1.0 - 1.0 / (gamma**2))
 
     beta = math.sqrt(2 * en_erg / ME) / CLIGHT
     betasq = beta**2
@@ -140,7 +138,9 @@ def get_lotz_xs_ionisation(shell: dict[str, int | float], en_ev: float) -> float
 
     p = ionpot_ev * EV
 
-    # if 0.5 * betasq * ME * CLIGHT**2 > p:
+    # WARNING: The Axelrod equation uses both ln() and log10(), but the log10() term is likely a typo and should be
+    # ln(). Fortunately, at our typical 16 keV value of EMAX, 511 keV electrons are only mildly relativistic and the
+    # log10 term is small anyway.
     if en_erg > p:
         part_sigma_shell = (
             electronsinshell / p * (math.log(betasq * ME * CLIGHT**2 / 2.0 / p) - math.log10(1 - betasq) - betasq)
