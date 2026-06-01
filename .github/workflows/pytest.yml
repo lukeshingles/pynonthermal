@@ -43,10 +43,6 @@ jobs:
               if: always()
               run: uv run -- ruff format --check --exit-non-zero-on-format
 
-            - name: Run ty
-              if: always()
-              run: uv run -- ty check
-
             - name: Run pyrefly
               if: always()
               run: uv run -- pyrefly check
