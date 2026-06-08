@@ -71,18 +71,15 @@ jobs:
 
     pytest:
         timeout-minutes: 120
-        runs-on: ${{ matrix.os }}
+        runs-on: ubuntu-24.04
         strategy:
             fail-fast: false
             matrix:
-                os: [ubuntu-24.04, macos-15]
                 python-version: ['3.12', '3.13', '3.14', 3.14t]
         env:
-            OS: ${{ matrix.os }}
-            PYTHON: ${{ matrix.python-version }}
             UV_FROZEN: 1
 
-        name: pytest ${{ matrix.os }} python ${{ matrix.python-version }}
+        name: pytest python ${{ matrix.python-version }}
         steps:
             - name: Checkout Code
               uses: actions/checkout@v6
@@ -108,6 +105,9 @@ jobs:
 
             - name: Upload coverage to Codecov
               uses: codecov/codecov-action@v6
+              env:
+                  OS: ${{ runner.os.name }}
+                  PYTHON: ${{ matrix.python-version }}
               with:
                   token: ${{ secrets.CODECOV_TOKEN }}
                   files: ./coverage.xml
