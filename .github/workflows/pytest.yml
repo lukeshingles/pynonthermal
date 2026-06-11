@@ -60,11 +60,11 @@ jobs:
 
     pytest:
         timeout-minutes: 120
-        runs-on: ubuntu-26.04-arm
         strategy:
             fail-fast: false
             matrix:
                 python-version: ['3.12', '3.13', '3.14', 3.14t]
+        runs-on: ubuntu-26.04${{ !endsWith(matrix.python-version, 't') && '-arm' || '' }}
         env:
             UV_FROZEN: 1
 
