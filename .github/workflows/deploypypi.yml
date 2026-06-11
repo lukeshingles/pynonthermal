@@ -13,13 +13,14 @@ on:
 jobs:
     build:
         name: Build distributions
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04-arm
         steps:
             - uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
-            - uses: actions/setup-python@v6
+            - name: Setup uv
+              uses: astral-sh/setup-uv@v7
 
             - name: Install dependencies
               run: |
@@ -40,7 +41,7 @@ jobs:
     testdeploy:
         name: Test upload to TestPyPI
         needs: [build]
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04-arm
         environment: test
         permissions:
             id-token: write
