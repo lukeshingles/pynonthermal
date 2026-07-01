@@ -19,7 +19,7 @@ jobs:
             UV_FROZEN: 1
         steps:
             - name: Checkout Code
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
               with:
                   fetch-depth: 0
 
@@ -71,7 +71,7 @@ jobs:
         name: pytest python ${{ matrix.python-version }}
         steps:
             - name: Checkout Code
-              uses: actions/checkout@v6
+              uses: actions/checkout@v7
               with:
                   fetch-depth: 0
 
@@ -93,7 +93,7 @@ jobs:
               run: uv run -- python3 -m coverage report
 
             - name: Upload coverage to Codecov
-              uses: codecov/codecov-action@v6
+              uses: codecov/codecov-action@v7
               env:
                   OS: ${{ runner.os.name }}
                   PYTHON: ${{ matrix.python-version }}
