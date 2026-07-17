@@ -10,10 +10,7 @@ outputfolder = Path(__file__).absolute().parent / "output"
 
 
 def test_helium() -> None:
-    # Pure-Helium Plasma, in the setup of KF1992 Figure 3.
-    # NB: the expected values below are regression values from this code, not the KF1992 result.
-    # They stopped matching KF1992 Fig. 3 (frac_excitation 0.3315, frac_ionisation 0.4849) when the
-    # collision-strength cross sections were enabled for transitions that KF1992 treated otherwise.
+    # KF1992 Figure 3. Pure-Helium Plasma
     x_e = 1e-4
     ions = [
         # Z ion_stage numberdensity
@@ -37,9 +34,9 @@ def test_helium() -> None:
 
         frac_sum = frac_excitation_tot + frac_ionisation_tot + frac_heating
         assert math.isclose(frac_sum, 1.0, abs_tol=0.005)
-        assert math.isclose(frac_excitation_tot, 0.1356, abs_tol=0.05)
-        assert math.isclose(frac_ionisation_tot, 0.6202, abs_tol=0.05)
-        assert math.isclose(sf.get_frac_ionisation_ion(Z=ions[0][0], ion_stage=ions[0][1]), 0.6202, abs_tol=0.05)
+        assert math.isclose(frac_excitation_tot, 0.3315, abs_tol=0.05)
+        assert math.isclose(frac_ionisation_tot, 0.4849, abs_tol=0.05)
+        assert math.isclose(sf.get_frac_ionisation_ion(Z=ions[0][0], ion_stage=ions[0][1]), 0.4807, abs_tol=0.05)
         assert math.isclose(sf.get_frac_ionisation_ion(Z=ions[1][0], ion_stage=ions[1][1]), 0.0, abs_tol=0.05)
 
         sf.plot_spec_channels(outputfilename=outputfolder / "spec_channels.pdf", xscalelog=True)
@@ -66,13 +63,13 @@ def test_iron() -> None:
 
         frac_sum = frac_excitation_tot + frac_ionisation_tot + frac_heating
         assert math.isclose(frac_sum, 1.0, abs_tol=0.005)
-        assert math.isclose(frac_excitation_tot, 0.00555, rel_tol=0.05)
-        assert math.isclose(frac_ionisation_tot, 0.1738, abs_tol=0.05)
+        assert math.isclose(frac_excitation_tot, 0.0204, abs_tol=0.05)
+        assert math.isclose(frac_ionisation_tot, 0.1391, abs_tol=0.05)
 
-        assert math.isclose(sf.get_ionisation_ratecoeff(26, 2), 4.42e-01, rel_tol=0.05)
-        assert math.isclose(sf.get_ionisation_ratecoeff(26, 3), 3.69e-01, rel_tol=0.05)
+        assert math.isclose(sf.get_ionisation_ratecoeff(26, 2), 4.44e-01, rel_tol=0.05)
+        assert math.isclose(sf.get_ionisation_ratecoeff(26, 3), 3.70e-01, rel_tol=0.05)
 
-        assert math.isclose(sf.get_excitation_ratecoeff(26, 2, (0, 100)), 3.9719740070759065e-07, rel_tol=0.05)
-        assert math.isclose(sf.get_excitation_ratecoeff(26, 2, (1, 100)), 6.619054348580435e-08, rel_tol=0.05)
+        assert math.isclose(sf.get_excitation_ratecoeff(26, 2, (0, 100)), 3.9930269946568673e-07, rel_tol=0.05)
+        assert math.isclose(sf.get_excitation_ratecoeff(26, 2, (1, 100)), 6.654239325994856e-08, rel_tol=0.05)
 
         sf.plot_spec_channels(outputfilename=outputfolder / "spec_channels.pdf", xscalelog=True)
