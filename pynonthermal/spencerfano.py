@@ -75,7 +75,7 @@ class SpencerFanoSolver:
     engrid: npt.NDArray[np.float64]
     deltaen: npt.NDArray[np.float64]
     dfcollion: pl.DataFrame
-    sourcevec: npt.NDArray[np.float64]
+    rhsvec: npt.NDArray[np.float64]
     E_init_ev: float
     sfmatrix: npt.NDArray[np.float64]
     adata_polars: pl.DataFrame | None
@@ -106,7 +106,7 @@ class SpencerFanoSolver:
             collionfilename=("collion-AR1985.txt" if use_ar1985 else "collion.txt")
         )
 
-        self.sourcevec = np.zeros(self.engrid.shape)
+        sourcevec = np.zeros(self.engrid.shape)
         # 0.3% of the energy range, so 0.1 keV for 3 KeV Emax to match Kozma & Fransson 1992
         source_spread_pts = math.ceil(npts / 30.0)
         if source_spread_pts < 1:
@@ -116,17 +116,22 @@ class SpencerFanoSolver:
         for s in range(npts):
             # spread the source over some energy width
             if s < npts - source_spread_pts:
-                self.sourcevec[s] = 0.0
+                sourcevec[s] = 0.0
             elif s < npts:
-                self.sourcevec[s] = 1.0 / (self.deltaen * source_spread_pts)
-        # self.sourcevec[-1] = 1.
+                sourcevec[s] = 1.0 / (self.deltaen * source_spread_pts)
 
-        source_emin = self.engrid[np.flatnonzero(self.sourcevec)[0]]
-        source_emax = self.engrid[np.flatnonzero(self.sourcevec)[-1]]
+        source_emin = self.engrid[np.flatnonzero(sourcevec)[0]]
+        source_emax = self.engrid[np.flatnonzero(sourcevec)[-1]]
+
+        self.rhsvec = np.zeros(npts)
+        source_integral = 0.0
+        for i in reversed(range(npts)):
+            source_integral += sourcevec[i] * self.deltaen
+            self.rhsvec[i] = source_integral
 
         # E_init_ev is the deposition rate density that we assume when solving the SF equation.
         # The solution will be scaled to the true deposition rate later
-        self.E_init_ev = np.dot(self.engrid, self.sourcevec) * self.deltaen
+        self.E_init_ev = np.dot(self.engrid, sourcevec) * self.deltaen
 
         self.adata_polars = None
 
@@ -435,21 +440,13 @@ class SpencerFanoSolver:
             print(f"       x_e: {x_e:.2e} [/cm3]        (electrons per nucleus)")
             print(f"deposition: {self.depositionratedensity_ev:7.2f}  [eV/s/cm3]")
 
-        deltaen = self.engrid[1] - self.engrid[0]
-        npts = len(self.engrid)
-
-        constvec = np.zeros(npts)
-        for i in range(npts):
-            for j in range(i, npts):
-                constvec[i] += self.sourcevec[j] * deltaen
-
         sfmatrix_with_electronloss = self.sfmatrix.copy()
         for i in range(npts):
             sfmatrix_with_electronloss[i, i] += electronlossfunction(self.engrid[i], n_e)
 
         yvec_reference = np.array(
             linalg.lu_solve(
-                linalg.lu_factor(sfmatrix_with_electronloss, overwrite_a=False), constvec, trans=0
+                linalg.lu_factor(sfmatrix_with_electronloss, overwrite_a=False), self.rhsvec, trans=0
             ),  # zuban: ignore[no-untyped-call]
             dtype=np.float64,
         )
