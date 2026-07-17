@@ -12,6 +12,8 @@ from pynonthermal.constants import H_ionpot
 from pynonthermal.constants import ME
 from pynonthermal.constants import QE
 
+use_collstrengths = False
+
 
 def get_xs_excitation(en_ev: float, row: dict[str, t.Any]) -> float:
     """Get the excitation cross section in cm^2 at energy en_ev [eV]."""
@@ -25,7 +27,7 @@ def get_xs_excitation(en_ev: float, row: dict[str, t.Any]) -> float:
     if en_ev < epsilon_trans_ev:
         return 0.0
 
-    if coll_str >= 0:
+    if coll_str >= 0 and use_collstrengths:
         # collision strength is available, so use it
         # Li et al. 2012 equation 11: sigma = pi * a_0^2 * (H_ionpot / E) * coll_str / lower_g,
         # with k_i^2 = E / H_ionpot in units of the inverse Bohr radius squared
@@ -70,7 +72,7 @@ def get_xs_excitation_vector(engrid: npt.NDArray[np.float64], row: dict[str, t.A
     startindex = pynonthermal.get_energyindex_gteq(en_ev=epsilon_trans_ev, engrid=engrid)
     xs_excitation_vec[:startindex] = 0.0
 
-    if coll_str >= 0:
+    if coll_str >= 0 and use_collstrengths:
         # collision strength is available, so use it
         # Li et al. 2012 equation 11: sigma = pi * a_0^2 * (H_ionpot / E) * coll_str / lower_g,
         # with k_i^2 = E / H_ionpot in units of the inverse Bohr radius squared
