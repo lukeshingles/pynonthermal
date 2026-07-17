@@ -32,8 +32,13 @@ def electronlossfunction(energy_ev: float, n_e_cgs: float) -> float:
         lossfunc = n_e * 2 * math.pi * QE**4 / energy * math.log(2 * energy / zetae)
     else:
         v = math.sqrt(2 * energy / ME)  # velocity in m/s
-        eulergamma = 0.577215664901532
-        lossfunc = n_e * 2 * math.pi * QE**4 / energy * math.log(ME * pow(v, 3) / (eulergamma * pow(QE, 2) * omegap))
+        # Kozma & Fransson (1992) eq. 2 describes the gamma in this Coulomb logarithm as "Euler's
+        # constant (Schunk & Hays 1971)", but Schunk & Hays (1971, p. 114) define it by "ln gamma is
+        # Euler's constant", i.e. gamma = exp(0.5772) = 1.781 rather than 0.5772 itself.
+        exp_eulergamma = math.exp(np.euler_gamma)
+        lossfunc = (
+            n_e * 2 * math.pi * QE**4 / energy * math.log(ME * pow(v, 3) / (exp_eulergamma * pow(QE, 2) * omegap))
+        )
 
     # lossfunc is now [erg / cm]
     return lossfunc / EV  # return as [eV / cm]
