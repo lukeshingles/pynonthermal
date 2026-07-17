@@ -21,7 +21,7 @@ def test_helium() -> None:
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=2000, verbose=True) as sf:
         for Z, ion_stage, n_ion in ions:
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
-            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion)
+            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
 
         # call solve twice to test that it can be called multiple times without error
         sf.solve(depositionratedensity_ev=1000)
@@ -52,7 +52,7 @@ def test_iron() -> None:
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=16000, npts=1024, verbose=True) as sf:
         for Z, ion_stage, n_ion in ions:
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
-            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion)
+            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
 
         sf.solve(depositionratedensity_ev=100)
 
