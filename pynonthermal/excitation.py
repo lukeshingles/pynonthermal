@@ -12,10 +12,8 @@ from pynonthermal.constants import H_ionpot
 from pynonthermal.constants import ME
 from pynonthermal.constants import QE
 
-use_collstrengths = False
 
-
-def get_xs_excitation(en_ev: float, row: dict[str, t.Any]) -> float:
+def get_xs_excitation(en_ev: float, row: dict[str, t.Any], use_collstrengths: bool = True) -> float:
     """Get the excitation cross section in cm^2 at energy en_ev [eV]."""
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
 
@@ -58,7 +56,9 @@ def get_xs_excitation(en_ev: float, row: dict[str, t.Any]) -> float:
     return 0.0
 
 
-def get_xs_excitation_vector(engrid: npt.NDArray[np.float64], row: dict[str, t.Any]) -> npt.NDArray[np.float64]:
+def get_xs_excitation_vector(
+    engrid: npt.NDArray[np.float64], row: dict[str, t.Any], use_collstrengths: bool = True
+) -> npt.NDArray[np.float64]:
     """Get an array containing the excitation cross section in cm^2 at every energy in the array engrid (eV)."""
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
     npts = len(engrid)

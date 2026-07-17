@@ -211,7 +211,13 @@ class SpencerFanoSolver:
             )
 
     def add_ion_ltepopexcitation(
-        self, Z: int, ion_stage: int, n_ion: float, temperature: float = 3000, adata_polars: pl.DataFrame | None = None
+        self,
+        Z: int,
+        ion_stage: int,
+        n_ion: float,
+        temperature: float = 3000,
+        adata_polars: pl.DataFrame | None = None,
+        use_collstrengths: bool = True,
     ) -> None:
         if adata_polars is not None:
             self.adata_polars = adata_polars
@@ -285,7 +291,9 @@ class SpencerFanoSolver:
             for transition in dftransitions.iter_rows(named=True):
                 epsilon_trans_ev = transition["epsilon_trans_ev"]
                 if epsilon_trans_ev >= self.engrid[0]:
-                    xs_vec = pynonthermal.excitation.get_xs_excitation_vector(self.engrid, transition)
+                    xs_vec = pynonthermal.excitation.get_xs_excitation_vector(
+                        self.engrid, transition, use_collstrengths=use_collstrengths
+                    )
                     self.add_excitation(
                         Z,
                         ion_stage,
