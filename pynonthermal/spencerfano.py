@@ -73,7 +73,7 @@ class SpencerFanoSolver:
     verbose: bool
     _n_e: float
     engrid: npt.NDArray[np.float64]
-    deltaen: npt.NDArray[np.float64]
+    deltaen: float
     dfcollion: pl.DataFrame
     rhsvec: npt.NDArray[np.float64]
     E_init_ev: float
