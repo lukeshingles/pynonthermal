@@ -94,6 +94,17 @@ class SpencerFanoSolver:
         verbose: bool = False,
         use_ar1985: bool = False,
     ) -> None:
+        if npts < 2:
+            msg = f"npts must be at least 2 to define an energy grid spacing but is {npts}"
+            raise ValueError(msg)
+        if emin_ev <= 0.0:
+            # the loss function and the cross section formulae all diverge at zero energy
+            msg = f"emin_ev must be greater than zero but is {emin_ev}"
+            raise ValueError(msg)
+        if emax_ev <= emin_ev:
+            msg = f"emax_ev ({emax_ev}) must be greater than emin_ev ({emin_ev})"
+            raise ValueError(msg)
+
         self._solved = False
         self._n_e = 0.0
         self.reset_solution_analysis()
