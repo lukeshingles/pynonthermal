@@ -9,7 +9,7 @@ import polars as pl
 
 import pynonthermal
 from pynonthermal.axelrod import get_binding_energies
-from pynonthermal.axelrod import get_lotz_xs_ionisation
+from pynonthermal.axelrod import get_lotz_xs_ionisation_vec
 from pynonthermal.axelrod import get_shell_configs
 from pynonthermal.constants import EV
 
@@ -37,6 +37,7 @@ def get_nist_ionization_energies_ev() -> dict[tuple[int, int], float]:
     }
 
 
+@lru_cache
 def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFrame:
     dfcollion = pl.read_csv(
         Path(pynonthermal.DATADIR, collionfilename),
@@ -60,12 +61,11 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFram
     nist_ionisation_energies_ev = get_nist_ionization_energies_ev()
     elements_electron_binding = get_binding_energies()
     all_shells_q = get_shell_configs()
+    covered_z_nelec = set(dfcollion.select(["Z", "nelec"]).iter_rows())
     new_rows: list[dict[str, int | float]] = []
-    for Z in range(1, len(elements_electron_binding)):
+    for Z in range(1, len(elements_electron_binding) + 1):
         for ionstage in range(1, Z + 1):
-            any_data_matched = (
-                dfcollion.filter(pl.col("Z") == Z).filter(pl.col("nelec") == (Z - ionstage + 1)).height > 0
-            )
+            any_data_matched = (Z, Z - ionstage + 1) in covered_z_nelec
 
             if not any_data_matched:
                 ioncharge = ionstage - 1
@@ -124,9 +124,12 @@ def Psecondary(e_p: float, ionpot_ev: float, J: float, e_s: float = -1, epsilon:
     # the primary electron epsilon [eV]) given a primary energy e_p [eV] for an impact ionisation event
 
     assert e_s >= 0 or epsilon >= 0
-    # if e_p < I:
-    #     return 0.
-    #
+
+    if e_p <= ionpot_ev:
+        # below the ionisation threshold there are no secondaries (and the
+        # normalisation atan((e_p - ionpot_ev) / 2 / J) would be zero or negative)
+        return 0.0
+
     if e_s < 0:
         e_s = epsilon - ionpot_ev
     if epsilon < 0:
@@ -177,10 +180,23 @@ def ar_xs(energy_ev: float, ionpot_ev: float, A: float, B: float, C: float, D: f
 
 def get_arxs_array_shell(arr_enev: npt.NDArray[np.float64], shell: dict[str, int | float]) -> npt.NDArray[np.float64]:
     if shell["n"] < 0:
-        return np.array([get_lotz_xs_ionisation(shell, en_ev=en_ev) for en_ev in arr_enev])
-    return np.array(
-        [ar_xs(energy_ev, shell["ionpot_ev"], shell["A"], shell["B"], shell["C"], shell["D"]) for energy_ev in arr_enev]
+        return get_lotz_xs_ionisation_vec(shell, arr_en_ev=arr_enev)
+
+    ionpot_ev = float(shell["ionpot_ev"])
+    xs = np.zeros_like(arr_enev)
+    abovethreshold = arr_enev > ionpot_ev
+    u = arr_enev[abovethreshold] / ionpot_ev
+    xs[abovethreshold] = (
+        1e-14
+        * (
+            shell["A"] * (1 - 1 / u)
+            + shell["B"] * (1 - 1 / u) ** 2
+            + shell["C"] * np.log(u)
+            + shell["D"] * np.log(u) / u
+        )
+        / (u * ionpot_ev**2)
     )
+    return xs
 
 
 def get_arxs_array_ion(

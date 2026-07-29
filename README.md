@@ -37,7 +37,7 @@ print("heating fraction:", sf.get_frac_heating())
 print("total ionisation fraction:", sf.get_frac_ionisation_tot())
 print("total excitation fraction:", sf.get_frac_excitation_tot())
 print("sum of fractions:", sf.get_frac_sum())
-print("ionisation rate coeff [cm^3 s^-1]:", sf.get_ionisation_ratecoeff(Z=8, ion_stage=2))
+print("ionisation rate coeff [s^-1]:", sf.get_ionisation_ratecoeff(Z=8, ion_stage=2))
 ```
 
 The [quickstart notebook](https://github.com/lukeshingles/pynonthermal/blob/main/quickstart.ipynb) contains a fuller worked example, and can be launched on Binder:

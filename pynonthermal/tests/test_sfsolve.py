@@ -1,12 +1,112 @@
 import math
 from pathlib import Path
 
+import numpy as np
+import polars as pl
 import pytest
 
 import pynonthermal
 
 pytestmark = pytest.mark.benchmark
 outputfolder = Path(__file__).absolute().parent / "output"
+
+
+def test_lotz_heavy_element() -> None:
+    # elements heavier than Ni (Z>28) use the Axelrod 1980/Lotz 1967 cross section approximation
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=400, verbose=True) as sf:
+        sf.add_ionisation(56, 2, n_ion=1.0)
+        sf.solve(depositionratedensity_ev=100, override_n_e=1.0)
+
+        # per-ion getter triggers the analysis lazily
+        assert sf.get_frac_ionisation_ion(56, 2) > 0.0
+        assert sf.get_eff_ionpot(56, 2) > 0.0
+        assert math.isclose(sf.get_frac_sum(), 1.0, abs_tol=0.01)
+        assert sf.get_ionisation_ratecoeff(56, 2) > 0.0
+
+
+class CountingAnalysisSolver(pynonthermal.SpencerFanoSolver):
+    analyse_count: int = 0
+
+    def analyse_ntspectrum(self) -> None:
+        self.analyse_count += 1
+        super().analyse_ntspectrum()
+
+
+def test_api_guards() -> None:
+    with CountingAnalysisSolver(emin_ev=1, emax_ev=3000, npts=200) as sf:
+        sf.add_ionisation(2, 1, n_ion=1.0)
+
+        # getters require solve() to have been called
+        with pytest.raises(RuntimeError):
+            sf.get_frac_heating()
+        with pytest.raises(RuntimeError):
+            sf.get_excitation_ratecoeff(2, 1, 0)
+
+        # the same ion can't be added twice
+        with pytest.raises(ValueError, match="twice"):
+            sf.add_ionisation(2, 1, n_ion=1.0)
+
+        # an ion with no cross-section data (here H II, which has no bound electrons) is rejected
+        with pytest.raises(ValueError, match="No ionisation cross-section data"):
+            sf.add_ionisation(1, 2, n_ion=1.0)
+
+        # xs_vec must be defined on the full energy grid
+        with pytest.raises(ValueError, match="engrid"):
+            sf.add_excitation(2, 1, levelnumberdensity=1.0, xs_vec=np.zeros(3), epsilon_trans_ev=10.0)
+
+        # an omitted transitionkey gets an automatic index, and duplicate keys are rejected
+        sf.add_excitation(2, 1, levelnumberdensity=1.0, xs_vec=np.zeros(200), epsilon_trans_ev=25.0)
+        with pytest.raises(ValueError, match="already added"):
+            sf.add_excitation(
+                2, 1, levelnumberdensity=1.0, xs_vec=np.zeros(200), epsilon_trans_ev=25.0, transitionkey=0
+            )
+
+        # excitation data must exist for the requested ion
+        with pytest.raises(ValueError, match="No excitation data"):
+            sf.add_ion_ltepopexcitation(3, 1, n_ion=1.0, adata_polars=pl.DataFrame({"Z": [2], "ion_stage": [1]}))
+
+        # a zero-population ion is a no-op and a negative population is rejected
+        sf.add_ionisation(8, 3, n_ion=0.0)
+        assert (8, 3) not in sf.ionpopdict
+        with pytest.raises(ValueError, match="non-negative"):
+            sf.add_ionisation(8, 3, n_ion=-1.0)
+
+        # second ion with no excitation channels (exercises the zero-excitation analysis path)
+        sf.add_ionisation(8, 2, n_ion=0.1)
+
+        sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
+
+        # a legitimately-zero excitation fraction must not trigger repeated re-analysis
+        assert sf.get_frac_excitation_tot() == 0.0
+        count_after_first_call = sf.analyse_count
+        assert count_after_first_call >= 1
+        assert sf.get_frac_excitation_tot() == 0.0
+        assert sf.analyse_count == count_after_first_call
+
+        # each getter triggers the analysis lazily from a freshly-solved (un-analysed) state
+        sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
+        assert sf.get_frac_ionisation_tot() > 0.0
+        sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
+        assert sf.get_frac_ionisation_ion(2, 1) > 0.0
+        sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
+        assert sf.get_eff_ionpot(2, 1) > 0.0
+        sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
+        assert sf.get_ionisation_ratecoeff(2, 1) > 0.0
+
+        # additions are locked after solving
+        with pytest.raises(RuntimeError):
+            sf.add_ionisation(2, 2, n_ion=1e-4)
+
+
+def test_invalid_excitation_fraction_ignored() -> None:
+    # an unphysically-large excitation cross section produces frac_excitation > 1,
+    # which is reported and excluded from the total
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=100) as sf:
+        sf.add_ionisation(2, 1, n_ion=1.0)
+        sf.add_excitation(2, 1, levelnumberdensity=1e30, xs_vec=np.full(100, 1e-10), epsilon_trans_ev=25.0)
+        sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
+
+        assert sf.get_frac_excitation_tot() == 0.0
 
 
 def test_helium() -> None:
@@ -22,6 +122,10 @@ def test_helium() -> None:
         for Z, ion_stage, n_ion in ions:
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
             sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
+
+        # re-adding an ion's excitations with a different population is not allowed
+        with pytest.raises(ValueError, match="different populations"):
+            sf.add_ion_ltepopexcitation(2, 1, n_ion=99.9, use_collstrengths=False)
 
         # call solve twice to test that it can be called multiple times without error
         sf.solve(depositionratedensity_ev=1000)
@@ -40,6 +144,8 @@ def test_helium() -> None:
         assert math.isclose(sf.get_frac_ionisation_ion(Z=ions[1][0], ion_stage=ions[1][1]), 0.0, abs_tol=0.05)
 
         sf.plot_spec_channels(outputfilename=outputfolder / "spec_channels.pdf", xscalelog=True)
+        sf.plot_yspectrum(outputfilename=outputfolder / "yspectrum.pdf")
+        sf.plot_channels(outputfilename=outputfolder / "channels.pdf", xscalelog=True)
 
 
 def test_iron() -> None:
