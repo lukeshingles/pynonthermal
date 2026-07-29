@@ -477,6 +477,16 @@ class SpencerFanoSolver:
 
         npts = len(self.engrid)
         n_e = self.get_n_e()
+        if n_e <= 0.0:
+            # without free electrons there is no thermal loss channel, so electrons below the lowest
+            # ionisation/excitation threshold have nowhere to deposit their energy and those rows of
+            # the Spencer-Fano matrix are all zero
+            msg = (
+                "the free electron density is zero because every added ion is neutral. The Spencer-Fano"
+                " equation is singular without a thermal electron loss channel, so add an ionised stage"
+                " with add_ionisation() or pass override_n_e to solve()."
+            )
+            raise ValueError(msg)
 
         if self.verbose:
             n_ion_tot = self.get_n_ion_tot()

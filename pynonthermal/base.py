@@ -20,6 +20,11 @@ def electronlossfunction(energy_ev: float, n_e_cgs: float) -> float:
     # returns a positive number
 
     # return math.log(energy_ev) / energy_ev
+    if n_e_cgs <= 0.0:
+        # the plasma frequency would be zero, making the Coulomb logarithm infinite
+        msg = f"the free-electron loss function requires a positive free electron density but n_e is {n_e_cgs}"
+        raise ValueError(msg)
+
     n_e = n_e_cgs
     energy = energy_ev * EV  # convert eV to erg
 
