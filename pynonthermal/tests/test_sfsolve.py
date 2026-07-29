@@ -1,12 +1,70 @@
 import math
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 import pynonthermal
 
 pytestmark = pytest.mark.benchmark
 outputfolder = Path(__file__).absolute().parent / "output"
+
+
+def test_lotz_heavy_element() -> None:
+    # elements heavier than Ni (Z>28) use the Axelrod 1980/Lotz 1967 cross section approximation
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=400) as sf:
+        sf.add_ionisation(56, 2, n_ion=1.0)
+        sf.solve(depositionratedensity_ev=100, override_n_e=1.0)
+
+        assert math.isclose(sf.get_frac_sum(), 1.0, abs_tol=0.01)
+        assert sf.get_ionisation_ratecoeff(56, 2) > 0.0
+
+
+class CountingAnalysisSolver(pynonthermal.SpencerFanoSolver):
+    analyse_count: int = 0
+
+    def analyse_ntspectrum(self) -> None:
+        self.analyse_count += 1
+        super().analyse_ntspectrum()
+
+
+def test_api_guards() -> None:
+    with CountingAnalysisSolver(emin_ev=1, emax_ev=3000, npts=200) as sf:
+        sf.add_ionisation(2, 1, n_ion=1.0)
+
+        # getters require solve() to have been called
+        with pytest.raises(RuntimeError):
+            sf.get_frac_heating()
+        with pytest.raises(RuntimeError):
+            sf.get_excitation_ratecoeff(2, 1, 0)
+
+        # the same ion can't be added twice
+        with pytest.raises(ValueError, match="twice"):
+            sf.add_ionisation(2, 1, n_ion=1.0)
+
+        # an ion with no cross-section data (here H II, which has no bound electrons) is rejected
+        with pytest.raises(ValueError, match="No ionisation cross-section data"):
+            sf.add_ionisation(1, 2, n_ion=1.0)
+
+        # xs_vec must be defined on the full energy grid
+        with pytest.raises(ValueError, match="engrid"):
+            sf.add_excitation(2, 1, levelnumberdensity=1.0, xs_vec=np.zeros(3), epsilon_trans_ev=10.0)
+
+        sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
+
+        # rate coefficient is available without an explicit analyse_ntspectrum() call
+        assert sf.get_ionisation_ratecoeff(2, 1) > 0.0
+
+        # a legitimately-zero excitation fraction must not trigger repeated re-analysis
+        assert sf.get_frac_excitation_tot() == 0.0
+        count_after_first_call = sf.analyse_count
+        assert count_after_first_call >= 1
+        assert sf.get_frac_excitation_tot() == 0.0
+        assert sf.analyse_count == count_after_first_call
+
+        # additions are locked after solving
+        with pytest.raises(RuntimeError):
+            sf.add_ionisation(2, 2, n_ion=1e-4)
 
 
 def test_helium() -> None:

@@ -154,6 +154,39 @@ def get_lotz_xs_ionisation(shell: dict[str, int | float], en_ev: float) -> float
     return 0.0
 
 
+def get_lotz_xs_ionisation_vec(
+    shell: dict[str, int | float], arr_en_ev: npt.NDArray[np.float64]
+) -> npt.NDArray[np.float64]:
+    # Axelrod 1980 Eq 3.38 evaluated at an array of energies [eV]
+
+    arr_en_erg = arr_en_ev * EV
+    betasq = 2 * arr_en_erg / ME / CLIGHT**2
+
+    atomic_number = int(shell["Z"])
+    ion_stage = int(shell["ion_stage"])
+    ionpot_ev = shell["ionpot_ev"]
+    shellindex = -int(shell["l"])
+
+    electron_binding = get_binding_energies()
+    all_shells_q = get_shell_configs()
+    electronsinshell = get_shell_occupancies(atomic_number, ion_stage, electron_binding, all_shells_q)[shellindex]
+
+    p = ionpot_ev * EV
+    Aconst = 1.33e-14 * EV * EV
+
+    # WARNING: The Axelrod equation uses both ln() and log10(), but the log10() term is likely a typo and should be
+    # ln(). Fortunately, at our typical 16 keV value of EMAX, 511 keV electrons are only mildly relativistic and the
+    # log10 term is small anyway.
+    valid = (arr_en_erg > p) & (betasq < 1.0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        part_sigma_shell = (
+            electronsinshell / p * (np.log(betasq * ME * CLIGHT**2 / 2.0 / p) - np.log10(1 - betasq) - betasq)
+        )
+        xs = 2 * Aconst / betasq / ME / CLIGHT**2 * part_sigma_shell
+
+    return np.where(valid & (part_sigma_shell > 0), xs, 0.0)
+
+
 def get_Latom_axelrod(Zboundbar: float, en_ev: float) -> float:
     # Axelrod 1980 Eq 3.21
     # Latom is 1/N * dE/dX where E is in erg
