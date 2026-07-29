@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import typing as t
+import warnings
 from math import atan
 from pathlib import Path
 
@@ -261,6 +262,7 @@ class SpencerFanoSolver:
         maxnlevelslower: int | None = 5,
         maxnlevelsupper: int | None = 250,
     ) -> None:
+        self._require_not_solved("add excitation")
         if adata_polars is not None:
             self.adata_polars = adata_polars
 
@@ -675,7 +677,10 @@ class SpencerFanoSolver:
                 integralgamma += np.dot(self.yvec, ar_xs_array) * deltaen
 
                 if frac_ionisation_shell > 1:
-                    print(f"WARNING: invalid frac_ionisation_shell of {frac_ionisation_shell} included in the total.")
+                    warnings.warn(
+                        f"invalid frac_ionisation_shell of {frac_ionisation_shell} included in the total",
+                        stacklevel=2,
+                    )
 
                 self._frac_ionisation_ion[(Z, ion_stage)] += frac_ionisation_shell
                 eta_over_ionpot_sum += frac_ionisation_shell / shell["ionpot_ev"]
@@ -696,7 +701,7 @@ class SpencerFanoSolver:
                 frac_excitation_thision = self.calculate_nt_frac_excitation_ion(Z, ion_stage) if n_ion > 0.0 else 0.0
 
                 if frac_excitation_thision > 1:
-                    print(f"WARNING: Ignoring invalid frac_excitation_ion of {frac_excitation_thision}.")
+                    warnings.warn(f"Ignoring invalid frac_excitation_ion of {frac_excitation_thision}", stacklevel=2)
                     frac_excitation_thision = 0.0
 
                 self._frac_excitation_ion[(Z, ion_stage)] = frac_excitation_thision
@@ -722,10 +727,11 @@ class SpencerFanoSolver:
 
             # the eff_ionpot-based rate coefficient should match a simple integral of xs * yvec * dE
             if not np.isclose(self._nt_ionisation_ratecoeff[(Z, ion_stage)], integralgamma, rtol=0.01):
-                print(
-                    f"WARNING: Z={Z} ion_stage {ion_stage} ionisation rate coefficient"
+                warnings.warn(
+                    f"Z={Z} ion_stage {ion_stage} ionisation rate coefficient"
                     f" {self._nt_ionisation_ratecoeff[(Z, ion_stage)]:.2e} [/s] does not match the direct"
-                    f" cross-section integral {integralgamma:.2e} [/s]"
+                    f" cross-section integral {integralgamma:.2e} [/s]",
+                    stacklevel=2,
                 )
 
         # n_e_nt = get_n_e_nt(engrid, yvec)

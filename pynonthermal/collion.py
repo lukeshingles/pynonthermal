@@ -183,8 +183,10 @@ def get_arxs_array_shell(arr_enev: npt.NDArray[np.float64], shell: dict[str, int
         return get_lotz_xs_ionisation_vec(shell, arr_en_ev=arr_enev)
 
     ionpot_ev = float(shell["ionpot_ev"])
-    u = arr_enev / ionpot_ev
-    xs = (
+    xs = np.zeros_like(arr_enev)
+    abovethreshold = arr_enev > ionpot_ev
+    u = arr_enev[abovethreshold] / ionpot_ev
+    xs[abovethreshold] = (
         1e-14
         * (
             shell["A"] * (1 - 1 / u)
@@ -194,7 +196,7 @@ def get_arxs_array_shell(arr_enev: npt.NDArray[np.float64], shell: dict[str, int
         )
         / (u * ionpot_ev**2)
     )
-    return np.where(u > 1.0, xs, 0.0)
+    return xs
 
 
 def get_arxs_array_ion(
