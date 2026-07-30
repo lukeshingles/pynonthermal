@@ -36,7 +36,7 @@ dev = [
     "pytest-codspeed>=4.1.1",
     "pytest-cov>=2.10.1",
     "pytest-xdist[psutil]>=3.6.1",
-    "ruff>=0.14.11",
+    "ruff>=0.16.0",
     "typeguard>=4.1.5",
     "types-PyYAML>=6.0.12.20250326",
 ]
@@ -117,8 +117,8 @@ addopts = " --durations=0  --typeguard-packages=pynonthermal -n auto"
 [tool.ruff]
 line-length = 120
 fix = true
-show-fixes = true
 extend-exclude = ["_version.py"]
+required-version = ">=0.16.0"
 
 [tool.ruff.lint]
 select = ["ALL"]
@@ -148,6 +148,7 @@ ignore = [
     "PLR0912", # too-many-branches
     "PLR0913", # too-many-arguments
     "PLR0915", # too-many-statements
+    "PLR0917",
     "PLR2004", # magic-value-comparison
     "S101",    # Use of assert detected
     "T201",    # print found

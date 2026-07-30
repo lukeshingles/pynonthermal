@@ -525,7 +525,7 @@ class SpencerFanoSolver:
             # without free electrons there is no thermal loss channel, so electrons below the lowest
             # ionisation/excitation threshold have nowhere to deposit their energy and those rows of
             # the Spencer-Fano matrix are all zero
-            reason = "no ions have been added" if not self.ionpopdict else "every added ion is neutral"
+            reason = "every added ion is neutral" if self.ionpopdict else "no ions have been added"
             msg = (
                 f"the free electron density is zero because {reason}. The Spencer-Fano"
                 " equation is singular without a thermal electron loss channel, so add an ionised stage"
