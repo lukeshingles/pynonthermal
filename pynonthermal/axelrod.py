@@ -10,7 +10,6 @@ import numpy.typing as npt
 import pynonthermal
 from pynonthermal.constants import CLIGHT
 from pynonthermal.constants import EV
-from pynonthermal.constants import H
 from pynonthermal.constants import ME
 from pynonthermal.constants import QE
 
@@ -102,6 +101,11 @@ def get_sum_q_over_binding_energy(atomic_number: int, ion_stage: int, ionpot_ev:
             enbinding = electron_binding[atomic_number - 1][electron_loop]
             ionpot = ionpot_ev * EV
             if enbinding <= 0:
+                # fall back to the next shell in, which a negative index would silently
+                # turn into the outermost shell instead
+                if electron_loop == 0:
+                    msg = f"No binding energy for the innermost shell of Z={atomic_number}"
+                    raise ValueError(msg)
                 enbinding = electron_binding[atomic_number - 1][electron_loop - 1]
                 assert enbinding > 0
 
@@ -118,49 +122,18 @@ def get_workfn_ev(atomic_number: int, ion_stage: int, ionpot_ev: float, Zbar: fl
     return (1 / oneoverW) / EV
 
 
-def get_lotz_xs_ionisation(shell: dict[str, int | float], en_ev: float) -> float:
-    # Axelrod 1980 Eq 3.38
-
-    en_erg = en_ev * EV
-
-    beta = math.sqrt(2 * en_erg / ME) / CLIGHT
-    betasq = beta**2
-    # beta = 0.99
-    # print(f'{gamma=} {beta=}')
-    atomic_number = int(shell["Z"])
-    ion_stage = int(shell["ion_stage"])
-    ionpot_ev = shell["ionpot_ev"]
-    shellindex = -int(shell["l"])
-
-    electron_binding = get_binding_energies()
-    all_shells_q = get_shell_configs()
-    electronsinshell = get_shell_occupancies(atomic_number, ion_stage, electron_binding, all_shells_q)[shellindex]
-
-    p = ionpot_ev * EV
-
-    # WARNING: The Axelrod equation uses both ln() and log10(), but the log10() term is likely a typo and should be
-    # ln(). Fortunately, at our typical 16 keV value of EMAX, 511 keV electrons are only mildly relativistic and the
-    # log10 term is small anyway.
-    if en_erg > p:
-        part_sigma_shell = (
-            electronsinshell / p * (math.log(betasq * ME * CLIGHT**2 / 2.0 / p) - math.log10(1 - betasq) - betasq)
-        )
-
-        if part_sigma_shell > 0:
-            Aconst = 1.33e-14 * EV * EV
-            # me is electron mass
-            return 2 * Aconst / betasq / ME / (CLIGHT**2) * part_sigma_shell
-
-    return 0.0
-
-
 def get_lotz_xs_ionisation_vec(
     shell: dict[str, int | float], arr_en_ev: npt.NDArray[np.float64]
 ) -> npt.NDArray[np.float64]:
     # Axelrod 1980 Eq 3.38 evaluated at an array of energies [eV]
 
     arr_en_erg = arr_en_ev * EV
-    betasq = 2 * arr_en_erg / ME / CLIGHT**2
+
+    # relativistic, to match the relativistic correction terms in the Axelrod equation below.
+    # The classical betasq = 2 * en_erg / (ME * CLIGHT**2) reaches one at 255 keV, above which every
+    # cross section was silently set to zero, and is already 5% high at 16 keV and 30% high at 100 keV.
+    gamma = arr_en_erg / (ME * CLIGHT**2) + 1.0
+    betasq = 1.0 - 1.0 / gamma**2
 
     atomic_number = int(shell["Z"])
     ion_stage = int(shell["ion_stage"])
@@ -177,7 +150,7 @@ def get_lotz_xs_ionisation_vec(
     # WARNING: The Axelrod equation uses both ln() and log10(), but the log10() term is likely a typo and should be
     # ln(). Fortunately, at our typical 16 keV value of EMAX, 511 keV electrons are only mildly relativistic and the
     # log10 term is small anyway.
-    valid = (arr_en_erg > p) & (betasq < 1.0)
+    valid = arr_en_erg > p
     with np.errstate(divide="ignore", invalid="ignore"):
         part_sigma_shell = (
             electronsinshell / p * (np.log(betasq * ME * CLIGHT**2 / 2.0 / p) - np.log10(1 - betasq) - betasq)
@@ -185,73 +158,3 @@ def get_lotz_xs_ionisation_vec(
         xs = 2 * Aconst / betasq / ME / CLIGHT**2 * part_sigma_shell
 
     return np.where(valid & (part_sigma_shell > 0), xs, 0.0)
-
-
-def get_Latom_axelrod(Zboundbar: float, en_ev: float) -> float:
-    # Axelrod 1980 Eq 3.21
-    # Latom is 1/N * dE/dX where E is in erg
-    # should be units of erg cm^2
-
-    en_erg = en_ev * EV
-
-    # relativistic
-    gamma = en_erg / (ME * CLIGHT**2) + 1
-    beta = math.sqrt(1.0 - 1.0 / (gamma**2))
-    vel = beta * CLIGHT  # in cm/s
-
-    # classical
-    # vel = math.sqrt(2. * en_erg / ME)
-    # beta = vel / CLIGHT
-
-    # I = ionpot_ev * EV
-    I = 280 * EV  # assumed in Axelrod thesis
-
-    if 2 * ME * vel**2 < I:
-        return 0.0
-
-    # if beta > 1.:
-    #     print(vel, beta)
-    #     beta = 0.9999
-
-    return (
-        4
-        * math.pi
-        * QE**4
-        / (ME * vel**2)
-        * Zboundbar
-        * (math.log(2 * ME * vel**2 / I) + math.log(1.0 / (1.0 - beta**2)) - beta**2)
-    )
-
-
-def get_Lelec_axelrod(en_ev: float, n_e: float, n_tot: float) -> float:
-    # - 1/N * dE / dX [erg cm^2]
-    # returns a positive number
-
-    # Axelrod Eq 3.36 (classical low energy limit)
-
-    # return 1.95e-13 * math.log(3.2e4 * en_ev) / en_ev
-
-    # Axelrod 1980 Eq 3.24
-
-    HBAR = H / 2.0 / math.pi
-    en_erg = en_ev * EV
-    gamma = en_erg / (ME * CLIGHT**2) + 1
-    beta = math.sqrt(1.0 - 1.0 / (gamma**2))
-    vel = beta * CLIGHT  # in cm/s
-    omegap = 5.64e4 * math.sqrt(n_e)  # in per second
-    return (
-        4
-        * math.pi
-        * QE**4
-        / (ME * vel**2)
-        * n_e
-        / n_tot
-        * (math.log(2 * ME * vel**2 / (HBAR * omegap)) + 0.5 * math.log(1.0 / (1.0 - beta**2)) - 0.5 * beta**2)
-    )
-
-
-def electronlossfunction_axelrod(en_ev: float, n_e: float) -> float:
-    # - dE / dX [erg / cm]
-    # returns a positive number
-
-    return get_Lelec_axelrod(en_ev, n_e=n_e, n_tot=1)

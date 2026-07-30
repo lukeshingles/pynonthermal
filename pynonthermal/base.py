@@ -20,6 +20,11 @@ def electronlossfunction(energy_ev: float, n_e_cgs: float) -> float:
     # returns a positive number
 
     # return math.log(energy_ev) / energy_ev
+    if n_e_cgs <= 0.0:
+        # the plasma frequency would be zero, making the Coulomb logarithm infinite
+        msg = f"the free-electron loss function requires a positive free electron density but n_e is {n_e_cgs}"
+        raise ValueError(msg)
+
     n_e = n_e_cgs
     energy = energy_ev * EV  # convert eV to erg
 
@@ -62,17 +67,6 @@ def get_Zbar(ions: Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], 
         Zbar += Z * n_ion / n_tot
 
     return Zbar
-
-
-def get_Zboundbar(ions: Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], float]) -> float:
-    # number density-weighted average number of bound electrons per nucleus
-    Zboundbar = 0.0
-    n_tot = get_n_tot(ions, ionpopdict)
-    for Z, ion_stage in ions:
-        n_ion = ionpopdict[(Z, ion_stage)]
-        Zboundbar += (Z - ion_stage + 1) * n_ion / n_tot
-
-    return Zboundbar
 
 
 def get_energyindex_lteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
