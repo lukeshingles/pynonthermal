@@ -56,6 +56,10 @@ def test_zero_free_electron_density() -> None:
         sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
         assert sf.get_n_e() == 1e-4
 
+    # the loss function itself also rejects a non-positive density
+    with pytest.raises(ValueError, match="positive free electron density"):
+        pynonthermal.electronlossfunction(100.0, 0.0)
+
 
 def test_override_n_e_not_confused_with_cache() -> None:
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=200) as sf:
@@ -189,3 +193,25 @@ def test_ltepopexcitation_registers_population() -> None:
         assert sf.get_ionisation_ratecoeff(26, 3) == 0.0
         assert sf.get_eff_ionpot(26, 3) == float("inf")
         assert math.isclose(sf.get_frac_sum(), 1.0, abs_tol=0.01)
+
+    # a negative population is rejected on the excitation path too
+    with (
+        pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=200) as sf,
+        pytest.raises(ValueError, match="non-negative"),
+    ):
+        sf.add_ion_ltepopexcitation(26, 3, n_ion=-1.0, use_collstrengths=False)
+
+
+def test_conservation_warning_on_coarse_grid() -> None:
+    # the energy fractions of a helium plasma are ~6.5% off unity at npts=100,
+    # which must trigger the conservation diagnostic
+    x_e = 1e-4
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=100) as sf:
+        for Z, ion_stage, n_ion in ((2, 1, 1.0 - x_e), (2, 2, x_e)):
+            sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
+            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
+        sf.solve(depositionratedensity_ev=100)
+
+        with pytest.warns(UserWarning, match="energy fractions sum to"):
+            frac_sum = sf.get_frac_sum()
+        assert not math.isclose(frac_sum, 1.0, rel_tol=0.05)
