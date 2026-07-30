@@ -79,6 +79,7 @@ Typical solver workflow:
 - Cross sections are in cm^2.
 - `ion_stage = charge + 1` (for example, Fe I has `ion_stage=1`, Fe II has `ion_stage=2`).
 - `depositionratedensity_ev` in `solve()` is in eV s^-1 cm^-3.
+- `get_ionisation_ratecoeff()` and `get_excitation_ratecoeff()` both return rates in s^-1, and both scale linearly with `depositionratedensity_ev`.
 
 ## Example output
 
@@ -114,7 +115,7 @@ sf.add_excitation(Z, ion_stage, n_level, xs_vec, epsilon_trans_ev, transitionkey
 - `xs_vec`: NumPy array of cross sections (cm^2), defined at every energy in `sf.engrid` (eV).
 - `transitionkey`: any unique key within the ion, used to retrieve the excitation rate coefficient.
 
-Retrieve the non-thermal excitation rate coefficient with:
+Retrieve the non-thermal excitation rate coefficient [s^-1] with:
 
 ```python
 nt_exc = sf.get_excitation_ratecoeff(Z, ion_stage, transitionkey)

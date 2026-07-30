@@ -291,7 +291,8 @@ def test_iron() -> None:
         assert math.isclose(sf.get_ionisation_ratecoeff(26, 2), 4.44e-01, rel_tol=0.05)
         assert math.isclose(sf.get_ionisation_ratecoeff(26, 3), 3.70e-01, rel_tol=0.05)
 
-        assert math.isclose(sf.get_excitation_ratecoeff(26, 2, (0, 100)), 3.9930269946568673e-07, rel_tol=0.05)
-        assert math.isclose(sf.get_excitation_ratecoeff(26, 2, (1, 100)), 6.654239325994856e-08, rel_tol=0.05)
+        # rate coefficients are in s^-1 and so scale with the deposition rate density of 100 eV/s/cm3
+        assert math.isclose(sf.get_excitation_ratecoeff(26, 2, (0, 100)), 3.9930269946568673e-05, rel_tol=0.05)
+        assert math.isclose(sf.get_excitation_ratecoeff(26, 2, (1, 100)), 6.654239325994856e-06, rel_tol=0.05)
 
         sf.plot_spec_channels(outputfilename=outputfolder / "spec_channels.pdf", xscalelog=True)

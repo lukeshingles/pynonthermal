@@ -862,6 +862,10 @@ class SpencerFanoSolver:
         return self._eff_ionpot[(Z, ion_stage)]
 
     def get_ionisation_ratecoeff(self, Z: int, ion_stage: int) -> float:
+        """Get the non-thermal ionisation rate coefficient in s^-1 for one ion.
+
+        This scales with depositionratedensity_ev.
+        """
         self._require_solved()
         if not self._analysed:
             self.analyse_ntspectrum()
@@ -869,11 +873,15 @@ class SpencerFanoSolver:
         return self._nt_ionisation_ratecoeff[(Z, ion_stage)]
 
     def get_excitation_ratecoeff(self, Z: int, ion_stage: int, transitionkey: t.Any) -> float:
-        # integral in Kozma & Fransson equation 9
+        """Get the non-thermal excitation rate coefficient in s^-1 for one transition.
+
+        This is the integral of y(E) * sigma(E) dE in Kozma & Fransson equation 9, matching the
+        convention of get_ionisation_ratecoeff(). It scales with depositionratedensity_ev.
+        """
         self._require_solved()
         _levelnumberdensity, xsvec, _epsilon_trans_ev = self.excitationlists[(Z, ion_stage)][transitionkey]
 
-        return np.dot(xsvec, self.yvec) * self.deltaen / self.depositionratedensity_ev
+        return float(np.dot(xsvec, self.yvec) * self.deltaen)
 
     def get_frac_sum(self) -> float:
         return self.get_frac_heating() + self.get_frac_excitation_tot() + self.get_frac_ionisation_tot()
