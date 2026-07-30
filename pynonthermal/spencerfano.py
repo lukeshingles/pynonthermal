@@ -432,6 +432,21 @@ class SpencerFanoSolver:
             msg = f"No ionisation cross-section data for Z={Z} ion_stage {ion_stage}"
             raise ValueError(msg)
 
+        # Kozma & Fransson 1992 assume that every threshold lies above the low-energy cutoff E_0, so that
+        # all energy reaching E_0 is thermalised by the free electrons. A shell below E_0 breaks that
+        # assumption and can't be accounted for consistently: leaving it out of the matrix drops a real
+        # energy sink, and including it credits ionisation below E_0 that the heating term already claims.
+        ionpots_below_emin = sorted(
+            float(shell["ionpot_ev"]) for shell in collionrows if shell["ionpot_ev"] < self.engrid[0]
+        )
+        if ionpots_below_emin:
+            msg = (
+                f"Z={Z} ion_stage {ion_stage} has {len(ionpots_below_emin)} ionisation shell(s) with an"
+                f" ionisation potential below emin_ev={self.engrid[0]} eV (lowest {ionpots_below_emin[0]} eV)."
+                f" The energy fractions would not sum to one, so set emin_ev <= {ionpots_below_emin[0]} eV."
+            )
+            raise ValueError(msg)
+
         if self.verbose:
             print(
                 f"  including Z={Z} ion_stage"
@@ -441,8 +456,7 @@ class SpencerFanoSolver:
         self.ionpopdict[(Z, ion_stage)] = n_ion
 
         for shell in collionrows:
-            if shell["ionpot_ev"] >= self.engrid[0]:
-                self._add_ionisation_shell(n_ion, shell)
+            self._add_ionisation_shell(n_ion, shell)
 
     def calculate_free_electron_density(self) -> float:
         # number density of free electrons [cm-^3]
