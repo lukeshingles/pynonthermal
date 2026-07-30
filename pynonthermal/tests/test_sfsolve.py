@@ -24,6 +24,63 @@ def test_lotz_heavy_element() -> None:
         assert sf.get_ionisation_ratecoeff(56, 2) > 0.0
 
 
+def test_grid_validation() -> None:
+    with pytest.raises(ValueError, match="npts must be at least 2"):
+        pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=1)
+    with pytest.raises(ValueError, match="emin_ev must be greater than zero"):
+        pynonthermal.SpencerFanoSolver(emin_ev=0, emax_ev=3000, npts=100)
+    with pytest.raises(ValueError, match="must be greater than emin_ev"):
+        pynonthermal.SpencerFanoSolver(emin_ev=3000, emax_ev=1, npts=100)
+
+
+def test_ionpot_below_emin_rejected() -> None:
+    # Fe I has 7.9 and 9.0 eV shells. Kozma & Fransson 1992 require all thresholds above the
+    # low-energy cutoff, so a grid starting above them would not conserve energy.
+    with (
+        pynonthermal.SpencerFanoSolver(emin_ev=12.0, emax_ev=3000, npts=200) as sf,
+        pytest.raises(ValueError, match="below emin_ev"),
+    ):
+        sf.add_ionisation(26, 1, n_ion=1.0)
+
+    # the same ion is accepted once the cutoff is below its lowest shell, and then conserves energy
+    with pynonthermal.SpencerFanoSolver(emin_ev=7.9, emax_ev=3000, npts=1000) as sf:
+        sf.add_ionisation(26, 1, n_ion=0.99)
+        sf.add_ionisation(26, 2, n_ion=0.01)
+        sf.solve(depositionratedensity_ev=1e6)
+        assert math.isclose(sf.get_frac_sum(), 1.0, abs_tol=0.05)
+
+
+def test_zero_free_electron_density() -> None:
+    # a plasma of only neutral ions has no thermal electron loss channel
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=200) as sf:
+        sf.add_ionisation(2, 1, n_ion=1.0)
+        assert sf.get_n_e() == 0.0
+        with pytest.raises(ValueError, match="free electron density is zero"):
+            sf.solve(depositionratedensity_ev=100)
+
+        # override_n_e is the documented way out, but must be a usable density
+        for badvalue in (0.0, -1.0):
+            with pytest.raises(ValueError, match="override_n_e must be greater than zero"):
+                sf.solve(depositionratedensity_ev=100, override_n_e=badvalue)
+
+        sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
+        assert sf.get_n_e() == 1e-4
+
+
+def test_override_n_e_not_confused_with_cache() -> None:
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=200) as sf:
+        sf.add_ionisation(8, 2, n_ion=1e8)
+        sf.add_ionisation(8, 3, n_ion=1e8)
+        assert sf.calculate_free_electron_density() == 3e8
+
+        sf.solve(depositionratedensity_ev=1e8, override_n_e=1e6)
+        assert sf.get_n_e() == 1e6
+
+        # omitting the override falls back to the ion populations
+        sf.solve(depositionratedensity_ev=1e8)
+        assert sf.get_n_e() == 3e8
+
+
 class CountingAnalysisSolver(pynonthermal.SpencerFanoSolver):
     analyse_count: int = 0
 
