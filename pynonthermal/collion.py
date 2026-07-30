@@ -171,10 +171,12 @@ def ar_xs(energy_ev: float, ionpot_ev: float, A: float, B: float, C: float, D: f
     if u <= 1:
         return 0
 
-    return (
+    # the fit can go slightly negative just above threshold, so clamp to zero
+    return max(
+        0.0,
         1e-14
         * (A * (1 - 1 / u) + B * pow((1 - 1 / u), 2) + C * math.log(u) + D * math.log(u) / u)
-        / (u * pow(ionpot_ev, 2))
+        / (u * pow(ionpot_ev, 2)),
     )
 
 
@@ -186,7 +188,10 @@ def get_arxs_array_shell(arr_enev: npt.NDArray[np.float64], shell: dict[str, int
     xs = np.zeros_like(arr_enev)
     abovethreshold = arr_enev > ionpot_ev
     u = arr_enev[abovethreshold] / ionpot_ev
-    xs[abovethreshold] = (
+    # a few of the fits (Ne I n=2 l=0, Na II n=2 l=1) go slightly negative just above threshold,
+    # so clamp to zero to keep the cross section physical
+    xs[abovethreshold] = np.maximum(
+        0.0,
         1e-14
         * (
             shell["A"] * (1 - 1 / u)
@@ -194,7 +199,7 @@ def get_arxs_array_shell(arr_enev: npt.NDArray[np.float64], shell: dict[str, int
             + shell["C"] * np.log(u)
             + shell["D"] * np.log(u) / u
         )
-        / (u * ionpot_ev**2)
+        / (u * ionpot_ev**2),
     )
     return xs
 
