@@ -990,7 +990,6 @@ class SpencerFanoSolver:
         else:
             ax = axis
 
-        npts = len(self.engrid)
         E_0 = self.engrid[0]
 
         # E_init_ev = np.dot(engrid, sourcevec) * deltaen
@@ -1003,58 +1002,11 @@ class SpencerFanoSolver:
 
         d_etaheat_by_d_en_vec = self.get_d_etaheating_by_d_en_vec()
 
-        deltaen = self.engrid[1:] - self.engrid[:-1]
-        etaion_int = np.zeros(npts)
-        etaexc_int = np.zeros(npts)
-        etaheat_int = np.zeros(npts)
-        for i in reversed(range(len(self.engrid) - 1)):
-            etaion_int[i] = etaion_int[i + 1] + d_etaion_by_d_en_vec[i] * deltaen[i]
-            etaexc_int[i] = etaexc_int[i + 1] + d_etaexc_by_d_en_vec[i] * deltaen[i]
-            etaheat_int[i] = etaheat_int[i + 1] + d_etaheat_by_d_en_vec[i] * deltaen[i]
-
-        etaheat_int[0] += E_0 * self.yvec[0] * self.electronlossfunction(E_0)
-
-        # etatot_int = etaion_int + etaexc_int + etaheat_int
-
-        # go below E_0
-        deltaen2 = E_0 / 20.0
-        engrid_low = np.arange(0.0, E_0, deltaen2, dtype=float)
+        # the plot extends below E_0, where the cross sections are all zero and every remaining
+        # electron thermalises, so only the heating channel is non-zero there
+        engrid_low = np.arange(0.0, E_0, E_0 / 20.0, dtype=float)
         npts_low = len(engrid_low)
-        d_etaheat_by_d_en_low = np.zeros(len(engrid_low))
-        etaheat_int_low = np.zeros(len(engrid_low))
-        etaion_int_low = np.zeros(len(engrid_low))
-        etaexc_int_low = np.zeros(len(engrid_low))
-
-        for i in reversed(range(len(engrid_low))):
-            en_ev = engrid_low[i]
-            N_e = self.calculate_N_e(en_ev)
-            d_etaheat_by_d_en_low[i] += (
-                N_e * en_ev / self.depositionratedensity_ev
-            )  # + (yvec[0] * lossfunction(E_0, n_e, n_e_tot) / depositionratedensity_ev)
-            etaheat_int_low[i] = (
-                etaheat_int_low[i + 1] if i < len(engrid_low) - 1 else etaheat_int[0]
-            ) + d_etaheat_by_d_en_low[i] * deltaen2
-
-            etaion_int_low[i] = etaion_int[0]  # cross sections start above E_0
-            etaexc_int_low[i] = etaexc_int[0]
-
-        # etatot_int_low = etaion_int_low + etaexc_int_low + etaheat_int_low
         engridfull = np.append(engrid_low, self.engrid)
-
-        # axes[0].plot(engridfull, np.append(etaion_int_low, etaion_int), marker="None", lw=1.5, color='C0', label='Ionisation')
-        #
-        # if not noexcitation:
-        #     axes[0].plot(engridfull, np.append(etaexc_int_low, etaexc_int), marker="None", lw=1.5,
-        #                  color='C1', label='Excitation')
-        #
-        # axes[0].plot(engridfull, np.append(etaheat_int_low, etaheat_int), marker="None", lw=1.5,
-        #              color='C2', label='Heating')
-        #
-        # axes[0].plot(engridfull, np.append(etatot_int_low, etatot_int), marker="None", lw=1.5, color='black', label='Total')
-        #
-        # axes[0].set_ylim(bottom=0)
-        # axes[0].legend(loc='best', handlelength=2, frameon=False, numpoints=1, prop={'size': 10})
-        # axes[0].set_ylabel(r'$\eta$ E to Emax', fontsize=fs)
 
         # delta_E_y_on_dE = np.zeros(npts)
         # for i in range(len(engrid) - 1):
@@ -1089,8 +1041,6 @@ class SpencerFanoSolver:
                 label="Excitation",
             )
 
-        # axis.plot(engridfull, np.append(d_etaheat_by_d_en_low, d_etaheat_by_d_en_vec) * engridfull / detaymax,
-        #           marker="None", lw=1.5, color='C2', label='Heating')
         ax.plot(
             self.engrid,
             (np.array(d_etaheat_by_d_en_vec) * self.engrid) / detaymax,
@@ -1103,8 +1053,6 @@ class SpencerFanoSolver:
         ax.set_ylim(bottom=0, top=1.0)
         ax.legend(loc="best", handlelength=2, frameon=False, numpoints=1, prop={"size": 10})
         ax.set_ylabel(r"E d$\eta$ / dE [eV$^{-1}$]", fontsize=fs)
-
-        # etatot_int = etaion_int + etaexc_int + etaheat_int
 
         #    ax.annotate(modellabel, xy=(0.97, 0.95), xycoords='axes fraction', horizontalalignment='right',
         #                verticalalignment='top', fontsize=fs)
