@@ -190,7 +190,9 @@ class SpencerFanoSolver:
             raise RuntimeError(msg)
 
     def _get_all_ions(self) -> list[tuple[int, int]]:
-        # every ion with an ionisation or an excitation channel, in the order it was added
+        # every ion with an ionisation or an excitation channel: ions with a registered population
+        # first (in population registration order), then ions that only have manually-added
+        # excitation channels (in the order their first excitation was added)
         return list(dict.fromkeys([*self.ionpopdict, *self.excitationlists]))
 
     def _register_ion_population(self, Z: int, ion_stage: int, n_ion: float) -> None:
