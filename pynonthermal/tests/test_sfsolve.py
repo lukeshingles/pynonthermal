@@ -81,6 +81,34 @@ def test_override_n_e_not_confused_with_cache() -> None:
         assert sf.get_n_e() == 3e8
 
 
+def test_excitation_xs_zero_above_grid() -> None:
+    # a transition that no electron on the grid can drive must have a zero cross section
+    # everywhere, rather than a spurious (and for the E1 branch, negative) value at the top point
+    engrid = np.linspace(1.0, 100.0, 200)
+    for row in (
+        {"collstr": -1, "epsilon_trans_ev": 500.0, "forbidden": 0, "lower_g": 1, "upper_g": 3, "A": 1e8},
+        {"collstr": 1.0, "epsilon_trans_ev": 500.0, "forbidden": 1, "lower_g": 1, "upper_g": 3, "A": 0.0},
+    ):
+        xs_vec = pynonthermal.excitation.get_xs_excitation_vector(engrid, row)
+        assert not xs_vec.any()
+        # the scalar implementation has always agreed on this point
+        assert pynonthermal.excitation.get_xs_excitation(engrid[-1], row) == 0.0
+
+    # a transition right at the top of the grid is still open
+    row_attop = {"collstr": -1, "epsilon_trans_ev": 100.0, "forbidden": 0, "lower_g": 1, "upper_g": 3, "A": 1e8}
+    assert pynonthermal.excitation.get_xs_excitation_vector(engrid, row_attop)[-1] > 0.0
+
+    # no cross section anywhere may be negative for real atomic data on a grid far below the
+    # highest transition energy
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=5.0, npts=300) as sf:
+        sf.add_ionisation(26, 3, n_ion=0.7)
+        sf.add_ion_ltepopexcitation(26, 3, n_ion=0.7)
+        for transitions in sf.excitationlists.values():
+            for _levelpop, xs_vec, epsilon_trans_ev in transitions.values():
+                assert epsilon_trans_ev <= sf.engrid[-1]
+                assert (xs_vec >= 0.0).all()
+
+
 def test_excitation_only_ion_counted() -> None:
     # an ion given an excitation channel but no ionisation channel still spends deposited energy,
     # so its excitation fraction has to appear in the totals

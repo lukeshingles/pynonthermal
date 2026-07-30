@@ -69,6 +69,12 @@ def get_xs_excitation_vector(
     assert isinstance(epsilon_trans_ev, float)
     epsilon_trans = epsilon_trans_ev * EV
 
+    if epsilon_trans_ev > engrid[-1]:
+        # no electron on the grid has enough energy to drive this transition. Without this check,
+        # get_energyindex_gteq clamps to the last grid point and leaves a spurious cross section
+        # there, which for the E1 branch below comes out negative (g_bar < 0 for U < 0.585).
+        return np.zeros(npts)
+
     startindex = pynonthermal.get_energyindex_gteq(en_ev=epsilon_trans_ev, engrid=engrid)
     xs_excitation_vec[:startindex] = 0.0
 

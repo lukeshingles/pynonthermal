@@ -335,7 +335,8 @@ class SpencerFanoSolver:
         if maxnlevelsupper is not None:
             lzdftransitions = lzdftransitions.filter(pl.col("upper") < maxnlevelsupper)
 
-        lzdftransitions = lzdftransitions.filter(pl.col("epsilon_trans_ev") >= self.engrid[0])
+        # transitions outside the grid can't be driven by any electron the solver represents
+        lzdftransitions = lzdftransitions.filter(pl.col("epsilon_trans_ev").is_between(self.engrid[0], self.engrid[-1]))
         dftransitions = lzdftransitions.collect()
 
         if not dftransitions.is_empty():
