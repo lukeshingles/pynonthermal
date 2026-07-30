@@ -1,9 +1,7 @@
 include LICENSE
 include README.md
 include pynonthermal/py.typed
-recursive-include pynonthermal/data *.txt *.zst
 
 prune pynonthermal/tests
 global-exclude *.py[cod]
-global-exclude __pycache__
 global-exclude .DS_Store
