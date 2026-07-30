@@ -678,9 +678,9 @@ class SpencerFanoSolver:
         self._frac_heating = frac_heating
         return frac_heating
 
-    def reset_solution_analysis(self) -> None:
+    def _reset_channel_fractions(self) -> None:
+        # clear the per-ion accumulators, which analyse_ntspectrum() sums into
         self._analysed = False
-        self._frac_heating = None
         self._frac_ionisation_tot = 0.0
         self._frac_excitation_tot = 0.0
         self._frac_ionisation_ion = {}
@@ -688,9 +688,14 @@ class SpencerFanoSolver:
         self._nt_ionisation_ratecoeff = {}
         self._eff_ionpot = {}
 
+    def reset_solution_analysis(self) -> None:
+        self._reset_channel_fractions()
+        self._frac_heating = None
+
     def analyse_ntspectrum(self) -> None:
         self._require_solved()
-        self.reset_solution_analysis()
+        # keep any frac_heating already computed for this solution, since it only depends on yvec
+        self._reset_channel_fractions()
 
         deltaen = self.engrid[1] - self.engrid[0]
 
@@ -800,7 +805,7 @@ class SpencerFanoSolver:
             print(f"  frac_excitation_tot: {self._frac_excitation_tot:.4f}")
             print(f"  frac_ionisation_tot: {self._frac_ionisation_tot:.4f}")
 
-        frac_heating = self.calculate_frac_heating()
+        frac_heating = self.get_frac_heating()
 
         self._analysed = True
 
