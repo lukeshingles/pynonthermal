@@ -69,17 +69,6 @@ def get_Zbar(ions: Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], 
     return Zbar
 
 
-def get_Zboundbar(ions: Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], float]) -> float:
-    # number density-weighted average number of bound electrons per nucleus
-    Zboundbar = 0.0
-    n_tot = get_n_tot(ions, ionpopdict)
-    for Z, ion_stage in ions:
-        n_ion = ionpopdict[(Z, ion_stage)]
-        Zboundbar += (Z - ion_stage + 1) * n_ion / n_tot
-
-    return Zboundbar
-
-
 def get_energyindex_lteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
     # find energy bin lower boundary is less than or equal to search value
     # assert en_ev >= engrid[0]

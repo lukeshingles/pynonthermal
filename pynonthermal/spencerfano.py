@@ -594,11 +594,6 @@ class SpencerFanoSolver:
                     i = self.get_energyindex_lteq(en_ev=energy_ev + epsilon_trans_ev)
                     # the level population is absolute, so this term is not scaled by n_ion below
                     N_e += levelnumberdensity * self.yvec[i] * xsvec[i]
-                    # enbelow = engrid[i]
-                    # enabove = engrid[i + 1]
-                    # x = (energy_ev - enbelow) / (enabove - enbelow)
-                    # yvecinterp = (1 - x) * yvec[i] + x * yvec[i + 1]
-                    # N_e += levelnumberdensity * yvecinterp * get_xs_excitation(energy_ev + epsilon_trans_ev, row)
 
             if (Z, ion_stage) not in self._ionisation_ions:
                 continue

@@ -13,49 +13,6 @@ from pynonthermal.constants import ME
 from pynonthermal.constants import QE
 
 
-def get_xs_excitation(en_ev: float, row: dict[str, t.Any], use_collstrengths: bool = True) -> float:
-    """Get the excitation cross section in cm^2 at energy en_ev [eV]."""
-    A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
-
-    coll_str = row["collstr"]
-    epsilon_trans_ev = row["epsilon_trans_ev"]
-    assert isinstance(epsilon_trans_ev, float)
-    epsilon_trans = epsilon_trans_ev * EV
-
-    if en_ev < epsilon_trans_ev:
-        return 0.0
-
-    if coll_str >= 0 and use_collstrengths:
-        # collision strength is available, so use it
-        # Li et al. 2012 equation 11: sigma = pi * a_0^2 * (H_ionpot / E) * coll_str / lower_g,
-        # with k_i^2 = E / H_ionpot in units of the inverse Bohr radius squared
-        constantfactor = H_ionpot / row["lower_g"] * coll_str * math.pi * A_naught_squared
-
-        return constantfactor / (en_ev * EV)
-
-    if not row["forbidden"]:
-        nu_trans = epsilon_trans / H
-        g = row["upper_g"] / row["lower_g"]
-        fij: float = g * ME * pow(CLIGHT, 3) / (8 * pow(QE * nu_trans * math.pi, 2)) * row["A"]
-        # permitted E1 electric dipole transitions
-
-        g_bar = 0.2
-
-        A = 0.28
-        B = 0.15
-
-        prefactor = 45.585750051
-        # Eq 4 of Mewe 1972, possibly from Seaton 1962?
-        constantfactor = prefactor * A_naught_squared * pow(H_ionpot / epsilon_trans, 2) * fij
-
-        U = en_ev / epsilon_trans_ev
-        g_bar = A * np.log(U) + B
-
-        return constantfactor * g_bar / U
-
-    return 0.0
-
-
 def get_xs_excitation_vector(
     engrid: npt.NDArray[np.float64], row: dict[str, t.Any], use_collstrengths: bool = True
 ) -> npt.NDArray[np.float64]:

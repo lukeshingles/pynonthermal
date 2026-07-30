@@ -1,4 +1,3 @@
-import math
 from functools import lru_cache
 from math import atan
 from pathlib import Path
@@ -171,20 +170,6 @@ def get_J(Z: int, ion_stage: int, ionpot_ev: float) -> float:
     return 0.6 * ionpot_ev
 
 
-def ar_xs(energy_ev: float, ionpot_ev: float, A: float, B: float, C: float, D: float) -> float:
-    u = energy_ev / ionpot_ev
-    if u <= 1:
-        return 0
-
-    # the fit can go slightly negative just above threshold, so clamp to zero
-    return max(
-        0.0,
-        1e-14
-        * (A * (1 - 1 / u) + B * pow((1 - 1 / u), 2) + C * math.log(u) + D * math.log(u) / u)
-        / (u * pow(ionpot_ev, 2)),
-    )
-
-
 def get_arxs_array_shell(arr_enev: npt.NDArray[np.float64], shell: dict[str, int | float]) -> npt.NDArray[np.float64]:
     if shell["n"] < 0:
         return get_lotz_xs_ionisation_vec(shell, arr_en_ev=arr_enev)
@@ -207,14 +192,3 @@ def get_arxs_array_shell(arr_enev: npt.NDArray[np.float64], shell: dict[str, int
         / (u * ionpot_ev**2),
     )
     return xs
-
-
-def get_arxs_array_ion(
-    arr_enev: npt.NDArray[np.float64], dfcollion: pl.DataFrame, Z: int, ion_stage: int
-) -> npt.NDArray[np.float64]:
-    ar_xs_array = np.zeros(len(arr_enev))
-    dfcollion_thision = dfcollion.filter(pl.col("Z") == Z).filter(pl.col("ion_stage") == ion_stage)
-    for shell in dfcollion_thision.iter_rows(named=True):
-        ar_xs_array += get_arxs_array_shell(arr_enev, shell)
-
-    return ar_xs_array
