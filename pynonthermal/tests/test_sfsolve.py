@@ -81,6 +81,37 @@ def test_override_n_e_not_confused_with_cache() -> None:
         assert sf.get_n_e() == 3e8
 
 
+def test_excitation_only_ion_counted() -> None:
+    # an ion given an excitation channel but no ionisation channel still spends deposited energy,
+    # so its excitation fraction has to appear in the totals
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=500) as sf:
+        sf.add_ionisation(8, 2, n_ion=1e8)
+        xs_vec = np.where(sf.engrid >= 20.0, 1e-16, 0.0)
+        sf.add_excitation(26, 2, levelnumberdensity=1e8, xs_vec=xs_vec, epsilon_trans_ev=20.0)
+        sf.solve(depositionratedensity_ev=1e8)
+
+        assert sf.get_frac_excitation_tot() > 0.3
+        assert math.isclose(sf.get_frac_sum(), 1.0, abs_tol=0.01)
+
+
+def test_ltepopexcitation_registers_population() -> None:
+    # add_ion_ltepopexcitation() without add_ionisation() must still contribute the ion's free
+    # electrons and nuclei, and must not invent an ionisation channel for it
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=600) as sf:
+        sf.add_ionisation(8, 2, n_ion=1e8)
+        sf.add_ion_ltepopexcitation(26, 3, n_ion=5e7, use_collstrengths=False)
+
+        assert sf.ionpopdict[(26, 3)] == 5e7
+        assert sf.get_n_e() == 1e8 * 1 + 5e7 * 2
+        assert sf.get_n_ion_tot() == 1.5e8
+
+        sf.solve(depositionratedensity_ev=1e8)
+        assert sf.get_frac_excitation_tot() > 0.0
+        assert sf.get_ionisation_ratecoeff(26, 3) == 0.0
+        assert sf.get_eff_ionpot(26, 3) == float("inf")
+        assert math.isclose(sf.get_frac_sum(), 1.0, abs_tol=0.01)
+
+
 class CountingAnalysisSolver(pynonthermal.SpencerFanoSolver):
     analyse_count: int = 0
 

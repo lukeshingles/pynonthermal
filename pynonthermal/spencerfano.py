@@ -70,6 +70,7 @@ class SpencerFanoSolver:
     _frac_excitation_ion: dict[tuple[int, int], float]
     _eff_ionpot: dict[tuple[int, int], float]
     _nt_ionisation_ratecoeff: dict[tuple[int, int], float]
+    _ionisation_ions: set[tuple[int, int]]
     _collionrows_ion: dict[tuple[int, int], list[dict[str, t.Any]]]
     _shell_xs: dict[tuple[int, int, int, int, float], npt.NDArray[np.float64]]
     depositionratedensity_ev: float
@@ -115,6 +116,7 @@ class SpencerFanoSolver:
         self._shell_xs = {}  # cache of ionisation cross section arrays per shell
 
         self.ionpopdict = {}  # key is (Z, ion_stage) value is number density
+        self._ionisation_ions = set()  # ions passed to add_ionisation(), i.e. those with ionisation channels
 
         # key is (Z, ion_stage) value is {levelkey : (levelnumberdensity, xs_vec, epsilon_trans_ev)}
         self.excitationlists = {}
@@ -186,6 +188,23 @@ class SpencerFanoSolver:
         if self._solved:
             msg = f"Can't {action} after solving the Spencer-Fano equation"
             raise RuntimeError(msg)
+
+    def _get_all_ions(self) -> list[tuple[int, int]]:
+        # every ion with an ionisation or an excitation channel, in the order it was added
+        return list(dict.fromkeys([*self.ionpopdict, *self.excitationlists]))
+
+    def _register_ion_population(self, Z: int, ion_stage: int, n_ion: float) -> None:
+        # an ion's number density must agree between its ionisation and excitation calls
+        if n_ion < 0.0:
+            msg = f"n_ion must be non-negative but is {n_ion}"
+            raise ValueError(msg)
+
+        n_ion_existing = self.ionpopdict.get((Z, ion_stage))
+        if n_ion_existing is not None and not math.isclose(n_ion_existing, n_ion, rel_tol=1e-6):
+            msg = f"Can't add Z={Z} ion_stage {ion_stage} twice with different populations"
+            raise ValueError(msg)
+
+        self.ionpopdict[(Z, ion_stage)] = n_ion
 
     def _get_ion_collion_rows(self, Z: int, ion_stage: int) -> list[dict[str, t.Any]]:
         # collisional ionisation shell data rows for one ion (cached)
@@ -294,9 +313,9 @@ class SpencerFanoSolver:
             msg = f"No excitation data for Z={Z} ion_stage {ion_stage} in internal database."
             raise ValueError(msg)
 
-        if (Z, ion_stage) in self.ionpopdict and not math.isclose(self.ionpopdict[(Z, ion_stage)], n_ion, rel_tol=1e-6):
-            msg = f"Can't add Z={Z} ion_stage {ion_stage} twice with different populations"
-            raise ValueError(msg)
+        # register the population so that this ion counts towards n_e and n_ion_tot even when
+        # add_ionisation() was never called for it
+        self._register_ion_population(Z, ion_stage, n_ion)
 
         dfpops_thision = ion["levels"].item()
 
@@ -418,7 +437,7 @@ class SpencerFanoSolver:
 
     def add_ionisation(self, Z: int, ion_stage: int, n_ion: float) -> None:
         self._require_not_solved("add ionisation")
-        if (Z, ion_stage) in self.ionpopdict:
+        if (Z, ion_stage) in self._ionisation_ions:
             msg = f"Can't add Z={Z} ion_stage {ion_stage} twice"
             raise ValueError(msg)
         if n_ion == 0.0:
@@ -453,7 +472,8 @@ class SpencerFanoSolver:
                 f" {ion_stage} ({at.get_ionstring(Z, ion_stage)}) ionisation with n_ion"
                 f" {n_ion:.1e} [/cm3]"
             )
-        self.ionpopdict[(Z, ion_stage)] = n_ion
+        self._register_ion_population(Z, ion_stage, n_ion)
+        self._ionisation_ions.add((Z, ion_stage))
 
         for shell in collionrows:
             self._add_ionisation_shell(n_ion, shell)
@@ -561,20 +581,23 @@ class SpencerFanoSolver:
 
         deltaen = self.engrid[1] - self.engrid[0]
 
-        for Z, ion_stage in self.ionpopdict:
+        for Z, ion_stage in self._get_all_ions():
             N_e_ion = 0.0
-            n_ion = self.ionpopdict[(Z, ion_stage)]
+            n_ion = self.ionpopdict.get((Z, ion_stage), 0.0)
 
-            if self.excitationlists and (Z, ion_stage) in self.excitationlists:
-                for levelnumberdensity, xsvec, epsilon_trans_ev in self.excitationlists[(Z, ion_stage)].values():
-                    if energy_ev + epsilon_trans_ev >= self.engrid[0]:
-                        i = self.get_energyindex_lteq(en_ev=energy_ev + epsilon_trans_ev)
-                        N_e_ion += (levelnumberdensity / n_ion) * self.yvec[i] * xsvec[i]
-                        # enbelow = engrid[i]
-                        # enabove = engrid[i + 1]
-                        # x = (energy_ev - enbelow) / (enabove - enbelow)
-                        # yvecinterp = (1 - x) * yvec[i] + x * yvec[i + 1]
-                        # N_e_ion += (levelnumberdensity / n_ion) * yvecinterp * get_xs_excitation(energy_ev + epsilon_trans_ev, row)
+            for levelnumberdensity, xsvec, epsilon_trans_ev in self.excitationlists.get((Z, ion_stage), {}).values():
+                if energy_ev + epsilon_trans_ev >= self.engrid[0]:
+                    i = self.get_energyindex_lteq(en_ev=energy_ev + epsilon_trans_ev)
+                    # the level population is absolute, so this term is not scaled by n_ion below
+                    N_e += levelnumberdensity * self.yvec[i] * xsvec[i]
+                    # enbelow = engrid[i]
+                    # enabove = engrid[i + 1]
+                    # x = (energy_ev - enbelow) / (enabove - enbelow)
+                    # yvecinterp = (1 - x) * yvec[i] + x * yvec[i + 1]
+                    # N_e += levelnumberdensity * yvecinterp * get_xs_excitation(energy_ev + epsilon_trans_ev, row)
+
+            if (Z, ion_stage) not in self._ionisation_ions:
+                continue
 
             for shell in self._get_ion_collion_rows(Z, ion_stage):
                 ionpot_ev = shell["ionpot_ev"]
@@ -673,19 +696,20 @@ class SpencerFanoSolver:
         if self.verbose:
             print(f"    n_e_nt: {self.get_n_e_nt():.2e} [/cm3]")
 
-        for (Z, ion_stage), n_ion in self.ionpopdict.items():
-            n_ion_tot = self.get_n_ion_tot()
-            X_ion = n_ion / n_ion_tot
-            collionrows = self._get_ion_collion_rows(Z, ion_stage)
-            ionpot_valence = min(shell["ionpot_ev"] for shell in collionrows)
-            assert isinstance(ionpot_valence, float)
+        n_ion_tot = self.get_n_ion_tot()
+        for Z, ion_stage in self._get_all_ions():
+            n_ion = self.ionpopdict.get((Z, ion_stage), 0.0)
+            X_ion = n_ion / n_ion_tot if n_ion_tot > 0.0 else 0.0
+            # an ion added only for excitation has no ionisation shells in the matrix
+            collionrows = self._get_ion_collion_rows(Z, ion_stage) if (Z, ion_stage) in self._ionisation_ions else []
+
+            ionpot_valence = min((float(shell["ionpot_ev"]) for shell in collionrows), default=None)
 
             if self.verbose:
-                print(
-                    f"\n====> Z={Z:2d} ion_stage"
-                    f" {ion_stage} {at.get_ionstring(Z, ion_stage)} (valence potential"
-                    f" {ionpot_valence:.1f} eV)"
+                valencestr = (
+                    "no ionisation channel" if ionpot_valence is None else f"valence potential {ionpot_valence:.1f} eV"
                 )
+                print(f"\n====> Z={Z:2d} ion_stage {ion_stage} {at.get_ionstring(Z, ion_stage)} ({valencestr})")
 
                 print(f"               n_ion: {n_ion:.2e} [/cm3]")
                 print(f"     n_ion/n_ion_tot: {X_ion:.5f}")
@@ -739,23 +763,22 @@ class SpencerFanoSolver:
             if self.verbose:
                 print(f"     frac_ionisation: {self._frac_ionisation_ion[(Z, ion_stage)]:.4f}")
 
-            if self.excitationlists:
-                frac_excitation_thision = self.calculate_nt_frac_excitation_ion(Z, ion_stage) if n_ion > 0.0 else 0.0
+            frac_excitation_thision = self.calculate_nt_frac_excitation_ion(Z, ion_stage)
 
-                if frac_excitation_thision > 1:
-                    warnings.warn(f"Ignoring invalid frac_excitation_ion of {frac_excitation_thision}", stacklevel=2)
-                    frac_excitation_thision = 0.0
+            if frac_excitation_thision > 1:
+                warnings.warn(f"Ignoring invalid frac_excitation_ion of {frac_excitation_thision}", stacklevel=2)
+                frac_excitation_thision = 0.0
 
-                self._frac_excitation_ion[(Z, ion_stage)] = frac_excitation_thision
-                self._frac_excitation_tot += frac_excitation_thision
+            self._frac_excitation_ion[(Z, ion_stage)] = frac_excitation_thision
+            self._frac_excitation_tot += frac_excitation_thision
 
-                if self.verbose:
-                    print(f"     frac_excitation: {self._frac_excitation_ion[(Z, ion_stage)]:.4f}")
-            else:
-                self._frac_excitation_ion[(Z, ion_stage)] = 0.0
+            if self.verbose and frac_excitation_thision > 0.0:
+                print(f"     frac_excitation: {self._frac_excitation_ion[(Z, ion_stage)]:.4f}")
 
-            self._nt_ionisation_ratecoeff[(Z, ion_stage)] = self.depositionratedensity_ev / n_ion_tot / eff_ionpot
-            if self.verbose:
+            self._nt_ionisation_ratecoeff[(Z, ion_stage)] = (
+                self.depositionratedensity_ev / n_ion_tot / eff_ionpot if n_ion_tot > 0.0 else 0.0
+            )
+            if self.verbose and ionpot_valence is not None:
                 workfn_ev = get_workfn_ev(
                     Z,
                     ion_stage,
@@ -879,7 +902,7 @@ class SpencerFanoSolver:
         self._require_solved()
         part_integrand = np.zeros(len(self.engrid))
 
-        for Z, ion_stage in self.ionpopdict:
+        for Z, ion_stage in self._ionisation_ions:
             n_ion = self.ionpopdict[(Z, ion_stage)]
 
             for shell in self._get_ion_collion_rows(Z, ion_stage):
