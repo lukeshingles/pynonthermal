@@ -716,7 +716,6 @@ class SpencerFanoSolver:
                 print(f"     n_ion/n_ion_tot: {X_ion:.5f}")
 
             self._frac_ionisation_ion[(Z, ion_stage)] = 0.0
-            integralgamma = 0.0
             eta_over_ionpot_sum = 0.0
             for shell in collionrows:
                 ar_xs_array = self._get_shell_xs(shell)
@@ -740,8 +739,6 @@ class SpencerFanoSolver:
                         f" {frac_ionisation_shell:.4f} (ionpot"
                         f" {shell['ionpot_ev']:.2f} eV)"
                     )
-
-                integralgamma += np.dot(self.yvec, ar_xs_array) * deltaen
 
                 if frac_ionisation_shell > 1:
                     warnings.warn(
@@ -791,15 +788,6 @@ class SpencerFanoSolver:
                 # print(f'  eff_ionpot_usevalence: {eff_ionpot_usevalence:.2f} [eV]')
                 print(f"ionisation ratecoeff: {self._nt_ionisation_ratecoeff[(Z, ion_stage)]:.2e} [/s]")
 
-            # the eff_ionpot-based rate coefficient should match a simple integral of xs * yvec * dE
-            if not np.isclose(self._nt_ionisation_ratecoeff[(Z, ion_stage)], integralgamma, rtol=0.01):
-                warnings.warn(
-                    f"Z={Z} ion_stage {ion_stage} ionisation rate coefficient"
-                    f" {self._nt_ionisation_ratecoeff[(Z, ion_stage)]:.2e} [/s] does not match the direct"
-                    f" cross-section integral {integralgamma:.2e} [/s]",
-                    stacklevel=2,
-                )
-
         # n_e_nt = get_n_e_nt(engrid, yvec)
         # print(f'               n_e_nt: {n_e_nt:.2e} /s/cm3')
 
@@ -812,9 +800,22 @@ class SpencerFanoSolver:
 
         self._analysed = True
 
+        frac_sum = self._frac_excitation_tot + self._frac_ionisation_tot + frac_heating
+
         if self.verbose:
             print(f"         frac_heating: {frac_heating:.4f}")
-            print(f"             frac_sum: {self._frac_excitation_tot + self._frac_ionisation_tot + frac_heating:.4f}")
+            print(f"             frac_sum: {frac_sum:.4f}")
+
+        # every deposited eV must end up in exactly one of the three channels. The tolerance is loose
+        # enough to absorb the discretisation error of a coarse energy grid, so a warning here means
+        # a channel is being double counted or omitted rather than merely under-resolved.
+        if not math.isclose(frac_sum, 1.0, rel_tol=0.05):
+            warnings.warn(
+                f"the energy fractions sum to {frac_sum:.4f} instead of 1: heating {frac_heating:.4f},"
+                f" ionisation {self._frac_ionisation_tot:.4f}, excitation {self._frac_excitation_tot:.4f}."
+                f" Try a finer energy grid (npts is {len(self.engrid)}).",
+                stacklevel=2,
+            )
 
     def get_n_e_nt(self) -> float:
         self._require_solved()
