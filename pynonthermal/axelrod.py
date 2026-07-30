@@ -147,13 +147,13 @@ def get_lotz_xs_ionisation_vec(
     p = ionpot_ev * EV
     Aconst = 1.33e-14 * EV * EV
 
-    # WARNING: The Axelrod equation uses both ln() and log10(), but the log10() term is likely a typo and should be
-    # ln(). Fortunately, at our typical 16 keV value of EMAX, 511 keV electrons are only mildly relativistic and the
-    # log10 term is small anyway.
+    # WARNING: The Axelrod equation uses both ln() and log10(), but the log10() term is likely a typo and has been
+    # corrected to ln(). Fortunately, at our typical 16 keV value of EMAX, 511 keV electrons are only mildly
+    # relativistic and the log(1 - beta^2) term is small anyway.
     valid = arr_en_erg > p
     with np.errstate(divide="ignore", invalid="ignore"):
         part_sigma_shell = (
-            electronsinshell / p * (np.log(betasq * ME * CLIGHT**2 / 2.0 / p) - np.log10(1 - betasq) - betasq)
+            electronsinshell / p * (np.log(betasq * ME * CLIGHT**2 / 2.0 / p) - np.log(1 - betasq) - betasq)
         )
         xs = 2 * Aconst / betasq / ME / CLIGHT**2 * part_sigma_shell
 
