@@ -71,6 +71,17 @@ def test_override_n_e_not_confused_with_cache() -> None:
         assert sf.get_n_e() == 3e8
 
 
+def test_n_e_cache_invalidated_by_later_adds() -> None:
+    # reading n_e between add_* calls must not freeze it at the earlier value
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=200) as sf:
+        sf.add_ionisation(8, 2, n_ion=1e8)
+        assert sf.get_n_e() == 1e8
+        sf.add_ionisation(8, 3, n_ion=1e8)
+        assert sf.get_n_e() == 3e8
+        sf.add_ion_ltepopexcitation(26, 3, n_ion=5e7, use_collstrengths=False)
+        assert sf.get_n_e() == 4e8
+
+
 def test_lotz_xs_relativistic() -> None:
     # the Lotz/Axelrod cross section must fall off smoothly rather than dropping to zero at the
     # 255 keV energy where the classical beta^2 = 2E/mc^2 reaches one

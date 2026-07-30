@@ -205,6 +205,8 @@ class SpencerFanoSolver:
             raise ValueError(msg)
 
         self.ionpopdict[(Z, ion_stage)] = n_ion
+        # the free electron density derived from the ion populations is no longer current
+        self._n_e = None
 
     def _get_ion_collion_rows(self, Z: int, ion_stage: int) -> list[dict[str, t.Any]]:
         # collisional ionisation shell data rows for one ion (cached)
