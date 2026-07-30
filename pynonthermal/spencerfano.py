@@ -76,7 +76,8 @@ class SpencerFanoSolver:
     ionpopdict: dict[tuple[int, int], float]
     excitationlists: dict[tuple[int, int], dict[t.Any, tuple[float, npt.NDArray[np.float64], float]]]
     verbose: bool
-    _n_e: float
+    _n_e: float | None
+    _n_e_override: float | None
     engrid: npt.NDArray[np.float64]
     deltaen: float
     dfcollion: pl.DataFrame
@@ -106,7 +107,8 @@ class SpencerFanoSolver:
             raise ValueError(msg)
 
         self._solved = False
-        self._n_e = 0.0
+        self._n_e = None
+        self._n_e_override = None
         self.reset_solution_analysis()
 
         self._collionrows_ion = {}  # cache of collisional ionisation shell data per (Z, ion_stage)
@@ -452,7 +454,10 @@ class SpencerFanoSolver:
         return n_e
 
     def get_n_e(self) -> float:
-        if self._n_e <= 0.0:
+        if self._n_e_override is not None:
+            return self._n_e_override
+
+        if self._n_e is None:
             self._n_e = self.calculate_free_electron_density()
 
         return self._n_e
@@ -469,11 +474,13 @@ class SpencerFanoSolver:
         self.reset_solution_analysis()
 
         self.depositionratedensity_ev = depositionratedensity_ev
-        if override_n_e is not None:
-            self._n_e = override_n_e
-        else:
-            # clear any previously-set override so that n_e is calculated on demand from ion populations
-            self._n_e = 0.0
+        if override_n_e is not None and override_n_e <= 0.0:
+            msg = f"override_n_e must be greater than zero but is {override_n_e}"
+            raise ValueError(msg)
+
+        # None clears any previously-set override, so that n_e is calculated on demand from ion populations
+        self._n_e_override = override_n_e
+        self._n_e = None
 
         npts = len(self.engrid)
         n_e = self.get_n_e()
