@@ -764,8 +764,12 @@ class SpencerFanoSolver:
             frac_excitation_thision = self.calculate_nt_frac_excitation_ion(Z, ion_stage)
 
             if frac_excitation_thision > 1:
-                warnings.warn(f"Ignoring invalid frac_excitation_ion of {frac_excitation_thision}", stacklevel=2)
-                frac_excitation_thision = 0.0
+                # keep it in the total, as for frac_ionisation_shell, so that the energy conservation
+                # check below still sees the problem instead of a total that silently lost a channel
+                warnings.warn(
+                    f"invalid frac_excitation_ion of {frac_excitation_thision} included in the total",
+                    stacklevel=2,
+                )
 
             self._frac_excitation_ion[(Z, ion_stage)] = frac_excitation_thision
             self._frac_excitation_tot += frac_excitation_thision

@@ -231,15 +231,19 @@ def test_api_guards() -> None:
             sf.add_ionisation(2, 2, n_ion=1e-4)
 
 
-def test_invalid_excitation_fraction_ignored() -> None:
-    # an unphysically-large excitation cross section produces frac_excitation > 1,
-    # which is reported and excluded from the total
+def test_invalid_excitation_fraction_reported() -> None:
+    # an unphysically-large excitation cross section produces frac_excitation > 1. It is reported
+    # but kept in the total, as for frac_ionisation_shell, so that the problem stays visible
+    # rather than being hidden behind a total that silently dropped the channel.
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=100) as sf:
         sf.add_ionisation(2, 1, n_ion=1.0)
         sf.add_excitation(2, 1, levelnumberdensity=1e30, xs_vec=np.full(100, 1e-10), epsilon_trans_ev=25.0)
         sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
 
-        assert sf.get_frac_excitation_tot() == 0.0
+        with pytest.warns(UserWarning, match="invalid frac_excitation_ion"):
+            frac_excitation_tot = sf.get_frac_excitation_tot()
+
+        assert frac_excitation_tot > 1.0
 
 
 def test_helium() -> None:
