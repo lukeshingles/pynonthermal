@@ -625,19 +625,22 @@ class SpencerFanoSolver:
                         * pynonthermal.collion.Psecondary(e_p=self.engrid[k], epsilon=endash, ionpot_ev=ionpot_ev, J=J)
                     )
 
-                # integral from 2E + I up to E_max
-                integral2startindex = self.get_energyindex_lteq(en_ev=2 * energy_ev + ionpot_ev)
-                N_e_ion += deltaen * sum(
-                    self.yvec[j]
-                    * ar_xs_array[j]
-                    * pynonthermal.collion.Psecondary(
-                        e_p=self.engrid[j],
-                        epsilon=energy_ev + ionpot_ev,
-                        ionpot_ev=ionpot_ev,
-                        J=J,
+                # integral from 2E + I up to E_max (skipped when the domain is empty, since
+                # get_energyindex_lteq would clamp to the last bin and add a spurious term;
+                # same guard as in _add_ionisation_shell)
+                if 2 * energy_ev + ionpot_ev < self.engrid[-1] + deltaen:
+                    integral2startindex = self.get_energyindex_lteq(en_ev=2 * energy_ev + ionpot_ev)
+                    N_e_ion += deltaen * sum(
+                        self.yvec[j]
+                        * ar_xs_array[j]
+                        * pynonthermal.collion.Psecondary(
+                            e_p=self.engrid[j],
+                            epsilon=energy_ev + ionpot_ev,
+                            ionpot_ev=ionpot_ev,
+                            J=J,
+                        )
+                        for j in range(integral2startindex, len(self.engrid))
                     )
-                    for j in range(integral2startindex, len(self.engrid))
-                )
 
             N_e += n_ion * N_e_ion
 

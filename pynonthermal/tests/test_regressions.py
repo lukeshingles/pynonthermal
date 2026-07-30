@@ -82,6 +82,41 @@ def test_n_e_cache_invalidated_by_later_adds() -> None:
         assert sf.get_n_e() == 4e8
 
 
+def test_N_e_empty_second_integral_domain() -> None:
+    # Kozma & Fransson eq. 6 has an integral over [2E + I, E_max]. When 2E + I lies beyond the
+    # top of the grid that domain is empty, but get_energyindex_lteq clamps to the last bin,
+    # which used to add one spurious term. Na XI's single shell (I = 1465 eV) on a 1400-3000 eV
+    # grid makes the domain empty for every E > 767.5 eV.
+    with pynonthermal.SpencerFanoSolver(emin_ev=1400, emax_ev=3000, npts=400) as sf:
+        sf.add_ionisation(11, 10, n_ion=1e8)
+        sf.solve(depositionratedensity_ev=1e8)
+
+        shell = (
+            pynonthermal.collion.read_colliondata()
+            .filter((pl.col("Z") == 11) & (pl.col("ion_stage") == 10))
+            .to_dicts()[0]
+        )
+        ionpot_ev = shell["ionpot_ev"]
+        J = pynonthermal.collion.get_J(11, 10, ionpot_ev)
+        ar_xs_array = pynonthermal.collion.get_arxs_array_shell(sf.engrid, shell)
+
+        energy_ev = 1200.0
+        assert 2 * energy_ev + ionpot_ev > sf.engrid[-1] + sf.deltaen  # second domain is empty
+
+        # reference: eq. 6 with only the first integral, endash in [I, min(E_max - E, E + I)]
+        enlambda = min(sf.engrid[-1] - energy_ev, energy_ev + ionpot_ev)
+        expected = 0.0
+        for j in range(sf.get_energyindex_lteq(ionpot_ev), sf.get_energyindex_lteq(enlambda) + 1):
+            endash = float(sf.engrid[j])
+            k = sf.get_energyindex_lteq(energy_ev + endash)
+            p_secondary = pynonthermal.collion.Psecondary(
+                e_p=float(sf.engrid[k]), epsilon=endash, ionpot_ev=ionpot_ev, J=J
+            )
+            expected += 1e8 * sf.deltaen * sf.yvec[k] * ar_xs_array[k] * p_secondary
+
+        assert math.isclose(sf.calculate_N_e(energy_ev), expected, rel_tol=1e-12)
+
+
 def test_lotz_xs_relativistic() -> None:
     # the Lotz/Axelrod cross section must fall off smoothly rather than dropping to zero at the
     # 255 keV energy where the classical beta^2 = 2E/mc^2 reaches one
