@@ -81,6 +81,23 @@ def test_override_n_e_not_confused_with_cache() -> None:
         assert sf.get_n_e() == 3e8
 
 
+def test_lotz_xs_relativistic() -> None:
+    # the Lotz/Axelrod cross section must fall off smoothly rather than dropping to zero at the
+    # 255 keV energy where the classical beta^2 = 2E/mc^2 reaches one
+    shell = (
+        pynonthermal.collion.read_colliondata()
+        .filter((pl.col("Z") == 56) & (pl.col("ion_stage") == 2) & (pl.col("n") < 0))
+        .to_dicts()[0]
+    )
+    arr_en_ev = np.array([1e2, 1e3, 1e4, 1e5, 2.54e5, 2.6e5, 5.11e5, 1e6])
+    xs_vec = pynonthermal.collion.get_arxs_array_shell(arr_en_ev, shell)
+
+    assert (xs_vec > 0.0).all()
+    assert np.isfinite(xs_vec).all()
+    # and the scalar implementation agrees instead of raising a math domain error
+    assert np.allclose(xs_vec, [pynonthermal.axelrod.get_lotz_xs_ionisation(shell, float(en)) for en in arr_en_ev])
+
+
 def test_excitation_xs_zero_above_grid() -> None:
     # a transition that no electron on the grid can drive must have a zero cross section
     # everywhere, rather than a spurious (and for the E1 branch, negative) value at the top point
