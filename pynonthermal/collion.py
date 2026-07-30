@@ -90,7 +90,12 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFram
                         continue
                     enbinding = elements_electron_binding[Z - 1][shellindex]
                     if enbinding <= 0:
-                        # if we don't have the shell's binding energy, use the previous one
+                        # if we don't have the shell's binding energy, use the previous one.
+                        # shellindex 0 has no previous shell, and a negative index would silently
+                        # wrap around to the outermost shell.
+                        if shellindex == 0:
+                            msg = f"No binding energy for the innermost shell of Z={Z}"
+                            raise ValueError(msg)
                         enbinding = elements_electron_binding[Z - 1][shellindex - 1]
                         assert enbinding > 0
 

@@ -102,6 +102,11 @@ def get_sum_q_over_binding_energy(atomic_number: int, ion_stage: int, ionpot_ev:
             enbinding = electron_binding[atomic_number - 1][electron_loop]
             ionpot = ionpot_ev * EV
             if enbinding <= 0:
+                # fall back to the next shell in, which a negative index would silently
+                # turn into the outermost shell instead
+                if electron_loop == 0:
+                    msg = f"No binding energy for the innermost shell of Z={atomic_number}"
+                    raise ValueError(msg)
                 enbinding = electron_binding[atomic_number - 1][electron_loop - 1]
                 assert enbinding > 0
 
