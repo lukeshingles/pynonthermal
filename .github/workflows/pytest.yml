@@ -56,7 +56,7 @@ jobs:
               run: uv run -- mypy
 
             - name: Run prek pre-commit checks
-              uses: j178/prek-action@v2
+              uses: j178/prek-action@v2.0.6
 
     pytest:
         timeout-minutes: 120
