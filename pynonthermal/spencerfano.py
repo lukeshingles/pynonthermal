@@ -660,9 +660,9 @@ class SpencerFanoSolver:
                 continue
 
             for shell in self._get_ion_collion_rows(Z, ion_stage):
-                ionpot_ev = shell["ionpot_ev"]
+                ionpot_ev = float(shell["ionpot_ev"])
 
-                enlambda = min(self.engrid[-1] - energy_ev, energy_ev + ionpot_ev)
+                enlambda = min(float(self.engrid[-1]) - energy_ev, energy_ev + ionpot_ev)
                 J = pynonthermal.collion.get_J(int(shell["Z"]), int(shell["ion_stage"]), ionpot_ev)
 
                 ar_xs_array = self._get_shell_xs(shell)
@@ -692,10 +692,15 @@ class SpencerFanoSolver:
                 en_lower2 = 2 * energy_ev + ionpot_ev
                 if en_lower2 < self.engrid[-1]:
                     integral2startindex = self.get_energyindex_gteq(en_ev=en_lower2)
-                    arr_e_p2 = np.concatenate(([en_lower2], self.engrid[integral2startindex:]))
+                    arr_e_p2 = np.concatenate(
+                        (
+                            np.array([en_lower2], dtype=np.float64),
+                            self.engrid[integral2startindex:],
+                        )
+                    )
                     arr_y2 = np.concatenate(
                         (
-                            [np.interp(en_lower2, self.engrid, self.yvec)],
+                            np.array([float(np.interp(en_lower2, self.engrid, self.yvec))], dtype=np.float64),
                             self.yvec[integral2startindex:],
                         )
                     )

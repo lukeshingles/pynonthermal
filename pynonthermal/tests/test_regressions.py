@@ -10,6 +10,7 @@ import math
 import warnings
 
 import numpy as np
+import numpy.typing as npt
 import polars as pl
 import pytest
 
@@ -172,7 +173,7 @@ def test_N_e_empty_second_integral_domain() -> None:
             .filter((pl.col("Z") == 11) & (pl.col("ion_stage") == 10))
             .to_dicts()[0]
         )
-        ionpot_ev = shell["ionpot_ev"]
+        ionpot_ev = float(shell["ionpot_ev"])
         J = pynonthermal.collion.get_J(11, 10, ionpot_ev)
 
         energy_ev = 1200.0
@@ -180,10 +181,10 @@ def test_N_e_empty_second_integral_domain() -> None:
 
         # reference: eq. 6 with only the first integral, epsilon in [I, min(E_max - E, E + I)],
         # integrated on a grid far finer than the solver's own
-        enlambda = min(sf.engrid[-1] - energy_ev, energy_ev + ionpot_ev)
-        arr_epsilon = np.linspace(ionpot_ev, enlambda, num=20001)
-        arr_e_p = energy_ev + arr_epsilon
-        arr_y = np.interp(arr_e_p, sf.engrid, sf.yvec, left=0.0, right=0.0)
+        enlambda = min(float(sf.engrid[-1]) - energy_ev, energy_ev + ionpot_ev)
+        arr_epsilon: npt.NDArray[np.float64] = np.linspace(ionpot_ev, enlambda, num=20001)
+        arr_e_p: npt.NDArray[np.float64] = energy_ev + arr_epsilon
+        arr_y: npt.NDArray[np.float64] = np.interp(arr_e_p, sf.engrid, sf.yvec, left=0.0, right=0.0)
         arr_xs = pynonthermal.collion.get_arxs_array_shell(arr_e_p, shell)
         arr_p = np.array(
             [
@@ -206,7 +207,7 @@ def test_N_e_epsilon_integral_not_keyed_to_the_grid() -> None:
     # 1200, 1800 and 2400 each put a grid point within 10 meV of it on a 1-3000 eV grid, where the
     # Psecondary normalisation 1/atan((e_p - I) / 2J) diverges. That gave frac_sum of 1.86, 1.37,
     # 1.15 and 1.07 at those four npts while the next npts up gave 0.99-1.00 each time.
-    fracsums = {}
+    fracsums: dict[int, float] = {}
     for npts in (600, 700, 1200, 1300, 1800, 1900, 2400, 2500):
         with (
             pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=npts) as sf,
