@@ -15,6 +15,7 @@ import polars as pl
 import pytest
 
 import pynonthermal
+from pynonthermal import spencerfano
 
 
 def test_grid_validation() -> None:
@@ -225,6 +226,83 @@ def test_N_e_epsilon_integral_not_keyed_to_the_grid() -> None:
 
     # and the remaining error is ordinary discretisation error, which shrinks with resolution
     assert abs(fracsums[2500] - 1.0) < abs(fracsums[600] - 1.0)
+
+
+def test_N_e_epsilon_integral_value_on_a_narrow_domain() -> None:
+    # The checks above pin the symptom (no spikes) rather than the value, so they would still pass if
+    # the epsilon integral returned zero. Pin the value itself, in the regime the fix is for: emin_ev=1
+    # makes the domain [I, E + I] at most 1 eV wide, narrower than the 0.75 eV grid spacing here.
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=4000) as sf:
+        sf.add_ionisation(13, 1, n_ion=1.0)
+        sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
+
+        shells = (
+            pynonthermal.collion.read_colliondata().filter((pl.col("Z") == 13) & (pl.col("ion_stage") == 1)).to_dicts()
+        )
+        energy_ev = 0.7
+        emax = float(sf.engrid[-1])
+
+        def psecondary(
+            arr_e_p: npt.NDArray[np.float64], e_s: npt.NDArray[np.float64] | float, ionpot_ev: float, J: float
+        ) -> npt.NDArray[np.float64]:
+            # the closed form, so the reference does not depend on the implementation it is checking
+            return 1.0 / J / np.arctan((arr_e_p - ionpot_ev) / 2 / J) / (1 + (np.asarray(e_s) / J) ** 2)
+
+        # both eq. 6 integrals over every shell, each on a grid far finer than the solver's own
+        expected = 0.0
+        narrow_domain_seen = False
+        for shell in shells:
+            ionpot_ev = float(shell["ionpot_ev"])
+            J = pynonthermal.collion.get_J(13, 1, ionpot_ev)
+
+            enlambda = min(emax - energy_ev, energy_ev + ionpot_ev)
+            if enlambda > ionpot_ev:
+                narrow_domain_seen |= (enlambda - ionpot_ev) < sf.deltaen
+                arr_epsilon = np.linspace(ionpot_ev, enlambda, num=20001)
+                arr_e_p = arr_epsilon + energy_ev
+                arr_y = np.interp(arr_e_p, sf.engrid, sf.yvec, left=0.0, right=0.0)
+                arr_xs = pynonthermal.collion.get_arxs_array_shell(arr_e_p, shell)
+                arr_p = psecondary(arr_e_p, arr_epsilon - ionpot_ev, ionpot_ev, J)
+                expected += float(np.trapezoid(arr_y * arr_xs * arr_p, arr_epsilon))
+
+            en_lower2 = 2 * energy_ev + ionpot_ev
+            if en_lower2 < emax:
+                arr_e_p2 = np.linspace(en_lower2, emax, num=40001)
+                arr_y2 = np.interp(arr_e_p2, sf.engrid, sf.yvec, left=0.0, right=0.0)
+                arr_xs2 = pynonthermal.collion.get_arxs_array_shell(arr_e_p2, shell)
+                arr_p2 = psecondary(arr_e_p2, energy_ev, ionpot_ev, J)
+                expected += float(np.trapezoid(arr_y2 * arr_xs2 * arr_p2, arr_e_p2))
+
+        # the epsilon domain really is narrower than one grid cell here, the regime the sub-grid is for
+        assert narrow_domain_seen
+        assert expected > 0.0
+        assert math.isclose(sf.calculate_N_e(energy_ev), expected, rel_tol=0.02)
+
+
+def test_quadrature_resolution_constants_are_adequate() -> None:
+    # NPTS_SUB_E0_INTEGRAL and NPTS_EPSILON_SUBGRID carry accuracy claims in their comments. Pin them,
+    # so that lowering either to buy speed cannot silently degrade frac_heating. emin_ev=7.9 is the
+    # demanding case, where the integral over [0, E_0] is about a third of the heating.
+    def frac_heating(npts_sub_e0: int, npts_epsilon: int) -> float:
+        original = (spencerfano.NPTS_SUB_E0_INTEGRAL, spencerfano.NPTS_EPSILON_SUBGRID)
+        spencerfano.NPTS_SUB_E0_INTEGRAL, spencerfano.NPTS_EPSILON_SUBGRID = npts_sub_e0, npts_epsilon
+        try:
+            with pynonthermal.SpencerFanoSolver(emin_ev=7.9, emax_ev=3000, npts=2000) as sf:
+                sf.add_ionisation(26, 1, n_ion=0.99)
+                sf.add_ionisation(26, 2, n_ion=0.01)
+                sf.solve(depositionratedensity_ev=1e6)
+                return sf.get_frac_heating()
+        finally:
+            spencerfano.NPTS_SUB_E0_INTEGRAL, spencerfano.NPTS_EPSILON_SUBGRID = original
+
+    converged = frac_heating(257, 256)
+    asconfigured = frac_heating(spencerfano.NPTS_SUB_E0_INTEGRAL, spencerfano.NPTS_EPSILON_SUBGRID)
+    assert math.isclose(asconfigured, converged, rel_tol=1e-3), (
+        f"the configured resolutions give frac_heating={asconfigured} against a converged {converged}"
+    )
+
+    # and the test would notice a drop: the node count the pre-fix code effectively used is not adequate
+    assert not math.isclose(frac_heating(5, 64), converged, rel_tol=1e-3)
 
 
 def test_lotz_xs_relativistic() -> None:

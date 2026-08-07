@@ -107,12 +107,12 @@ Ionization cross sections from H (Z=1) to Ni (Z=28) are sourced from the analyti
 You can supply your own excitation cross section table:
 
 ```python
-sf.add_excitation(Z, ion_stage, n_level, xs_vec, epsilon_trans_ev, transitionkey=(lower, upper))
+sf.add_excitation(Z, ion_stage, levelnumberdensity, xs_vec, epsilon_trans_ev, transitionkey=(lower, upper))
 ```
 
 - `Z`: atomic number.
 - `ion_stage`: one more than ion charge.
-- `n_level`: population density of the lower level (cm^-3), non-negative.
+- `levelnumberdensity`: population density of the lower level (cm^-3), non-negative.
 - `xs_vec`: NumPy array of cross sections (cm^2), non-negative, defined at every energy in `sf.engrid` (eV).
 - `epsilon_trans_ev`: transition energy (eV). Must be positive and no greater than `emax_ev`, since no
   electron the solver represents could otherwise drive the transition.

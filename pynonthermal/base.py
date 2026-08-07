@@ -18,8 +18,8 @@ DATADIR = Path(__file__).absolute().parent / "data"
 def get_betasq(en_ev: npt.NDArray[np.float64] | float) -> npt.NDArray[np.float64]:
     """Get (v/c)^2 for an electron of kinetic energy en_ev [eV], relativistically.
 
-    The classical 2 * en_ev * EV / ME reaches one at 255 keV and is already 5 per cent high at 16 keV,
-    which is within the range of emax_ev this package is used over.
+    The classical 2 * en_ev * EV / (ME * CLIGHT**2) reaches one at 255 keV and is already 5 per cent
+    high at 16 keV, which is within the range of emax_ev this package is used over.
     """
     gamma = np.asarray(en_ev, dtype=np.float64) * EV / (ME * CLIGHT**2) + 1.0
 
@@ -91,23 +91,25 @@ def get_Zbar(ions: Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], 
     return Zbar
 
 
-def get_energyindex_lteq(en_ev: float, engrid: npt.NDArray[np.float64], deltaen: float | None = None) -> int:
-    # find energy bin lower boundary is less than or equal to search value.
-    # deltaen is the grid spacing, which callers that already hold it should pass in: re-deriving it
-    # from the array costs more than the index arithmetic itself when called in a loop.
+def _get_energyindex(en_ev: float, engrid: npt.NDArray[np.float64], deltaen: float | None, round_up: bool) -> int:
+    # index of the energy bin holding en_ev, clamped into the grid at both ends.
+    # deltaen must be engrid's own uniform spacing; callers that already hold it pass it in, because
+    # re-deriving it from the array costs more than the index arithmetic itself when called in a loop.
+    # A value that does not match engrid gives silently wrong indices, so it is not a free parameter.
     if deltaen is None:
         deltaen = float(engrid[1]) - float(engrid[0])
 
-    index = math.floor((en_ev - float(engrid[0])) / deltaen)
+    offset = (en_ev - float(engrid[0])) / deltaen
+    index = math.ceil(offset) if round_up else math.floor(offset)
 
     return 0 if index < 0 else min(index, len(engrid) - 1)
+
+
+def get_energyindex_lteq(en_ev: float, engrid: npt.NDArray[np.float64], deltaen: float | None = None) -> int:
+    """Get the index of the energy bin whose lower boundary is less than or equal to en_ev."""
+    return _get_energyindex(en_ev, engrid, deltaen, round_up=False)
 
 
 def get_energyindex_gteq(en_ev: float, engrid: npt.NDArray[np.float64], deltaen: float | None = None) -> int:
-    # find energy bin lower boundary is greater than or equal to search value
-    if deltaen is None:
-        deltaen = float(engrid[1]) - float(engrid[0])
-
-    index = math.ceil((en_ev - float(engrid[0])) / deltaen)
-
-    return 0 if index < 0 else min(index, len(engrid) - 1)
+    """Get the index of the energy bin whose lower boundary is greater than or equal to en_ev."""
+    return _get_energyindex(en_ev, engrid, deltaen, round_up=True)

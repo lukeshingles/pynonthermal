@@ -24,14 +24,14 @@ from pynonthermal.constants import K_B
 # number of nodes used to resolve the epsilon integral of Kozma & Fransson equation 6. That integral spans
 # at most emin_ev in energy, which is typically narrower than one cell of the solver's own energy grid, so
 # it needs a sub-grid of its own. The integrand is smooth over such a short interval and needs few nodes.
-NPTS_EPSILON_SUBGRID = 64
+NPTS_EPSILON_SUBGRID: int = 64
 
 # number of nodes used for the integral over E in [0, E_0] of Kozma & Fransson equation 8. This one is
 # not free: every node costs a full calculate_N_e() over all ions and shells, so it dominates the cost
 # of the analysis. Convergence is second order, and the most demanding case found (a large emin_ev,
 # where the sub-E_0 term is a third of the heating) is within 6e-4 of its converged value here, which
 # is far inside the discretisation error of the main grid.
-NPTS_SUB_E0_INTEGRAL = 17
+NPTS_SUB_E0_INTEGRAL: int = 17
 
 SUBSHELLNAMES = [
     "K ",
@@ -636,9 +636,10 @@ class SpencerFanoSolver:
 
         return np.dot(xs_excitation_vec_sum_alltrans, self.yvec) * deltaen / self.depositionratedensity_ev
 
+    @staticmethod
     def _integrate_shell_secondaries(
-        self,
         arr_e_p: npt.NDArray[np.float64],
+        arr_y: npt.NDArray[np.float64],
         arr_xs: npt.NDArray[np.float64],
         e_s: npt.NDArray[np.float64] | float,
         ionpot_ev: float,
@@ -646,9 +647,9 @@ class SpencerFanoSolver:
     ) -> float:
         # The integrand shared by both integrals of Kozma & Fransson equation 6: y(E') sigma(E') P(e_s, E')
         # over the primary energies arr_e_p. Both use E' as the variable of integration, since the first
-        # one's epsilon differs from it only by a constant. y is interpolated from the solution, and is
-        # zero off the grid because the solver has no electrons there.
-        arr_y = np.interp(arr_e_p, self.engrid, self.yvec, left=0.0, right=0.0)
+        # one's epsilon differs from it only by a constant. Each caller supplies y and the cross section
+        # however is cheapest for its own nodes: off the grid they have to be evaluated, but on it the
+        # solution and the cached cross sections can be sliced directly.
         arr_psecondary = pynonthermal.collion.Psecondary_vec(e_p=arr_e_p, e_s=e_s, ionpot_ev=ionpot_ev, J=J)
 
         return float(np.trapezoid(arr_y * arr_xs * arr_psecondary, arr_e_p))
@@ -695,10 +696,13 @@ class SpencerFanoSolver:
                 if enlambda > ionpot_ev:
                     arr_epsilon = np.linspace(ionpot_ev, enlambda, num=NPTS_EPSILON_SUBGRID, dtype=np.float64)
                     arr_e_p = energy_ev + arr_epsilon
-                    # the cross section is evaluated directly off the grid here, since it rises steeply
-                    # from zero just above the threshold that starts this integral
+                    # every node here lies between grid points, so y is interpolated and the cross section
+                    # evaluated directly, the latter because it rises steeply from zero just above the
+                    # ionisation threshold that starts this integral
                     N_e_ion += self._integrate_shell_secondaries(
                         arr_e_p=arr_e_p,
+                        # asarray because np.interp is typed as returning a scalar for a scalar x
+                        arr_y=np.asarray(np.interp(arr_e_p, self.engrid, self.yvec, left=0.0, right=0.0)),
                         arr_xs=pynonthermal.collion.get_arxs_array_shell(arr_e_p, shell),
                         e_s=arr_epsilon - ionpot_ev,
                         ionpot_ev=ionpot_ev,
@@ -714,15 +718,21 @@ class SpencerFanoSolver:
                 if en_lower2 < e_max:
                     startindex = self.get_energyindex_gteq(en_ev=en_lower2)
                     arr_en_lower2 = np.array([en_lower2], dtype=np.float64)
-                    ar_xs_array = self._get_shell_xs(shell)
+                    # every node but the exact lower limit is a grid point, so y and the cross section
+                    # are sliced straight from the solution and the cache. Interpolating the whole tail
+                    # instead would just reproduce those same values at ten times the cost.
                     N_e_ion += self._integrate_shell_secondaries(
                         arr_e_p=np.concatenate((arr_en_lower2, self.engrid[startindex:])),
-                        # the grid part reuses the cached cross sections; only the exact lower limit
-                        # falls between grid points and has to be evaluated
+                        arr_y=np.concatenate(
+                            (
+                                np.interp(arr_en_lower2, self.engrid, self.yvec, left=0.0, right=0.0),
+                                self.yvec[startindex:],
+                            )
+                        ),
                         arr_xs=np.concatenate(
                             (
                                 pynonthermal.collion.get_arxs_array_shell(arr_en_lower2, shell),
-                                ar_xs_array[startindex:],
+                                self._get_shell_xs(shell)[startindex:],
                             )
                         ),
                         e_s=energy_ev,

@@ -90,6 +90,10 @@ def get_shell_occupancies(atomic_number: int, ion_stage: int) -> npt.NDArray[np.
 
     assert sum(element_shells_q) == nbound
 
+    # the cached array is handed straight to callers, so make a write raise at the mutation site
+    # rather than silently changing the occupancies every later cross section evaluation sees
+    element_shells_q.flags.writeable = False
+
     return element_shells_q
 
 
