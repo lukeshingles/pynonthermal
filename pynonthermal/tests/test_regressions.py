@@ -192,9 +192,23 @@ def test_N_e_empty_second_integral_domain() -> None:
         arr_p = 1.0 / J / np.arctan((arr_e_p - ionpot_ev) / 2 / J) / (1 + ((arr_epsilon - ionpot_ev) / J) ** 2)
         expected = 1e8 * float(np.trapezoid(arr_y * arr_xs * arr_p, arr_epsilon))
 
-        # the tolerance covers the solver's own coarser sub-grid for this integral, not the second
-        # domain, whose contribution would be several per cent were it not correctly skipped
-        assert math.isclose(sf.calculate_N_e(energy_ev), expected, rel_tol=1e-3)
+        # the tolerance covers the solver's own coarser sub-grids for these integrals, and is tight
+        # enough to notice the empty-domain guard going away (asserted just below)
+        got = sf.calculate_N_e(energy_ev)
+        assert math.isclose(got, expected, rel_tol=1e-4)
+
+        # reproduce the term the old clamping added, and check the result would no longer pass
+        clamped_index = sf.get_energyindex_lteq(2 * energy_ev + ionpot_ev)
+        spurious = 1e8 * float(
+            sf.deltaen
+            * sf.yvec[clamped_index]
+            * pynonthermal.collion.get_arxs_array_shell(sf.engrid, shell)[clamped_index]
+            * pynonthermal.collion.Psecondary_vec(
+                e_p=float(sf.engrid[clamped_index]), e_s=energy_ev, ionpot_ev=ionpot_ev, J=J
+            )
+        )
+        assert spurious > 0.0
+        assert not math.isclose(got + spurious, expected, rel_tol=1e-4)
 
 
 def test_N_e_epsilon_integral_not_keyed_to_the_grid() -> None:
@@ -205,8 +219,30 @@ def test_N_e_epsilon_integral_not_keyed_to_the_grid() -> None:
     # 1200, 1800 and 2400 each put a grid point within 10 meV of it on a 1-3000 eV grid, where the
     # Psecondary normalisation 1/atan((e_p - I) / 2J) diverges. That gave frac_sum of 1.86, 1.37,
     # 1.15 and 1.07 at those four npts while the next npts up gave 0.99-1.00 each time.
+    # assert the premise rather than trusting the hard-coded npts: each of the first of these pairs
+    # must put a grid point within a few meV of an Al I threshold, and each second one must not
+    ionpots = [
+        float(row["ionpot_ev"])
+        for row in pynonthermal.collion.read_colliondata()
+        .filter((pl.col("Z") == 13) & (pl.col("ion_stage") == 1))
+        .to_dicts()
+    ]
+
+    def distance_to_threshold(npts: int) -> float:
+        engrid = np.linspace(1.0, 3000.0, num=npts)
+        return min(float(np.abs(engrid - ionpot).min()) for ionpot in ionpots)
+
+    pairs = ((600, 700), (1200, 1300), (1800, 1900), (2400, 2900))
+    for npts_onthreshold, npts_neighbour in pairs:
+        assert distance_to_threshold(npts_onthreshold) < 0.01, (
+            f"npts={npts_onthreshold} is no longer on an Al I threshold; this test needs one that is"
+        )
+        assert distance_to_threshold(npts_neighbour) > 0.05, (
+            f"npts={npts_neighbour} is itself on an Al I threshold, so it is not a clean control"
+        )
+
     fracsums: dict[int, float] = {}
-    for npts in (600, 700, 1200, 1300, 1800, 1900, 2400, 2500):
+    for npts in [npts for pair in pairs for npts in pair]:
         with (
             pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=npts) as sf,
             # the coarsest grids here are genuinely under-resolved, so the conservation diagnostic
@@ -218,14 +254,14 @@ def test_N_e_epsilon_integral_not_keyed_to_the_grid() -> None:
             sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
             fracsums[npts] = sf.get_frac_sum()
 
-    for npts_onthreshold, npts_neighbour in ((600, 700), (1200, 1300), (1800, 1900), (2400, 2500)):
+    for npts_onthreshold, npts_neighbour in pairs:
         assert math.isclose(fracsums[npts_onthreshold], fracsums[npts_neighbour], abs_tol=0.03), (
             f"npts={npts_onthreshold} gives frac_sum={fracsums[npts_onthreshold]} but the neighbouring"
             f" npts={npts_neighbour} gives {fracsums[npts_neighbour]}"
         )
 
     # and the remaining error is ordinary discretisation error, which shrinks with resolution
-    assert abs(fracsums[2500] - 1.0) < abs(fracsums[600] - 1.0)
+    assert abs(fracsums[2900] - 1.0) < abs(fracsums[600] - 1.0)
 
 
 def test_N_e_epsilon_integral_value_on_a_narrow_domain() -> None:
@@ -283,26 +319,24 @@ def test_quadrature_resolution_constants_are_adequate() -> None:
     # NPTS_SUB_E0_INTEGRAL and NPTS_EPSILON_SUBGRID carry accuracy claims in their comments. Pin them,
     # so that lowering either to buy speed cannot silently degrade frac_heating. emin_ev=7.9 is the
     # demanding case, where the integral over [0, E_0] is about a third of the heating.
-    def frac_heating(npts_sub_e0: int, npts_epsilon: int) -> float:
-        original = (spencerfano.NPTS_SUB_E0_INTEGRAL, spencerfano.NPTS_EPSILON_SUBGRID)
-        spencerfano.NPTS_SUB_E0_INTEGRAL, spencerfano.NPTS_EPSILON_SUBGRID = npts_sub_e0, npts_epsilon
-        try:
-            with pynonthermal.SpencerFanoSolver(emin_ev=7.9, emax_ev=3000, npts=2000) as sf:
-                sf.add_ionisation(26, 1, n_ion=0.99)
-                sf.add_ionisation(26, 2, n_ion=0.01)
-                sf.solve(depositionratedensity_ev=1e6)
-                return sf.get_frac_heating()
-        finally:
-            spencerfano.NPTS_SUB_E0_INTEGRAL, spencerfano.NPTS_EPSILON_SUBGRID = original
+    def frac_heating(monkeypatch: pytest.MonkeyPatch, npts_sub_e0: int, emin_ev: float, Z: int) -> float:
+        monkeypatch.setattr(spencerfano, "NPTS_SUB_E0_INTEGRAL", npts_sub_e0)
+        with pynonthermal.SpencerFanoSolver(emin_ev=emin_ev, emax_ev=3000, npts=2000) as sf:
+            sf.add_ionisation(Z, 1, n_ion=0.99)
+            sf.add_ionisation(Z, 2, n_ion=0.01)
+            sf.solve(depositionratedensity_ev=1e6)
+            return sf.get_frac_heating()
 
-    converged = frac_heating(257, 256)
-    asconfigured = frac_heating(spencerfano.NPTS_SUB_E0_INTEGRAL, spencerfano.NPTS_EPSILON_SUBGRID)
-    assert math.isclose(asconfigured, converged, rel_tol=1e-3), (
-        f"the configured resolutions give frac_heating={asconfigured} against a converged {converged}"
-    )
-
-    # and the test would notice a drop: the node count the pre-fix code effectively used is not adequate
-    assert not math.isclose(frac_heating(5, 64), converged, rel_tol=1e-3)
+    # emin_ev has to cover the large values add_ionisation's own error message steers users towards
+    # ("set emin_ev <= {lowest ionpot} eV"), not just the default grid where this term is negligible
+    for emin_ev, Z in ((7.9, 26), (15.7, 18), (24.5, 2)):
+        with pytest.MonkeyPatch.context() as mp:
+            converged = frac_heating(mp, 129, emin_ev, Z)
+            asconfigured = frac_heating(mp, spencerfano.NPTS_SUB_E0_INTEGRAL, emin_ev, Z)
+        assert math.isclose(asconfigured, converged, rel_tol=1e-3), (
+            f"emin_ev={emin_ev}: the configured resolution gives frac_heating={asconfigured}"
+            f" against a converged {converged}"
+        )
 
 
 def test_lotz_xs_relativistic() -> None:

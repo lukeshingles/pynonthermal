@@ -49,23 +49,27 @@ def electronlossfunction(energy_ev: float, n_e_cgs: float) -> float:
     # the published prescription (and of the ARTIS implementation this follows), so it is left in place
     # rather than smoothed with a formula that is nobody's.
     if energy_ev > 14:
-        if 2 * energy <= zetae:
-            # the Coulomb logarithm would be zero or negative, giving a non-positive loss rate
-            msg = (
-                f"the free-electron loss function is not valid at {energy_ev} eV for n_e = {n_e_cgs} cm^-3:"
-                f" the plasma energy hbar*omega_p is {zetae / EV:.3g} eV, which is not below 2E."
-            )
-            raise ValueError(msg)
-        lossfunc = n_e * 2 * math.pi * QE**4 / energy * math.log(2 * energy / zetae)
+        coulomblog_arg = 2 * energy / zetae
     else:
         v = math.sqrt(2 * energy / ME)  # velocity in cm/s (energy is in erg and ME in g, so cgs)
         # Kozma & Fransson (1992) eq. 2 describes the gamma in this Coulomb logarithm as "Euler's
         # constant (Schunk & Hays 1971)", but Schunk & Hays (1971, p. 114) define it by "ln gamma is
         # Euler's constant", i.e. gamma = exp(0.5772) = 1.781 rather than 0.5772 itself.
         exp_eulergamma = math.exp(np.euler_gamma)
-        lossfunc = (
-            n_e * 2 * math.pi * QE**4 / energy * math.log(ME * pow(v, 3) / (exp_eulergamma * pow(QE, 2) * omegap))
+        coulomblog_arg = ME * pow(v, 3) / (exp_eulergamma * pow(QE, 2) * omegap)
+
+    # Both branches lose their meaning once the plasma is dense enough that the Coulomb logarithm
+    # reaches zero, which would put a non-positive loss rate on the Spencer-Fano matrix diagonal. The
+    # low-energy branch fails first, at n_e ~ 7e19 for a 1 eV electron against ~6e23 for the other.
+    if coulomblog_arg <= 1.0:
+        msg = (
+            f"the free-electron loss function is not valid at {energy_ev} eV for n_e = {n_e_cgs} cm^-3:"
+            f" the plasma energy hbar*omega_p is {zetae / EV:.3g} eV, which is too close to the electron"
+            " energy for the Coulomb logarithm to be positive."
         )
+        raise ValueError(msg)
+
+    lossfunc = n_e * 2 * math.pi * QE**4 / energy * math.log(coulomblog_arg)
 
     # lossfunc is now [erg / cm]
     return lossfunc / EV  # return as [eV / cm]
@@ -91,25 +95,19 @@ def get_Zbar(ions: Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], 
     return Zbar
 
 
-def _get_energyindex(en_ev: float, engrid: npt.NDArray[np.float64], deltaen: float | None, round_up: bool) -> int:
-    # index of the energy bin holding en_ev, clamped into the grid at both ends.
-    # deltaen must be engrid's own uniform spacing; callers that already hold it pass it in, because
-    # re-deriving it from the array costs more than the index arithmetic itself when called in a loop.
-    # A value that does not match engrid gives silently wrong indices, so it is not a free parameter.
-    if deltaen is None:
-        deltaen = float(engrid[1]) - float(engrid[0])
-
-    offset = (en_ev - float(engrid[0])) / deltaen
+def _get_energyindex(en_ev: float, engrid: npt.NDArray[np.float64], round_up: bool) -> int:
+    # index of the energy bin holding en_ev, clamped into the grid at both ends
+    offset = (en_ev - float(engrid[0])) / (float(engrid[1]) - float(engrid[0]))
     index = math.ceil(offset) if round_up else math.floor(offset)
 
     return 0 if index < 0 else min(index, len(engrid) - 1)
 
 
-def get_energyindex_lteq(en_ev: float, engrid: npt.NDArray[np.float64], deltaen: float | None = None) -> int:
+def get_energyindex_lteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
     """Get the index of the energy bin whose lower boundary is less than or equal to en_ev."""
-    return _get_energyindex(en_ev, engrid, deltaen, round_up=False)
+    return _get_energyindex(en_ev, engrid, round_up=False)
 
 
-def get_energyindex_gteq(en_ev: float, engrid: npt.NDArray[np.float64], deltaen: float | None = None) -> int:
+def get_energyindex_gteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
     """Get the index of the energy bin whose lower boundary is greater than or equal to en_ev."""
-    return _get_energyindex(en_ev, engrid, deltaen, round_up=True)
+    return _get_energyindex(en_ev, engrid, round_up=True)

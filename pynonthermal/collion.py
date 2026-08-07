@@ -71,7 +71,6 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFram
                 if nbound <= 0:
                     continue
 
-                # ion_shells_q = get_shell_occupancies(Z, ionstage, elements_electron_binding, all_shells_q)
                 try:
                     ion_shells_q = all_shells_q[Z - 1]
                     ionpot = nist_ionisation_energies_ev[(Z, ionstage)] * EV

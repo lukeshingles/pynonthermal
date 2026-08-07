@@ -1,6 +1,7 @@
 # functions related to Axelrod 1980 non-thermal treatment
 
 import math
+from functools import cache
 from functools import lru_cache
 from pathlib import Path
 
@@ -35,6 +36,9 @@ def get_binding_energies() -> npt.NDArray[np.float64]:
             assert int(linesplit[0]) == i + 1
             electron_binding[i] = np.array([float(x) for x in linesplit[1:]]) * EV
 
+    # handed straight to callers from the cache, so a write must raise at the mutation site
+    electron_binding.flags.writeable = False
+
     return electron_binding
 
 
@@ -59,10 +63,13 @@ def get_shell_configs() -> npt.NDArray[np.int64]:
             shells_q[i, :] = np.array([int(x) for x in linesplit[1:]])
             assert sum(shells_q[i]) == i + 1
 
+    # handed straight to callers from the cache, so a write must raise at the mutation site
+    shells_q.flags.writeable = False
+
     return shells_q
 
 
-@lru_cache
+@cache
 def get_shell_occupancies(atomic_number: int, ion_stage: int) -> npt.NDArray[np.int64]:
     # electrons in each shell of one ion, taken from the neutral configuration with the outermost
     # electrons removed. Cached, like the two tables it reads, because every ionisation cross section
