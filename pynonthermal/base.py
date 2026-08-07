@@ -28,12 +28,22 @@ def electronlossfunction(energy_ev: float, n_e_cgs: float) -> float:
     n_e = n_e_cgs
     energy = energy_ev * EV  # convert eV to erg
 
-    # omegap = math.sqrt(4 * math.pi * n_e_cgs * pow(QE, 2) / ME)
-    omegap = 5.64e4 * math.sqrt(n_e_cgs)
+    omegap = math.sqrt(4 * math.pi * n_e_cgs * QE**2 / ME)
     zetae = H * omegap / 2 / math.pi
 
+    # Kozma & Fransson (1992) give separate Coulomb logarithms above and below 14 eV and the two do not
+    # meet there: the branch below is lower by ln(hbar * v / (exp(eulergamma) * QE^2)), which is a step of
+    # about 2-3 per cent in the loss rate for the free electron densities of interest. The step is part of
+    # the published prescription (and of the ARTIS implementation this follows), so it is left in place
+    # rather than smoothed with a formula that is nobody's.
     if energy_ev > 14:
-        assert 2 * energy > zetae
+        if 2 * energy <= zetae:
+            # the Coulomb logarithm would be zero or negative, giving a non-positive loss rate
+            msg = (
+                f"the free-electron loss function is not valid at {energy_ev} eV for n_e = {n_e_cgs} cm^-3:"
+                f" the plasma energy hbar*omega_p is {zetae / EV:.3g} eV, which is not below 2E."
+            )
+            raise ValueError(msg)
         lossfunc = n_e * 2 * math.pi * QE**4 / energy * math.log(2 * energy / zetae)
     else:
         v = math.sqrt(2 * energy / ME)  # velocity in cm/s (energy is in erg and ME in g, so cgs)

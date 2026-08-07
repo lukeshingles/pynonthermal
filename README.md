@@ -112,8 +112,15 @@ sf.add_excitation(Z, ion_stage, n_level, xs_vec, epsilon_trans_ev, transitionkey
 
 - `Z`: atomic number.
 - `ion_stage`: one more than ion charge.
-- `xs_vec`: NumPy array of cross sections (cm^2), defined at every energy in `sf.engrid` (eV).
+- `n_level`: population density of the lower level (cm^-3), non-negative.
+- `xs_vec`: NumPy array of cross sections (cm^2), non-negative, defined at every energy in `sf.engrid` (eV).
+- `epsilon_trans_ev`: transition energy (eV). Must be positive and no greater than `emax_ev`, since no
+  electron the solver represents could otherwise drive the transition.
 - `transitionkey`: any unique key within the ion, used to retrieve the excitation rate coefficient.
+
+Transitions below `emin_ev` are allowed here, but `add_ion_ltepopexcitation()` drops them: Kozma and
+Fransson (1992) take every electron below `emin_ev` to have thermalised, so that energy is accounted for
+as heating instead.
 
 Retrieve the non-thermal excitation rate coefficient [s^-1] with:
 

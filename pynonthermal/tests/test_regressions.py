@@ -5,7 +5,9 @@ rather than solver performance, so instrumenting them would only lengthen the Co
 add noise to the tracked benchmark set. Performance-relevant cases live in test_sfsolve.py.
 """
 
+import itertools
 import math
+import warnings
 
 import numpy as np
 import polars as pl
@@ -32,8 +34,10 @@ def test_ionpot_below_emin_rejected() -> None:
     ):
         sf.add_ionisation(26, 1, n_ion=1.0)
 
-    # the same ion is accepted once the cutoff is below its lowest shell, and then conserves energy
-    with pynonthermal.SpencerFanoSolver(emin_ev=7.9, emax_ev=3000, npts=1000) as sf:
+    # the same ion is accepted once the cutoff is below its lowest shell, and then conserves energy.
+    # npts has to resolve the 7.9 and 9.0 eV shells: at npts=1000 the 3 eV grid spacing leaves the
+    # fractions 5.6% short of unity, almost all of it in the ionisation term.
+    with pynonthermal.SpencerFanoSolver(emin_ev=7.9, emax_ev=3000, npts=4000) as sf:
         sf.add_ionisation(26, 1, n_ion=0.99)
         sf.add_ionisation(26, 2, n_ion=0.01)
         sf.solve(depositionratedensity_ev=1e6)
@@ -59,6 +63,74 @@ def test_zero_free_electron_density() -> None:
     # the loss function itself also rejects a non-positive density
     with pytest.raises(ValueError, match="positive free electron density"):
         pynonthermal.electronlossfunction(100.0, 0.0)
+
+
+def test_deposition_rate_validated() -> None:
+    # every fraction and rate coefficient is divided by the deposition rate density. Zero raised a bare
+    # ZeroDivisionError from inside the analysis, and a negative value was accepted outright: it flipped
+    # the sign of yvec and of every rate coefficient while still leaving the fractions summing to one,
+    # so the conservation diagnostic never noticed.
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=300, npts=100) as sf:
+        sf.add_ionisation(8, 2, n_ion=1e8)
+        for badvalue in (0.0, -100.0):
+            with pytest.raises(ValueError, match="depositionratedensity_ev must be greater than zero"):
+                sf.solve(depositionratedensity_ev=badvalue)
+
+        sf.solve(depositionratedensity_ev=1e8)
+        assert (sf.yvec > 0.0).all()
+        assert sf.get_ionisation_ratecoeff(8, 2) > 0.0
+
+
+def test_excitation_inputs_validated() -> None:
+    npts = 100
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=300, npts=npts) as sf:
+        sf.add_ionisation(8, 2, n_ion=1e8)
+        xs_vec = np.full(npts, 1e-16)
+
+        # a non-positive transition energy puts entries below the diagonal, where the triangular
+        # solve silently discards them, and the solution comes out looking plausible
+        for badvalue in (-50.0, 0.0):
+            with pytest.raises(ValueError, match="epsilon_trans_ev must be greater than zero"):
+                sf.add_excitation(8, 2, levelnumberdensity=1e10, xs_vec=xs_vec, epsilon_trans_ev=badvalue)
+
+        # above the top of the grid there is no electron that could drive the transition
+        with pytest.raises(ValueError, match="above the top of the energy grid"):
+            sf.add_excitation(8, 2, levelnumberdensity=1e10, xs_vec=xs_vec, epsilon_trans_ev=301.0)
+
+        # negative populations and cross sections give a negative excitation fraction
+        with pytest.raises(ValueError, match="levelnumberdensity must be non-negative"):
+            sf.add_excitation(8, 2, levelnumberdensity=-1e10, xs_vec=xs_vec, epsilon_trans_ev=20.0)
+        with pytest.raises(ValueError, match="xs_vec must be non-negative"):
+            sf.add_excitation(8, 2, levelnumberdensity=1e10, xs_vec=-xs_vec, epsilon_trans_ev=20.0)
+
+        # a transition exactly at the top of the grid is still legal
+        sf.add_excitation(8, 2, levelnumberdensity=1e10, xs_vec=xs_vec, epsilon_trans_ev=300.0)
+        assert np.array_equal(sf.sfmatrix, np.triu(sf.sfmatrix))
+
+
+def test_N_e_excitation_above_grid() -> None:
+    # eq. 6 evaluates y and the cross section at energy_ev + epsilon_trans_ev. Above the top of the
+    # grid no such electron exists, but get_energyindex_lteq clamps to the last bin, so the term came
+    # out equal to its value at emax_ev instead of zero. This is the same clamp that the second
+    # ionisation integral is already guarded against.
+    npts, emax = 300, 300.0
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=emax, npts=npts) as sf:
+        epsilon_trans_ev = 299.5
+        sf.add_excitation(
+            26,
+            2,
+            levelnumberdensity=1e8,
+            xs_vec=np.where(sf.engrid >= epsilon_trans_ev, 1e-16, 0.0),
+            epsilon_trans_ev=epsilon_trans_ev,
+        )
+        sf.solve(depositionratedensity_ev=1e8, override_n_e=1e8)
+
+        # at 0.5 eV the excited electron is exactly at emax_ev and the term is real
+        assert sf.calculate_N_e(emax - epsilon_trans_ev) > 0.0
+        # above that it would have to have come from an electron the solver never had
+        for energy_ev in (0.75, 1.0):
+            assert energy_ev + epsilon_trans_ev > emax
+            assert sf.calculate_N_e(energy_ev) == 0.0
 
 
 def test_override_n_e_not_confused_with_cache() -> None:
@@ -102,23 +174,59 @@ def test_N_e_empty_second_integral_domain() -> None:
         )
         ionpot_ev = shell["ionpot_ev"]
         J = pynonthermal.collion.get_J(11, 10, ionpot_ev)
-        ar_xs_array = pynonthermal.collion.get_arxs_array_shell(sf.engrid, shell)
 
         energy_ev = 1200.0
         assert 2 * energy_ev + ionpot_ev > sf.engrid[-1] + sf.deltaen  # second domain is empty
 
-        # reference: eq. 6 with only the first integral, endash in [I, min(E_max - E, E + I)]
+        # reference: eq. 6 with only the first integral, epsilon in [I, min(E_max - E, E + I)],
+        # integrated on a grid far finer than the solver's own
         enlambda = min(sf.engrid[-1] - energy_ev, energy_ev + ionpot_ev)
-        expected = 0.0
-        for j in range(sf.get_energyindex_lteq(ionpot_ev), sf.get_energyindex_lteq(enlambda) + 1):
-            endash = float(sf.engrid[j])
-            k = sf.get_energyindex_lteq(energy_ev + endash)
-            p_secondary = pynonthermal.collion.Psecondary(
-                e_p=float(sf.engrid[k]), epsilon=endash, ionpot_ev=ionpot_ev, J=J
-            )
-            expected += 1e8 * sf.deltaen * sf.yvec[k] * ar_xs_array[k] * p_secondary
+        arr_epsilon = np.linspace(ionpot_ev, enlambda, num=20001)
+        arr_e_p = energy_ev + arr_epsilon
+        arr_y = np.interp(arr_e_p, sf.engrid, sf.yvec, left=0.0, right=0.0)
+        arr_xs = pynonthermal.collion.get_arxs_array_shell(arr_e_p, shell)
+        arr_p = np.array(
+            [
+                pynonthermal.collion.Psecondary(e_p=float(e_p), epsilon=float(eps), ionpot_ev=ionpot_ev, J=J)
+                for e_p, eps in zip(arr_e_p, arr_epsilon, strict=True)
+            ]
+        )
+        expected = 1e8 * float(np.trapezoid(arr_y * arr_xs * arr_p, arr_epsilon))
 
-        assert math.isclose(sf.calculate_N_e(energy_ev), expected, rel_tol=1e-12)
+        # the tolerance covers the solver's own coarser sub-grid for this integral, not the second
+        # domain, whose contribution would be several per cent were it not correctly skipped
+        assert math.isclose(sf.calculate_N_e(energy_ev), expected, rel_tol=1e-3)
+
+
+def test_N_e_epsilon_integral_not_keyed_to_the_grid() -> None:
+    # The epsilon integral of eq. 6 spans at most emin_ev, so it is narrower than one cell of a
+    # typical energy grid and needs a sub-grid of its own. Evaluating it on the solver's own grid
+    # instead made the answer depend on where the grid points happened to fall relative to the
+    # ionisation threshold rather than on the resolution. Al I has a 6.0 eV shell, and npts of 600,
+    # 1200, 1800 and 2400 each put a grid point within 10 meV of it on a 1-3000 eV grid, where the
+    # Psecondary normalisation 1/atan((e_p - I) / 2J) diverges. That gave frac_sum of 1.86, 1.37,
+    # 1.15 and 1.07 at those four npts while the next npts up gave 0.99-1.00 each time.
+    fracsums = {}
+    for npts in (600, 700, 1200, 1300, 1800, 1900, 2400, 2500):
+        with (
+            pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=npts) as sf,
+            # the coarsest grids here are genuinely under-resolved, so the conservation diagnostic
+            # fires as designed. This test is about the spikes, not about the residual error.
+            warnings.catch_warnings(),
+        ):
+            warnings.simplefilter("ignore", UserWarning)
+            sf.add_ionisation(13, 1, n_ion=1.0)
+            sf.solve(depositionratedensity_ev=100, override_n_e=1e-4)
+            fracsums[npts] = sf.get_frac_sum()
+
+    for npts_onthreshold, npts_neighbour in ((600, 700), (1200, 1300), (1800, 1900), (2400, 2500)):
+        assert math.isclose(fracsums[npts_onthreshold], fracsums[npts_neighbour], abs_tol=0.03), (
+            f"npts={npts_onthreshold} gives frac_sum={fracsums[npts_onthreshold]} but the neighbouring"
+            f" npts={npts_neighbour} gives {fracsums[npts_neighbour]}"
+        )
+
+    # and the remaining error is ordinary discretisation error, which shrinks with resolution
+    assert abs(fracsums[2500] - 1.0) < abs(fracsums[600] - 1.0)
 
 
 def test_lotz_xs_relativistic() -> None:
@@ -215,3 +323,66 @@ def test_conservation_warning_on_coarse_grid() -> None:
         with pytest.warns(UserWarning, match="energy fractions sum to"):
             frac_sum = sf.get_frac_sum()
         assert not math.isclose(frac_sum, 1.0, rel_tol=0.05)
+
+
+def test_opal_J_applies_to_every_shell_of_its_ion() -> None:
+    # The measured secondary-electron widths of Opal et al. 1971 are whole-atom values dominated by
+    # valence-shell ionisation, but ARTIS applies each to every shell of its ion and pynonthermal
+    # deliberately matches that, so Ne I's 48.5 eV 2s shell gets the same J as its 21.6 eV 2p shell.
+    assert pynonthermal.collion.get_J(2, 1, 24.6) == 15.8  # He I, its only shell
+    for ionpot_ev in (21.6, 48.5):  # Ne I 2p and 2s
+        assert pynonthermal.collion.get_J(10, 1, ionpot_ev) == 24.2
+    for ionpot_ev in (15.8, 29.2):  # Ar I 3p and 3s
+        assert pynonthermal.collion.get_J(18, 1, ionpot_ev) == 10.0
+
+    # every other ion, including the ionised stages of those three, uses the general rule
+    for Z, ion_stage, ionpot_ev in ((26, 2, 16.18), (2, 2, 54.4), (10, 2, 41.0), (18, 2, 27.6)):
+        assert pynonthermal.collion.get_J(Z, ion_stage, ionpot_ev) == 0.6 * ionpot_ev
+
+
+def test_psecondary_requires_an_energy() -> None:
+    # this guard was an assert, so it vanished under python -O and left the sentinel default of -1
+    # to be used as a real secondary energy
+    with pytest.raises(ValueError, match="e_s or the primary energy loss epsilon"):
+        pynonthermal.collion.Psecondary(e_p=100.0, ionpot_ev=10.0, J=6.0)
+
+    # the scalar and vectorised forms have to agree, since the solver uses both
+    e_s = np.array([0.0, 5.0, 20.0])
+    arr = pynonthermal.collion.Psecondary_vec(e_p=100.0, e_s=e_s, ionpot_ev=10.0, J=6.0)
+    for i, value in enumerate(e_s):
+        assert math.isclose(
+            float(arr[i]), pynonthermal.collion.Psecondary(e_p=100.0, e_s=float(value), ionpot_ev=10.0, J=6.0)
+        )
+
+    # below threshold there are no secondaries
+    assert not pynonthermal.collion.Psecondary_vec(e_p=np.array([5.0, 10.0]), e_s=0.0, ionpot_ev=10.0, J=6.0).any()
+
+
+def test_n_e_nt_relativistic() -> None:
+    # the electron speed used to be the classical sqrt(2E/m_e), which exceeds c above 511 keV and is
+    # already 2.5 per cent fast at the 16 keV emax_ev that the iron benchmark uses
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=16000, npts=400) as sf:
+        sf.add_ionisation(26, 2, n_ion=1.0)
+        sf.solve(depositionratedensity_ev=1e8)
+        n_e_nt = sf.get_n_e_nt()
+
+        gamma = sf.engrid * pynonthermal.constants.EV / (pynonthermal.constants.ME * pynonthermal.constants.CLIGHT**2)
+        arr_velocity = pynonthermal.constants.CLIGHT * np.sqrt(1.0 - 1.0 / (gamma + 1.0) ** 2)
+        assert (arr_velocity < pynonthermal.constants.CLIGHT).all()
+        assert math.isclose(n_e_nt, float(np.sum(sf.yvec / arr_velocity) * sf.deltaen))
+
+        # the classical speed is faster, so it gives a lower density
+        arr_velocity_classical = np.sqrt(2 * sf.engrid * pynonthermal.constants.EV / pynonthermal.constants.ME)
+        assert n_e_nt > float(np.sum(sf.yvec / arr_velocity_classical) * sf.deltaen)
+
+
+def test_lossfunction_plasma_energy_guard() -> None:
+    # the high-energy branch is ln(2E / hbar*omega_p), which is zero or negative once the plasma
+    # energy reaches 2E. That was an assert, so under python -O it returned a non-positive loss rate.
+    with pytest.raises(ValueError, match="not valid at"):
+        pynonthermal.electronlossfunction(100.0, 1e30)
+
+    # for densities the solver is actually used at, the loss rate is positive and falls with energy
+    arr_loss = [pynonthermal.electronlossfunction(en_ev, 1e8) for en_ev in (1.0, 5.0, 14.0, 100.0, 3000.0)]
+    assert all(loss > 0.0 for loss in arr_loss)
+    assert all(b < a for a, b in itertools.pairwise(arr_loss))

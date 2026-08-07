@@ -1,5 +1,4 @@
 from functools import lru_cache
-from math import atan
 from pathlib import Path
 
 import numpy as np
@@ -123,42 +122,45 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFram
     )
 
 
+def Psecondary_vec(
+    e_p: npt.NDArray[np.float64] | float, e_s: npt.NDArray[np.float64] | float, ionpot_ev: float, J: float
+) -> npt.NDArray[np.float64]:
+    """Evaluate the secondary-electron energy distribution over arrays of e_p and/or e_s.
+
+    e_p is the primary electron energy [eV] and e_s the secondary electron energy [eV]. The two
+    arguments broadcast against each other, so either may be a scalar. See Psecondary() for the
+    scalar form and the caller's responsibility for the limits of integration.
+    """
+    arr_e_p = np.asarray(e_p, dtype=np.float64)
+    arr_e_s = np.asarray(e_s, dtype=np.float64)
+
+    # below the ionisation threshold there are no secondaries (and the normalisation
+    # atan((e_p - ionpot_ev) / 2 / J) would be zero or negative)
+    norm = np.arctan((arr_e_p - ionpot_ev) / 2.0 / J)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(arr_e_p > ionpot_ev, 1.0 / J / norm / (1 + (arr_e_s / J) ** 2), 0.0)
+
+
 def Psecondary(e_p: float, ionpot_ev: float, J: float, e_s: float = -1, epsilon: float = -1) -> float:
     # probability distribution function for secondaries energy e_s [eV] (or equivalently the energy loss of
     # the primary electron epsilon [eV]) given a primary energy e_p [eV] for an impact ionisation event
 
-    assert e_s >= 0 or epsilon >= 0
-
-    if e_p <= ionpot_ev:
-        # below the ionisation threshold there are no secondaries (and the
-        # normalisation atan((e_p - ionpot_ev) / 2 / J) would be zero or negative)
-        return 0.0
+    # the distribution is normalised over the physical support e_s in [0, (e_p - ionpot_ev) / 2] but is
+    # not truncated to it here, so the caller must supply limits of integration that stay inside it
+    if e_s < 0 and epsilon < 0:
+        msg = "either the secondary energy e_s or the primary energy loss epsilon must be given"
+        raise ValueError(msg)
 
     if e_s < 0:
         e_s = epsilon - ionpot_ev
-    if epsilon < 0:
-        epsilon = e_s + ionpot_ev
 
-    #
-    # if epsilon < I:
-    #     return 0.
-    # if e_s < 0:
-    #     return 0.
-    # if e_s > e_p - I:
-    #     return 0.
-    # if e_s > e_p:
-    #     return 0.
-
-    # test case: constant, always below ionisation
-    # Psecondary_e_s_max = 1. / J / 2.
-    # return 1. / Psecondary_e_s_max if (e_s < Psecondary_e_s_max) else 0.
-
-    return 1.0 / J / atan((e_p - ionpot_ev) / 2.0 / J) / (1 + ((e_s / J) ** 2))
+    return float(Psecondary_vec(e_p=e_p, e_s=e_s, ionpot_ev=ionpot_ev, J=J))
 
 
 def get_J(Z: int, ion_stage: int, ionpot_ev: float) -> float:
     # returns an energy in eV
-    # values from Opal et al. 1971 as applied by Kozma & Fransson 1992
+    # values from Opal et al. 1971 as applied by Kozma & Fransson 1992. They are whole-atom measurements
+    # dominated by valence-shell ionisation, but are used for every shell of the ion to match ARTIS.
     if ion_stage == 1:
         if Z == 2:  # He I
             return 15.8
