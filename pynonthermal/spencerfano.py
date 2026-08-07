@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 import typing as t
 import warnings
-from math import atan
 from pathlib import Path
 
 import artistools as at
@@ -12,13 +11,36 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+from scipy import integrate
 from scipy import linalg
 
 import pynonthermal
 from pynonthermal.axelrod import get_workfn_ev
 from pynonthermal.base import electronlossfunction
+from pynonthermal.base import get_betasq
 from pynonthermal.base import get_Zbar
+from pynonthermal.constants import CLIGHT
 from pynonthermal.constants import K_B
+
+# Nodes for the sub-grids that resolve the parts of the Kozma & Fransson equation 6 integrals that the
+# solver's own energy grid cannot. Both integrands vary on the scale of J = 0.6 * ionpot_ev, so the node
+# count is set from the domain width in units of J, with a floor for the narrow domains that
+# calculate_frac_heating produces and a cap for the wide ones a direct calculate_N_e call can ask for.
+NPTS_SUBGRID_MIN: int = 65
+NPTS_SUBGRID_MAX: int = 1025
+NPTS_SUBGRID_PER_J: int = 32
+
+# how many whole grid cells above the lower limit of the second equation 6 integral get the sub-grid
+# treatment. The integrand is steepest at that limit and smooth a few J above it.
+NCELLS_SECOND_INTEGRAL_SUBGRID: int = 2
+
+# Number of nodes for the integral over E in [0, E_0] of Kozma & Fransson equation 8. This one is not
+# free: every node costs a full calculate_N_e() over all ions and shells, so it dominates the cost of
+# the analysis. It is integrated by Simpson's rule, which is fourth order here and reaches an accuracy
+# at 9 nodes that the trapezoid rule needs several hundred for. The node count is a property of this
+# integral alone: the old ceil(E_0 / deltaen) * 5 tied it to the main grid, which gave 5 nodes when
+# emin_ev was below the grid spacing and several hundred when it was well above.
+NPTS_SUB_E0_INTEGRAL: int = 9
 
 SUBSHELLNAMES = [
     "K ",
@@ -251,6 +273,26 @@ class SpencerFanoSolver:
             msg = f"xs_vec has {len(xs_vec)} points but engrid has {len(self.engrid)}"
             raise ValueError(msg)
 
+        # a non-positive transition energy would put matrix entries below the diagonal, where the
+        # triangular solve silently discards them, and a negative population or cross section would
+        # produce a negative excitation fraction that no later check looks for
+        if epsilon_trans_ev <= 0.0:
+            msg = f"epsilon_trans_ev must be greater than zero but is {epsilon_trans_ev}"
+            raise ValueError(msg)
+        if epsilon_trans_ev > self.engrid[-1]:
+            msg = (
+                f"epsilon_trans_ev ({epsilon_trans_ev} eV) is above the top of the energy grid"
+                f" ({self.engrid[-1]} eV), so no electron the solver represents can drive the transition"
+            )
+            raise ValueError(msg)
+        # >= rather than < 0, so that NaN, for which every comparison is False, is rejected too
+        if not levelnumberdensity >= 0.0:
+            msg = f"levelnumberdensity must be non-negative but is {levelnumberdensity}"
+            raise ValueError(msg)
+        if not (xs_vec >= 0.0).all():
+            msg = f"xs_vec must be non-negative and finite but its lowest value is {xs_vec.min()}"
+            raise ValueError(msg)
+
         if (Z, ion_stage) not in self.excitationlists:
             self.excitationlists[(Z, ion_stage)] = {}
 
@@ -298,6 +340,15 @@ class SpencerFanoSolver:
         maxnlevelslower: int | None = 5,
         maxnlevelsupper: int | None = 250,
     ) -> None:
+        """Add bound-bound excitations of one ion, with LTE level populations at the given temperature.
+
+        Transitions whose energy lies outside the solver's energy grid are dropped: above emax_ev no
+        electron the solver represents can drive them, and below emin_ev Kozma & Fransson 1992 take every
+        electron to have thermalised already, so their energy is accounted for as heating instead. Unlike
+        the equivalent case in add_ionisation(), this cannot be raised as an error, because real ions have
+        fine-structure transitions far below any usable emin_ev. Pass verbose=True to the solver to see how
+        many transitions were dropped.
+        """
         self._require_not_solved("add excitation")
         if adata_polars is not None:
             self.adata_polars = adata_polars
@@ -339,9 +390,21 @@ class SpencerFanoSolver:
         if maxnlevelsupper is not None:
             lzdftransitions = lzdftransitions.filter(pl.col("upper") < maxnlevelsupper)
 
-        # transitions outside the grid can't be driven by any electron the solver represents
-        lzdftransitions = lzdftransitions.filter(pl.col("epsilon_trans_ev").is_between(self.engrid[0], self.engrid[-1]))
-        dftransitions = lzdftransitions.collect()
+        # transitions outside the grid are dropped (see the docstring), but say how many, so that a grid
+        # that happens to exclude most of an ion's excitation channels doesn't go unnoticed
+        dftransitions_allenergies = lzdftransitions.collect()
+        dftransitions = dftransitions_allenergies.filter(
+            pl.col("epsilon_trans_ev").is_between(self.engrid[0], self.engrid[-1])
+        )
+
+        if self.verbose and len(dftransitions) < len(dftransitions_allenergies):
+            arr_epsilon_trans_ev = dftransitions_allenergies["epsilon_trans_ev"]
+            n_below_grid = int((arr_epsilon_trans_ev < self.engrid[0]).sum())
+            print(
+                f"  dropped {n_below_grid} transition(s) below emin_ev={self.engrid[0]} eV and"
+                f" {len(dftransitions_allenergies) - len(dftransitions) - n_below_grid} above"
+                f" emax_ev={self.engrid[-1]} eV for Z={Z} ion_stage {ion_stage} ({len(dftransitions)} kept)"
+            )
 
         if not dftransitions.is_empty():
             dftransitions = dftransitions.join(
@@ -432,7 +495,7 @@ class SpencerFanoSolver:
                 # epsilon_lower = en + ionpot_ev
                 # epsilon_upper = min((endash + ionpot_ev) / 2, endash)]
                 epsilon_lower2 = en + ionpot_ev
-                int_eps_lower2 = atan((epsilon_lower2 - ionpot_ev) / J)
+                int_eps_lower2 = math.atan((epsilon_lower2 - ionpot_ev) / J)
                 self.sfmatrix[i, secondintegralstartindex:] -= np.where(
                     epsilon_lower2 <= epsilon_uppers[secondintegralstartindex:],
                     prefactors[secondintegralstartindex:]
@@ -512,6 +575,13 @@ class SpencerFanoSolver:
         self._solved = False
         self.reset_solution_analysis()
 
+        # every fraction and rate coefficient is divided by the deposition rate density. A zero gave a bare
+        # ZeroDivisionError from inside the analysis, and a negative one silently flipped the sign of yvec
+        # and of every rate coefficient while leaving the energy fractions summing to one.
+        if depositionratedensity_ev <= 0.0:
+            msg = f"depositionratedensity_ev must be greater than zero but is {depositionratedensity_ev}"
+            raise ValueError(msg)
+
         self.depositionratedensity_ev = depositionratedensity_ev
         if override_n_e is not None and override_n_e <= 0.0:
             msg = f"override_n_e must be greater than zero but is {override_n_e}"
@@ -562,7 +632,7 @@ class SpencerFanoSolver:
             return 0.0
 
         # integral in Kozma & Fransson equation 9, but summed over all transitions for given ion
-        deltaen = self.engrid[1] - self.engrid[0]
+        deltaen = self.deltaen
         npts = len(self.engrid)
 
         xs_excitation_vec_sum_alltrans = np.zeros(npts)
@@ -576,6 +646,32 @@ class SpencerFanoSolver:
 
         return np.dot(xs_excitation_vec_sum_alltrans, self.yvec) * deltaen / self.depositionratedensity_ev
 
+    @staticmethod
+    def _npts_subgrid(width_ev: float, J: float) -> int:
+        # nodes for a sub-grid spanning width_ev, given that the integrand varies on the scale of J.
+        # Odd, so that a Simpson-style rule would see whole panels.
+        npts = int(np.clip(NPTS_SUBGRID_PER_J * width_ev / J, NPTS_SUBGRID_MIN, NPTS_SUBGRID_MAX))
+
+        return npts + 1 - npts % 2
+
+    @staticmethod
+    def _integrate_shell_secondaries(
+        arr_e_p: npt.NDArray[np.float64],
+        arr_y: npt.NDArray[np.float64],
+        arr_xs: npt.NDArray[np.float64],
+        e_s: npt.NDArray[np.float64] | float,
+        ionpot_ev: float,
+        J: float,
+    ) -> float:
+        # The integrand shared by both integrals of Kozma & Fransson equation 6: y(E') sigma(E') P(e_s, E')
+        # over the primary energies arr_e_p. Both use E' as the variable of integration, since the first
+        # one's epsilon differs from it only by a constant. Each caller supplies y and the cross section
+        # however is cheapest for its own nodes: off the grid they have to be evaluated, but on it the
+        # solution and the cached cross sections can be sliced directly.
+        arr_psecondary = pynonthermal.collion.Psecondary_vec(e_p=arr_e_p, e_s=e_s, ionpot_ev=ionpot_ev, J=J)
+
+        return float(np.trapezoid(arr_y * arr_xs * arr_psecondary, arr_e_p))
+
     def calculate_N_e(self, energy_ev: float) -> float:
         # Kozma & Fransson equation 6.
         # Something related to a number of electrons, needed to calculate the heating fraction in equation 3
@@ -584,60 +680,106 @@ class SpencerFanoSolver:
             return 0.0
 
         N_e = 0.0
-
-        deltaen = self.engrid[1] - self.engrid[0]
+        e_min = float(self.engrid[0])
+        e_max = float(self.engrid[-1])
+        deltaen = float(self.deltaen)
+        lastindex = len(self.engrid) - 2
 
         for Z, ion_stage in self._get_all_ions():
             N_e_ion = 0.0
             n_ion = self.ionpopdict.get((Z, ion_stage), 0.0)
 
             for levelnumberdensity, xsvec, epsilon_trans_ev in self.excitationlists.get((Z, ion_stage), {}).values():
-                if energy_ev + epsilon_trans_ev >= self.engrid[0]:
-                    i = self.get_energyindex_lteq(en_ev=energy_ev + epsilon_trans_ev)
+                # Interpolate y and the cross section at energy_ev + epsilon_trans_ev, as the two
+                # ionisation integrals below also do, rather than snapping down to the grid point under
+                # it. Snapping lands below the transition energy whenever E has not yet carried the sum
+                # past it, and get_xs_excitation_vector makes the cross section exactly zero there, so
+                # the whole transition silently dropped out: on the helium benchmark at E = 0.25 eV that
+                # was 280 of 296 transitions and 43% of N_e. The interpolation is written out rather
+                # than left to np.interp because this runs once per transition per quadrature node,
+                # where the call overhead of np.interp costs more than the arithmetic; the grid is
+                # uniform, so the index and weight are exact.
+                en_upper = energy_ev + epsilon_trans_ev
+                if e_min <= en_upper <= e_max:
+                    pos = (en_upper - e_min) / deltaen
+                    i = min(int(pos), lastindex)
+                    weight = pos - i
                     # the level population is absolute, so this term is not scaled by n_ion below
-                    N_e += levelnumberdensity * self.yvec[i] * xsvec[i]
+                    N_e += (
+                        levelnumberdensity
+                        * (self.yvec[i] + weight * (self.yvec[i + 1] - self.yvec[i]))
+                        * (xsvec[i] + weight * (xsvec[i + 1] - xsvec[i]))
+                    )
 
             if (Z, ion_stage) not in self._ionisation_ions:
                 continue
 
             for shell in self._get_ion_collion_rows(Z, ion_stage):
-                ionpot_ev = shell["ionpot_ev"]
+                ionpot_ev = float(shell["ionpot_ev"])
 
-                enlambda = min(self.engrid[-1] - energy_ev, energy_ev + ionpot_ev)
+                enlambda = min(e_max - energy_ev, energy_ev + ionpot_ev)
                 J = pynonthermal.collion.get_J(int(shell["Z"]), int(shell["ion_stage"]), ionpot_ev)
 
-                ar_xs_array = self._get_shell_xs(shell)
-
-                # integral from ionpot to enlambda
-                integral1startindex = self.get_energyindex_lteq(en_ev=ionpot_ev)
-                integral2stopindex = self.get_energyindex_lteq(en_ev=enlambda)
-
-                for j in range(integral1startindex, integral2stopindex + 1):
-                    endash = self.engrid[j]
-                    k = self.get_energyindex_lteq(en_ev=energy_ev + endash)
-                    N_e_ion += (
-                        deltaen
-                        * self.yvec[k]
-                        * ar_xs_array[k]
-                        * pynonthermal.collion.Psecondary(e_p=self.engrid[k], epsilon=endash, ionpot_ev=ionpot_ev, J=J)
+                # Integral over epsilon from ionpot_ev to enlambda. Its width is at most energy_ev, which
+                # is at most E_0 = emin_ev, so it is usually narrower than one cell of self.engrid and has
+                # to be resolved on a sub-grid of its own. Evaluating it on self.engrid instead gave an
+                # error that swung between missing the domain entirely and overcounting it by an order of
+                # magnitude, depending on where the grid points happened to fall relative to ionpot_ev.
+                if enlambda > ionpot_ev:
+                    arr_epsilon = np.linspace(
+                        ionpot_ev, enlambda, num=self._npts_subgrid(enlambda - ionpot_ev, J), dtype=np.float64
+                    )
+                    arr_e_p = energy_ev + arr_epsilon
+                    # every node here lies between grid points, so y is interpolated and the cross section
+                    # evaluated directly, the latter because it rises steeply from zero just above the
+                    # ionisation threshold that starts this integral
+                    N_e_ion += self._integrate_shell_secondaries(
+                        arr_e_p=arr_e_p,
+                        # asarray because np.interp is typed as returning a scalar for a scalar x
+                        arr_y=np.asarray(np.interp(arr_e_p, self.engrid, self.yvec, left=0.0, right=0.0)),
+                        arr_xs=pynonthermal.collion.get_arxs_array_shell(arr_e_p, shell),
+                        e_s=arr_epsilon - ionpot_ev,
+                        ionpot_ev=ionpot_ev,
+                        J=J,
                     )
 
-                # integral from 2E + I up to E_max (skipped when the domain is empty, since
-                # get_energyindex_lteq would clamp to the last bin and add a spurious term;
-                # same guard as in _add_ionisation_shell)
-                if 2 * energy_ev + ionpot_ev < self.engrid[-1] + deltaen:
-                    integral2startindex = self.get_energyindex_lteq(en_ev=2 * energy_ev + ionpot_ev)
-                    N_e_ion += deltaen * sum(
-                        self.yvec[j]
-                        * ar_xs_array[j]
-                        * pynonthermal.collion.Psecondary(
-                            e_p=self.engrid[j],
-                            epsilon=energy_ev + ionpot_ev,
+                # Integral from 2E + I up to E_max. Away from the lower limit self.engrid resolves this
+                # domain, but the Psecondary normalisation 1/atan((E' - I) / 2J) varies on the scale of
+                # J = 0.6 * I rather than deltaen, and 2E + I sits just above the threshold for the small
+                # E this is called with. A single trapezoid panel from 2E + I to the first grid point
+                # above it therefore spans the steepest, most convex part of the integrand and
+                # overestimates it one-sidedly: for Al I on a 1-3000 eV grid at npts=600 that one panel
+                # made the integral 35% high. Resolve the leading panels on a sub-grid, and let the main
+                # grid carry the smooth remainder. An empty domain is skipped rather than integrated
+                # backwards.
+                en_lower2 = 2 * energy_ev + ionpot_ev
+                if en_lower2 < e_max:
+                    startindex = self.get_energyindex_gteq(en_ev=en_lower2)
+                    # cover whole grid cells with the sub-grid, so that it meets the grid part exactly
+                    stopindex = min(startindex + NCELLS_SECOND_INTEGRAL_SUBGRID, len(self.engrid) - 1)
+                    en_upper_low = float(self.engrid[stopindex])
+                    arr_e_p_low = np.linspace(
+                        en_lower2, en_upper_low, num=self._npts_subgrid(en_upper_low - en_lower2, J), dtype=np.float64
+                    )
+                    N_e_ion += self._integrate_shell_secondaries(
+                        arr_e_p=arr_e_p_low,
+                        arr_y=np.asarray(np.interp(arr_e_p_low, self.engrid, self.yvec, left=0.0, right=0.0)),
+                        arr_xs=pynonthermal.collion.get_arxs_array_shell(arr_e_p_low, shell),
+                        e_s=energy_ev,
+                        ionpot_ev=ionpot_ev,
+                        J=J,
+                    )
+                    # the rest is smooth on the scale of J, so y and the cross section come straight
+                    # from the solution and the cache rather than being re-evaluated
+                    if stopindex < len(self.engrid) - 1:
+                        N_e_ion += self._integrate_shell_secondaries(
+                            arr_e_p=self.engrid[stopindex:],
+                            arr_y=self.yvec[stopindex:],
+                            arr_xs=self._get_shell_xs(shell)[stopindex:],
+                            e_s=energy_ev,
                             ionpot_ev=ionpot_ev,
                             J=J,
                         )
-                        for j in range(integral2startindex, len(self.engrid))
-                    )
 
             N_e += n_ion * N_e_ion
 
@@ -651,7 +793,7 @@ class SpencerFanoSolver:
         E_0 = self.engrid[0]
         n_e = self.get_n_e()
 
-        deltaen = self.engrid[1] - self.engrid[0]
+        deltaen = self.deltaen
         frac_heating += (
             deltaen
             / self.depositionratedensity_ev
@@ -665,13 +807,15 @@ class SpencerFanoSolver:
         # if self.verbose:
         #     print(f"            frac_heating E_0 * y * l(E_0) part: {frac_heating_E_0_part:.5f}")
 
-        frac_heating_N_e: float = 0.0
-        npts_integral = math.ceil(E_0 / deltaen) * 5
-        # if self.verbose:
-        #     print(f'N_e npts_integral: {npts_integral}')
-        arr_en, deltaen2 = np.linspace(0.0, E_0, num=npts_integral, retstep=True, endpoint=True, dtype=np.float64)
+        # E * N_e(E) is smooth over [0, E_0], so Simpson's rule earns its extra order here: it reaches
+        # 5e-5 of the converged value at 9 nodes where the trapezoid rule needs several hundred, and
+        # every node costs a full calculate_N_e(). Summing the nodes, as the code did before, counted
+        # half a node too much at each end of the interval.
+        arr_en = np.linspace(0.0, E_0, num=NPTS_SUB_E0_INTEGRAL, endpoint=True, dtype=np.float64)
         arr_en_N_e = np.array([en_ev * self.calculate_N_e(en_ev) for en_ev in arr_en], dtype=np.float64)
-        frac_heating_N_e += float(1.0 / self.depositionratedensity_ev * arr_en_N_e.sum() * deltaen2)
+        # cast because scipy.integrate.simpson is untyped, so its result is Any to the type checkers
+        integral_e_n_e = t.cast("float", integrate.simpson(arr_en_N_e, x=arr_en))
+        frac_heating_N_e = integral_e_n_e / self.depositionratedensity_ev
 
         if self.verbose:
             print(f" frac_heating(E<EMIN): {frac_heating_N_e:.5f}")
@@ -700,7 +844,7 @@ class SpencerFanoSolver:
         # keep any frac_heating already computed for this solution, since it only depends on yvec
         self._reset_channel_fractions()
 
-        deltaen = self.engrid[1] - self.engrid[0]
+        deltaen = self.deltaen
 
         if self.verbose:
             print(f"    n_e_nt: {self.get_n_e_nt():.2e} [/cm3]")
@@ -748,7 +892,7 @@ class SpencerFanoSolver:
                         f" {shell['ionpot_ev']:.2f} eV)"
                     )
 
-                if frac_ionisation_shell > 1:
+                if not 0.0 <= frac_ionisation_shell <= 1.0:
                     warnings.warn(
                         f"invalid frac_ionisation_shell of {frac_ionisation_shell} included in the total",
                         stacklevel=2,
@@ -771,7 +915,7 @@ class SpencerFanoSolver:
 
             frac_excitation_thision = self.calculate_nt_frac_excitation_ion(Z, ion_stage)
 
-            if frac_excitation_thision > 1:
+            if not 0.0 <= frac_excitation_thision <= 1.0:
                 # keep it in the total, as for frac_ionisation_shell, so that the energy conservation
                 # check below still sees the problem instead of a total that silently lost a channel
                 warnings.warn(
@@ -830,14 +974,11 @@ class SpencerFanoSolver:
             )
 
     def get_n_e_nt(self) -> float:
+        """Get the number density of non-thermal electrons in cm^-3."""
         self._require_solved()
-        n_e_nt = 0.0
-        for i, en in enumerate(self.engrid):
-            # oneovervelocity = np.sqrt(9.10938e-31 / 2 / en / 1.60218e-19) / 100.
-            velocity = np.sqrt(2 * en * 1.60218e-19 / 9.10938e-31) * 100.0  # cm/s
-            n_e_nt += self.yvec[i] / velocity * self.deltaen
+        arr_velocity = CLIGHT * np.sqrt(get_betasq(self.engrid))  # cm/s
 
-        return n_e_nt
+        return float(np.sum(self.yvec / arr_velocity) * self.deltaen)
 
     def get_frac_heating(self) -> float:
         self._require_solved()
@@ -1010,8 +1151,12 @@ class SpencerFanoSolver:
 
         d_etaheat_by_d_en_vec = self.get_d_etaheating_by_d_en_vec()
 
-        # the plot extends below E_0, where the cross sections are all zero and every remaining
-        # electron thermalises, so only the heating channel is non-zero there
+        # The plot extends below E_0 to show where the channels stand there. Every ionisation threshold
+        # is above E_0 (add_ionisation rejects any that are not), so that curve is genuinely zero;
+        # excitation is drawn flat because add_excitation does allow a transition energy below E_0.
+        # The heating curve stops at E_0 instead of continuing, because l(E) * y(E) needs y, which the
+        # solver only has above E_0. The energy that thermalises below E_0 is in get_frac_heating()
+        # (via the integral of E * N_e over [0, E_0]) but has no per-energy curve to draw here.
         engrid_low = np.arange(0.0, E_0, E_0 / 20.0, dtype=float)
         npts_low = len(engrid_low)
         engridfull = np.append(engrid_low, self.engrid)
@@ -1039,7 +1184,9 @@ class SpencerFanoSolver:
             label="Ionisation",
         )
 
-        if self.get_frac_excitation_tot() > 0.0:
+        # test the curve itself rather than get_frac_excitation_tot(), so that drawing a plot does not
+        # trigger analyse_ntspectrum() and its diagnostic warnings as a side effect
+        if d_etaexc_by_d_en_vec.any():
             ax.plot(
                 engridfull,
                 np.append(np.zeros(npts_low), d_etaexc_by_d_en_vec) * engridfull / detaymax,

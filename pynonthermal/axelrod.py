@@ -1,6 +1,7 @@
 # functions related to Axelrod 1980 non-thermal treatment
 
 import math
+from functools import cache
 from functools import lru_cache
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import numpy as np
 import numpy.typing as npt
 
 import pynonthermal
+from pynonthermal.base import get_betasq
 from pynonthermal.constants import CLIGHT
 from pynonthermal.constants import EV
 from pynonthermal.constants import ME
@@ -34,6 +36,9 @@ def get_binding_energies() -> npt.NDArray[np.float64]:
             assert int(linesplit[0]) == i + 1
             electron_binding[i] = np.array([float(x) for x in linesplit[1:]]) * EV
 
+    # handed straight to callers from the cache, so a write must raise at the mutation site
+    electron_binding.flags.writeable = False
+
     return electron_binding
 
 
@@ -58,12 +63,19 @@ def get_shell_configs() -> npt.NDArray[np.int64]:
             shells_q[i, :] = np.array([int(x) for x in linesplit[1:]])
             assert sum(shells_q[i]) == i + 1
 
+    # handed straight to callers from the cache, so a write must raise at the mutation site
+    shells_q.flags.writeable = False
+
     return shells_q
 
 
-def get_shell_occupancies(
-    atomic_number: int, ion_stage: int, electron_binding: npt.NDArray[np.float64], all_shells_q: npt.NDArray[np.int64]
-) -> npt.NDArray[np.int64]:
+@cache
+def get_shell_occupancies(atomic_number: int, ion_stage: int) -> npt.NDArray[np.int64]:
+    # electrons in each shell of one ion, taken from the neutral configuration with the outermost
+    # electrons removed. Cached, like the two tables it reads, because every ionisation cross section
+    # evaluation needs it and it depends only on the ion.
+    electron_binding = get_binding_energies()
+    all_shells_q = get_shell_configs()
     nbound = atomic_number - ion_stage + 1
     element_shells_q_neutral = all_shells_q[atomic_number - 1]
     shellcount = min(len(element_shells_q_neutral), len(electron_binding[atomic_number - 1]))
@@ -85,14 +97,17 @@ def get_shell_occupancies(
 
     assert sum(element_shells_q) == nbound
 
+    # the cached array is handed straight to callers, so make a write raise at the mutation site
+    # rather than silently changing the occupancies every later cross section evaluation sees
+    element_shells_q.flags.writeable = False
+
     return element_shells_q
 
 
 def get_sum_q_over_binding_energy(atomic_number: int, ion_stage: int, ionpot_ev: float) -> float:
     # LJS: translated from artis nonthermal.cc
     electron_binding = get_binding_energies()
-    all_shells_q = get_shell_configs()
-    q = get_shell_occupancies(atomic_number, ion_stage, electron_binding, all_shells_q)
+    q = get_shell_occupancies(atomic_number, ion_stage)
 
     total = 0.0
     for electron_loop in range(q.size):
@@ -129,20 +144,16 @@ def get_lotz_xs_ionisation_vec(
 
     arr_en_erg = arr_en_ev * EV
 
-    # relativistic, to match the relativistic correction terms in the Axelrod equation below.
-    # The classical betasq = 2 * en_erg / (ME * CLIGHT**2) reaches one at 255 keV, above which every
-    # cross section was silently set to zero, and is already 5% high at 16 keV and 30% high at 100 keV.
-    gamma = arr_en_erg / (ME * CLIGHT**2) + 1.0
-    betasq = 1.0 - 1.0 / gamma**2
+    # relativistic, to match the relativistic correction terms in the Axelrod equation below. The
+    # classical form reaches one at 255 keV, above which every cross section was silently set to zero.
+    betasq = get_betasq(arr_en_ev)
 
     atomic_number = int(shell["Z"])
     ion_stage = int(shell["ion_stage"])
     ionpot_ev = shell["ionpot_ev"]
     shellindex = -int(shell["l"])
 
-    electron_binding = get_binding_energies()
-    all_shells_q = get_shell_configs()
-    electronsinshell = get_shell_occupancies(atomic_number, ion_stage, electron_binding, all_shells_q)[shellindex]
+    electronsinshell = get_shell_occupancies(atomic_number, ion_stage)[shellindex]
 
     p = ionpot_ev * EV
     Aconst = 1.33e-14 * EV * EV
