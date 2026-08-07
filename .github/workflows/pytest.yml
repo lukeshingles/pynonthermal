@@ -87,22 +87,7 @@ jobs:
                   uv pip install --compile-bytecode .
 
             - name: Test with pytest
-              run: uv run -- python3 -m pytest --cov=./ --cov-report=xml
+              run: uv run -- python3 -m pytest --cov --cov-report=xml
 
             - name: Report coverage
               run: uv run -- python3 -m coverage report
-
-            - name: Upload coverage to Codecov
-              uses: codecov/codecov-action@v7
-              env:
-                  OS: ${{ runner.os.name }}
-                  PYTHON: ${{ matrix.python-version }}
-              with:
-                  token: ${{ secrets.CODECOV_TOKEN }}
-                  files: ./coverage.xml
-                  # directory: ./coverage/reports/
-                  flags: unittests
-                  env_vars: OS,PYTHON
-                  name: codecov-umbrella
-                  fail_ci_if_error: false
-                  verbose: true
