@@ -6,12 +6,24 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
+from pynonthermal.constants import CLIGHT
 from pynonthermal.constants import EV
 from pynonthermal.constants import H
 from pynonthermal.constants import ME
 from pynonthermal.constants import QE
 
 DATADIR = Path(__file__).absolute().parent / "data"
+
+
+def get_betasq(en_ev: npt.NDArray[np.float64] | float) -> npt.NDArray[np.float64]:
+    """Get (v/c)^2 for an electron of kinetic energy en_ev [eV], relativistically.
+
+    The classical 2 * en_ev * EV / ME reaches one at 255 keV and is already 5 per cent high at 16 keV,
+    which is within the range of emax_ev this package is used over.
+    """
+    gamma = np.asarray(en_ev, dtype=np.float64) * EV / (ME * CLIGHT**2) + 1.0
+
+    return 1.0 - 1.0 / gamma**2
 
 
 def electronlossfunction(energy_ev: float, n_e_cgs: float) -> float:
@@ -79,21 +91,23 @@ def get_Zbar(ions: Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], 
     return Zbar
 
 
-def get_energyindex_lteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
-    # find energy bin lower boundary is less than or equal to search value
-    # assert en_ev >= engrid[0]
-    deltaen = engrid[1] - engrid[0]
-    # assert en_ev < (engrid[-1] + deltaen)
+def get_energyindex_lteq(en_ev: float, engrid: npt.NDArray[np.float64], deltaen: float | None = None) -> int:
+    # find energy bin lower boundary is less than or equal to search value.
+    # deltaen is the grid spacing, which callers that already hold it should pass in: re-deriving it
+    # from the array costs more than the index arithmetic itself when called in a loop.
+    if deltaen is None:
+        deltaen = float(engrid[1]) - float(engrid[0])
 
-    index = math.floor((en_ev - engrid[0]) / deltaen)
+    index = math.floor((en_ev - float(engrid[0])) / deltaen)
 
     return 0 if index < 0 else min(index, len(engrid) - 1)
 
 
-def get_energyindex_gteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
+def get_energyindex_gteq(en_ev: float, engrid: npt.NDArray[np.float64], deltaen: float | None = None) -> int:
     # find energy bin lower boundary is greater than or equal to search value
-    deltaen = engrid[1] - engrid[0]
+    if deltaen is None:
+        deltaen = float(engrid[1]) - float(engrid[0])
 
-    index = math.ceil((en_ev - engrid[0]) / deltaen)
+    index = math.ceil((en_ev - float(engrid[0])) / deltaen)
 
     return 0 if index < 0 else min(index, len(engrid) - 1)

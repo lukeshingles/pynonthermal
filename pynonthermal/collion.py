@@ -128,8 +128,12 @@ def Psecondary_vec(
     """Evaluate the secondary-electron energy distribution over arrays of e_p and/or e_s.
 
     e_p is the primary electron energy [eV] and e_s the secondary electron energy [eV]. The two
-    arguments broadcast against each other, so either may be a scalar. See Psecondary() for the
-    scalar form and the caller's responsibility for the limits of integration.
+    arguments broadcast against each other, so either may be a scalar. Psecondary() is the scalar form.
+
+    The distribution is normalised over its physical support, e_s in [0, (e_p - ionpot_ev) / 2], but is
+    not truncated to it here, so the caller must supply limits of integration that stay inside it. Note
+    also that the normalisation diverges as e_p approaches ionpot_ev from above, so a limit of
+    integration that is snapped onto a coarse energy grid near the threshold can be badly wrong.
     """
     arr_e_p = np.asarray(e_p, dtype=np.float64)
     arr_e_s = np.asarray(e_s, dtype=np.float64)
@@ -145,8 +149,7 @@ def Psecondary(e_p: float, ionpot_ev: float, J: float, e_s: float = -1, epsilon:
     # probability distribution function for secondaries energy e_s [eV] (or equivalently the energy loss of
     # the primary electron epsilon [eV]) given a primary energy e_p [eV] for an impact ionisation event
 
-    # the distribution is normalised over the physical support e_s in [0, (e_p - ionpot_ev) / 2] but is
-    # not truncated to it here, so the caller must supply limits of integration that stay inside it
+    # see Psecondary_vec() for the support that the caller's limits of integration must stay inside
     if e_s < 0 and epsilon < 0:
         msg = "either the secondary energy e_s or the primary energy loss epsilon must be given"
         raise ValueError(msg)

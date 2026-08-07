@@ -1,4 +1,5 @@
 from pynonthermal import axelrod as axelrod
+from pynonthermal import base as base
 from pynonthermal import collion as collion
 from pynonthermal import constants as constants
 from pynonthermal import excitation as excitation

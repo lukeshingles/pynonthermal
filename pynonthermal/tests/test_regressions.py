@@ -186,12 +186,9 @@ def test_N_e_empty_second_integral_domain() -> None:
         arr_e_p: npt.NDArray[np.float64] = energy_ev + arr_epsilon
         arr_y: npt.NDArray[np.float64] = np.interp(arr_e_p, sf.engrid, sf.yvec, left=0.0, right=0.0)
         arr_xs = pynonthermal.collion.get_arxs_array_shell(arr_e_p, shell)
-        arr_p = np.array(
-            [
-                pynonthermal.collion.Psecondary(e_p=float(e_p), epsilon=float(eps), ionpot_ev=ionpot_ev, J=J)
-                for e_p, eps in zip(arr_e_p, arr_epsilon, strict=True)
-            ]
-        )
+        # the closed form of Psecondary, written out so that the reference does not depend on the
+        # implementation it is checking
+        arr_p = 1.0 / J / np.arctan((arr_e_p - ionpot_ev) / 2 / J) / (1 + ((arr_epsilon - ionpot_ev) / J) ** 2)
         expected = 1e8 * float(np.trapezoid(arr_y * arr_xs * arr_p, arr_epsilon))
 
         # the tolerance covers the solver's own coarser sub-grid for this integral, not the second
@@ -366,15 +363,16 @@ def test_n_e_nt_relativistic() -> None:
         sf.add_ionisation(26, 2, n_ion=1.0)
         sf.solve(depositionratedensity_ev=1e8)
         n_e_nt = sf.get_n_e_nt()
+        assert n_e_nt > 0.0
 
-        gamma = sf.engrid * pynonthermal.constants.EV / (pynonthermal.constants.ME * pynonthermal.constants.CLIGHT**2)
-        arr_velocity = pynonthermal.constants.CLIGHT * np.sqrt(1.0 - 1.0 / (gamma + 1.0) ** 2)
-        assert (arr_velocity < pynonthermal.constants.CLIGHT).all()
-        assert math.isclose(n_e_nt, float(np.sum(sf.yvec / arr_velocity) * sf.deltaen))
-
-        # the classical speed is faster, so it gives a lower density
+        # the classical speed exceeds the relativistic one, so it gives a lower density. Comparing
+        # against it pins the physics without restating the implementation.
         arr_velocity_classical = np.sqrt(2 * sf.engrid * pynonthermal.constants.EV / pynonthermal.constants.ME)
         assert n_e_nt > float(np.sum(sf.yvec / arr_velocity_classical) * sf.deltaen)
+
+        # and no electron may travel faster than light, which the classical form allows above 511 keV
+        assert (pynonthermal.base.get_betasq(sf.engrid) < 1.0).all()
+        assert n_e_nt > float(np.sum(sf.yvec) * sf.deltaen / pynonthermal.constants.CLIGHT)
 
 
 def test_lossfunction_plasma_energy_guard() -> None:
