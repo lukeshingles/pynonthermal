@@ -127,3 +127,6 @@ jobs:
                   file: coverage.xml
                   language: Python
                   label: code-coverage-agent
+                  # the upload returns 404 until code coverage is enabled for the repository, which
+                  # should not fail an otherwise passing test run
+                  fail-on-error: false
