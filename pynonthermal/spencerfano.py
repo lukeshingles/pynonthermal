@@ -496,26 +496,32 @@ class SpencerFanoSolver:
             # linearly, so each distinct k is written once, with the vectors pre-summed.
             groups: dict[int, tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]] = {}
             npts = len(self.engrid)
-            for transition in dftransitions.iter_rows(named=True):
-                xs_vec = pynonthermal.excitation.get_xs_excitation_vector(
-                    self.engrid, transition, use_collstrengths=use_collstrengths
-                )
-                vec, k, frac = self._store_excitation(
-                    Z,
-                    ion_stage,
-                    transition["lower_pop"],
-                    xs_vec,
-                    transition["epsilon_trans_ev"],
-                    transitionkey=(transition["lower"], transition["upper"]),
-                )
-                if k not in groups:
-                    groups[k] = (np.zeros(npts), np.zeros(npts))
-                groupvec, groupfracvec = groups[k]
-                groupvec += vec
-                groupfracvec += vec * frac
-
-            for k, (groupvec, groupfracvec) in sorted(groups.items()):
-                self._add_excitation_band(groupvec, groupfracvec, k)
+            try:
+                for transition in dftransitions.iter_rows(named=True):
+                    xs_vec = pynonthermal.excitation.get_xs_excitation_vector(
+                        self.engrid, transition, use_collstrengths=use_collstrengths
+                    )
+                    vec, k, frac = self._store_excitation(
+                        Z,
+                        ion_stage,
+                        transition["lower_pop"],
+                        xs_vec,
+                        transition["epsilon_trans_ev"],
+                        transitionkey=(transition["lower"], transition["upper"]),
+                    )
+                    if k not in groups:
+                        groups[k] = (np.zeros(npts), np.zeros(npts))
+                    groupvec, groupfracvec = groups[k]
+                    groupvec += vec
+                    groupfracvec += vec * frac
+            finally:
+                # _store_excitation validates before it records, so if a transition raises (for
+                # example a duplicate key in custom atomic data), exactly the transitions already
+                # recorded in excitationlists have accumulated bands. Writing them on the way out
+                # keeps the matrix consistent with the bookkeeping for a caller that catches the
+                # error, matching the old behaviour of adding each transition atomically.
+                for k, (groupvec, groupfracvec) in sorted(groups.items()):
+                    self._add_excitation_band(groupvec, groupfracvec, k)
 
     def _add_ionisation_shell(self, n_ion: float, shell: dict[str, int | float]) -> None:
         # add the terms related to ionisation cross sections for one shell
