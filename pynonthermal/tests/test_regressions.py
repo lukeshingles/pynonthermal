@@ -585,6 +585,30 @@ def test_excitation_band_fill_matches_rowwise() -> None:
             expected = _reference_excitation_fill(sf, 1e5, xs_vec, epsilon_trans_ev)
             assert sf.sfmatrix.tobytes() == expected.tobytes(), f"mismatch for {epsilon_trans_ev=}"
 
+    # transitions are summed per band offset in a shared buffer before being applied to the
+    # matrix. Buffer cells accumulate transitions in the order they were added, so a sequence
+    # of buffered bands flushed onto a zero matrix is bit-identical to row-by-row fills
+    # applied in the same order.
+    with pynonthermal.SpencerFanoSolver(emin_ev=200.0, emax_ev=300.0, npts=npts) as sf:
+        expected = np.zeros((npts, npts))
+        for epsilon_trans_ev in (5.0, 13.3, 5.0):
+            xs_vec = rng.random(npts) * 1e-16
+            sf.add_excitation(8, 2, levelnumberdensity=1e5, xs_vec=xs_vec, epsilon_trans_ev=epsilon_trans_ev)
+            expected += _reference_excitation_fill(sf, 1e5, xs_vec, epsilon_trans_ev)
+        assert sf.sfmatrix.tobytes() == expected.tobytes()
+
+    # a band too wide for the buffer is written to the matrix directly after flushing it, so
+    # entries touched both before and after the flush see their transitions summed in a
+    # different (but same-order) association than sequential row fills: equal to within one
+    # rounding, not bitwise
+    with pynonthermal.SpencerFanoSolver(emin_ev=200.0, emax_ev=300.0, npts=npts) as sf:
+        expected = np.zeros((npts, npts))
+        for epsilon_trans_ev in (5.0, 250.0, 5.0, 13.3):
+            xs_vec = rng.random(npts) * 1e-16
+            sf.add_excitation(8, 2, levelnumberdensity=1e5, xs_vec=xs_vec, epsilon_trans_ev=epsilon_trans_ev)
+            expected += _reference_excitation_fill(sf, 1e5, xs_vec, epsilon_trans_ev)
+        assert np.allclose(sf.sfmatrix, expected, rtol=1e-13, atol=0.0)
+
 
 def _reference_ionisation_fill(
     sf: pynonthermal.SpencerFanoSolver, n_ion: float, shell: dict[str, int | float]

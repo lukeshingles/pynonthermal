@@ -40,6 +40,13 @@ NCELLS_SECOND_INTEGRAL_SUBGRID: int = 2
 # emin_ev was below the grid spacing and several hundred when it was well above.
 NPTS_SUB_E0_INTEGRAL: int = 9
 
+# Excitation contributions are summed per band offset in a small cache-resident buffer and
+# applied to the matrix in one pass per offset when the matrix is next read, instead of
+# sweeping a strip of the whole npts x npts matrix once per transition. The buffer covers
+# bands up to this many offsets; the rare wider bands (epsilon_trans_ev of hundreds of eV at
+# the default grid spacing) are written to the matrix directly.
+EXCITATION_BAND_ACCUM_MAX_ROWS: int = 256
+
 SUBSHELLNAMES = [
     "K ",
     "L1",
@@ -152,7 +159,9 @@ class SpencerFanoSolver:
     dfcollion: pl.DataFrame
     rhsvec: npt.NDArray[np.float64]
     E_init_ev: float
-    sfmatrix: npt.NDArray[np.float64]
+    _sfmatrix: npt.NDArray[np.float64]
+    _excitation_band: npt.NDArray[np.float64] | None
+    _excitation_band_nrows: int
     adata_polars: pl.DataFrame | None
     yvec: npt.NDArray[np.float64]
 
@@ -229,7 +238,9 @@ class SpencerFanoSolver:
                 f" {source_emax:.2f} eV with E_init {self.E_init_ev:7.2f} [eV/s/cm3]"
             )
 
-        self.sfmatrix = np.zeros((npts, npts))
+        self._sfmatrix = np.zeros((npts, npts))
+        self._excitation_band = None
+        self._excitation_band_nrows = 0
 
     def __enter__(self) -> t.Self:
         """Enter the context manager."""
@@ -293,6 +304,25 @@ class SpencerFanoSolver:
         if key not in self._shell_xs:
             self._shell_xs[key] = pynonthermal.collion.get_arxs_array_shell(self.engrid, shell)
         return self._shell_xs[key]
+
+    @property
+    def sfmatrix(self) -> npt.NDArray[np.float64]:
+        """The Spencer-Fano matrix, with any pending excitation contributions applied."""
+        self._flush_excitation_band()
+        return self._sfmatrix
+
+    def _flush_excitation_band(self) -> None:
+        # apply the summed per-offset excitation contributions to the matrix: buffer row d
+        # holds the values of the matrix elements (i, i + d), i.e. the d-th superdiagonal
+        band = self._excitation_band
+        if band is None:
+            return
+        self._excitation_band = None
+        npts = len(self.engrid)
+        flat = self._sfmatrix.reshape(-1, copy=False)
+        for d in range(self._excitation_band_nrows):
+            flat[d :: npts + 1][: npts - d] += band[d, d:]
+        self._excitation_band_nrows = 0
 
     def add_excitation(
         self,
@@ -361,43 +391,66 @@ class SpencerFanoSolver:
         # partial final bin covering frac of a cell, truncated where the window leaves the top
         # of the grid. The uniform grid makes k and frac the same for every row, and the value
         # written at (i, j) is vec[j], independent of the row, so the whole contribution is a
-        # constant-width band of one 1D vector: one windowed addition for the full-weight band
-        # and one matrix diagonal for the partial bins, with a row-by-row fill only for the
-        # rows truncated by the excitation threshold (i < r0) or clipped at the top of the
-        # grid (i >= bandstop).
+        # constant-width band of one 1D vector.
         k = int(epsilon_trans_ev / self.deltaen)
         frac = epsilon_trans_ev / self.deltaen - k
-        bandstop = max(npts - k, 0)  # rows from here on have their window clipped at the top of the grid
-        r0 = min(xsstartindex, bandstop)  # first row with an untruncated full-weight window
-        nrows = bandstop - r0
-        self._excitation_fill_rows(range(r0), vec, xsstartindex, k, frac)
-        # sfmatrix is C-contiguous (np.zeros), so element (i, i + d) sits at flat index
-        # i * (npts + 1) + d; copy=False makes reshape raise rather than silently write to a copy
-        flat = self.sfmatrix.reshape(-1, copy=False)
-        flatstart = r0 * (npts + 1)
-        if 0 < k < npts:
-            # rows of this view are the band segments sfmatrix[i, i:i+k] for i in [r0, bandstop)
-            band = flat[flatstart : flatstart + nrows * (npts + 1)].reshape(nrows, npts + 1)[:, :k]
-            band += np.lib.stride_tricks.sliding_window_view(vec[r0:], k)[:nrows]
-        fracdiag = flat[flatstart + k :: npts + 1][:nrows]  # elements sfmatrix[i, i + k]
-        fracdiag += vec[r0 + k : bandstop + k] * frac
-        self._excitation_fill_rows(range(bandstop, npts), vec, xsstartindex, k, frac)
+
+        if k < min(EXCITATION_BAND_ACCUM_MAX_ROWS, npts):
+            # sum this transition into the per-offset buffer instead of the matrix: element
+            # (i, i + d) takes vec[i + d], so buffer row d needs vec[j] over the columns
+            # j >= max(xsstartindex, d) at full weight for d < k, and vec[j] * frac on row k
+            # over j >= k (rows i >= npts - k have their window clipped at the top of the grid
+            # and every remaining bin at full width, which the column bound j <= npts - 1
+            # already encodes). Buffer cells accumulate transitions in the order they are
+            # added, so flushing gives the same entries as adding each band to the matrix
+            # directly would.
+            band = self._excitation_band
+            if band is None:
+                band = self._excitation_band = np.zeros((min(EXCITATION_BAND_ACCUM_MAX_ROWS, npts), npts))
+            self._excitation_band_nrows = max(self._excitation_band_nrows, k + 1)
+            band[: min(k, xsstartindex), xsstartindex:] += vec[xsstartindex:]
+            for d in range(min(k, xsstartindex), k):
+                band[d, d:] += vec[d:]
+            band[k, k:] += vec[k:] * frac
+        else:
+            # a band too wide for the buffer is written to the matrix directly: one windowed
+            # addition for the full-weight band and one matrix diagonal for the partial bins,
+            # with a row-by-row fill for the rows truncated by the excitation threshold
+            # (i < r0) or clipped at the top of the grid (i >= bandstop). Any buffered
+            # transitions must land first so that every matrix entry accumulates its
+            # transitions in the order they were added.
+            self._flush_excitation_band()
+            bandstop = max(npts - k, 0)
+            r0 = min(xsstartindex, bandstop)  # first row with an untruncated full-weight window
+            nrows = bandstop - r0
+            self._excitation_fill_rows(range(r0), vec, xsstartindex, k, frac)
+            # the matrix is C-contiguous (np.zeros), so element (i, i + d) sits at flat index
+            # i * (npts + 1) + d; copy=False makes reshape raise rather than silently write to a copy
+            flat = self._sfmatrix.reshape(-1, copy=False)
+            flatstart = r0 * (npts + 1)
+            if 0 < k < npts:
+                # rows of this view are the band segments sfmatrix[i, i:i+k] for i in [r0, bandstop)
+                band_view = flat[flatstart : flatstart + nrows * (npts + 1)].reshape(nrows, npts + 1)[:, :k]
+                band_view += np.lib.stride_tricks.sliding_window_view(vec[r0:], k)[:nrows]
+            fracdiag = flat[flatstart + k :: npts + 1][:nrows]  # elements sfmatrix[i, i + k]
+            fracdiag += vec[r0 + k : bandstop + k] * frac
+            self._excitation_fill_rows(range(bandstop, npts), vec, xsstartindex, k, frac)
 
     def _excitation_fill_rows(
         self, rows: range, vec: npt.NDArray[np.float64], xsstartindex: int, k: int, frac: float
     ) -> None:
-        # row-by-row fill for one excitation transition, for the rows the banded fast path in
+        # row-by-row fill for one excitation transition, for the rows the direct banded fill in
         # add_excitation cannot cover: rows truncated by the excitation threshold and rows
         # whose window is clipped at the top of the grid, where every remaining bin is full width
         npts = len(self.engrid)
         for i in rows:
             startindex = max(i, xsstartindex)
             if i + k < npts:
-                self.sfmatrix[i, startindex : i + k] += vec[startindex : i + k]
+                self._sfmatrix[i, startindex : i + k] += vec[startindex : i + k]
                 # the final bin [E_i + k * deltaen, E_i + epsilon_trans_ev] covers frac of a cell
-                self.sfmatrix[i, i + k] += vec[i + k] * frac
+                self._sfmatrix[i, i + k] += vec[i + k] * frac
             else:
-                self.sfmatrix[i, startindex:] += vec[startindex:]
+                self._sfmatrix[i, startindex:] += vec[startindex:]
 
     def add_ion_ltepopexcitation(
         self,
@@ -556,6 +609,7 @@ class SpencerFanoSolver:
         # non-decreasing epsilon_uppers.
         cut1 = 0  # end of the first integral's non-empty column range, clamped to jstart per row
         top_en_plus_deltaen = self.engrid[-1] + deltaen
+        sfmatrix = self.sfmatrix  # applies pending excitation contributions once, before the row loop
         for i, en in enumerate(self.engrid):
             # endash ranges from en to SF_EMAX, but skip over the zero-cross section points
             jstart = max(i, xsstartindex)
@@ -567,7 +621,7 @@ class SpencerFanoSolver:
             cut1 = max(cut1, jstart)
             while cut1 < npts and epsilon_lowers1[cut1 - i] <= epsilon_uppers[cut1]:
                 cut1 += 1
-            self.sfmatrix[i, jstart:cut1] += prefactors[jstart:cut1] * (
+            sfmatrix[i, jstart:cut1] += prefactors[jstart:cut1] * (
                 int_eps_uppers[jstart:cut1] - int_eps_lowers1[jstart - i : cut1 - i]
             )
 
@@ -581,7 +635,7 @@ class SpencerFanoSolver:
                 epsilon_lower2 = en + ionpot_ev
                 int_eps_lower2 = math.atan((epsilon_lower2 - ionpot_ev) / J)
                 jstart2 = max(secondintegralstartindex, int(np.searchsorted(epsilon_uppers, epsilon_lower2)))
-                self.sfmatrix[i, jstart2:] -= prefactors[jstart2:] * (int_eps_uppers[jstart2:] - int_eps_lower2)
+                sfmatrix[i, jstart2:] -= prefactors[jstart2:] * (int_eps_uppers[jstart2:] - int_eps_lower2)
 
     def add_ionisation(self, Z: int, ion_stage: int, n_ion: float) -> None:
         self._require_not_solved("add ionisation")
