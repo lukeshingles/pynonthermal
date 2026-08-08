@@ -530,3 +530,142 @@ def test_lossfunction_plasma_energy_guard() -> None:
     arr_loss = [pynonthermal.electronlossfunction(en_ev, 1e8) for en_ev in (1.0, 5.0, 14.0, 100.0, 3000.0)]
     assert all(loss > 0.0 for loss in arr_loss)
     assert all(b < a for a, b in itertools.pairwise(arr_loss))
+
+
+def _reference_excitation_fill(
+    sf: pynonthermal.SpencerFanoSolver,
+    levelnumberdensity: float,
+    xs_vec: npt.NDArray[np.float64],
+    epsilon_trans_ev: float,
+) -> npt.NDArray[np.float64]:
+    # the row-by-row construction of one transition's matrix contribution that predates the
+    # strided band fill, kept verbatim as the reference the fast path must reproduce exactly
+    engrid = sf.engrid
+    npts = len(engrid)
+    deltaen = sf.deltaen
+    contribution = np.zeros((npts, npts))
+    vec = levelnumberdensity * deltaen * xs_vec
+    xsstartindex = sf.get_energyindex_lteq(en_ev=epsilon_trans_ev)
+    stopindices = np.clip(np.floor((engrid + epsilon_trans_ev - engrid[0]) / deltaen).astype(np.int64), 0, npts - 1)
+    delta_en_actuals = np.minimum(engrid + epsilon_trans_ev - engrid[stopindices], deltaen)
+    for i in range(npts):
+        stopindex = stopindices[i]
+        startindex = max(i, xsstartindex)
+        contribution[i, startindex:stopindex] += vec[startindex:stopindex]
+        contribution[i, stopindex] += vec[stopindex] * delta_en_actuals[i] / deltaen
+    return contribution
+
+
+def test_excitation_band_fill_matches_rowwise() -> None:
+    # add_excitation writes each transition as one strided band plus a partial-bin diagonal
+    # (every row repeats the same vec[j] values over the overlap of its window with the next
+    # row's). The result must be bit-identical to the row-by-row fill, including the rows
+    # truncated by the excitation threshold and the rows clipped at the top of the grid.
+    npts = 157
+    emin, emax = 1.0, 300.0
+    deltaen = (emax - emin) / (npts - 1)
+    rng = np.random.default_rng(42)
+    epsilons = [
+        0.5 * deltaen,  # narrower than one grid cell: band width zero, partial bins only
+        5 * deltaen,  # an exact multiple of the grid spacing
+        13.3,  # a typical transition energy, not aligned with the grid
+        299.0,  # band nearly as wide as the whole grid
+        emax,  # at the top of the grid: every row's window is clipped
+    ]
+    for epsilon_trans_ev in epsilons:
+        with pynonthermal.SpencerFanoSolver(emin_ev=emin, emax_ev=emax, npts=npts) as sf:
+            # nonzero cross sections below threshold too: the caller is not required to zero them,
+            # and the partial-bin term is written for every row
+            xs_vec = rng.random(npts) * 1e-16
+            sf.add_excitation(8, 2, levelnumberdensity=1e5, xs_vec=xs_vec, epsilon_trans_ev=epsilon_trans_ev)
+            expected = _reference_excitation_fill(sf, 1e5, xs_vec, epsilon_trans_ev)
+            assert sf.sfmatrix.tobytes() == expected.tobytes(), f"mismatch for {epsilon_trans_ev=}"
+
+
+def _reference_ionisation_fill(
+    sf: pynonthermal.SpencerFanoSolver, n_ion: float, shell: dict[str, int | float]
+) -> npt.NDArray[np.float64]:
+    # the masked full-tail construction of one shell's matrix contribution that predates the
+    # forward-only cut pointers, kept verbatim as the reference the slice fill must reproduce
+    engrid = sf.engrid
+    npts = len(engrid)
+    deltaen = sf.deltaen
+    ionpot_ev = float(shell["ionpot_ev"])
+    J = pynonthermal.collion.get_J(int(shell["Z"]), int(shell["ion_stage"]), ionpot_ev)
+    ar_xs_array = pynonthermal.collion.get_arxs_array_shell(engrid, shell)
+    xsstartindex = 0 if ionpot_ev <= engrid[0] else sf.get_energyindex_gteq(en_ev=ionpot_ev)
+    atan_epsilon = np.arctan((engrid - ionpot_ev) / 2.0 / J)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        prefactors = np.divide(
+            n_ion * ar_xs_array * deltaen, atan_epsilon, out=np.zeros(npts), where=atan_epsilon != 0.0
+        )
+    epsilon_uppers = np.minimum((engrid + ionpot_ev) / 2, engrid)
+    int_eps_uppers = np.arctan((epsilon_uppers - ionpot_ev) / J)
+    epsilon_lowers1 = np.maximum(engrid - engrid[0], ionpot_ev)
+    int_eps_lowers1 = np.arctan((epsilon_lowers1 - ionpot_ev) / J)
+    contribution = np.zeros((npts, npts))
+    for i, en in enumerate(engrid):
+        jstart = max(i, xsstartindex)
+        contribution[i, jstart:] += np.where(
+            epsilon_lowers1[jstart - i : npts - i] <= epsilon_uppers[jstart:],
+            prefactors[jstart:] * (int_eps_uppers[jstart:] - int_eps_lowers1[jstart - i : npts - i]),
+            0.0,
+        )
+        if 2 * en + ionpot_ev < engrid[-1] + deltaen:
+            secondintegralstartindex = sf.get_energyindex_lteq(float(2 * en + ionpot_ev))
+            epsilon_lower2 = en + ionpot_ev
+            int_eps_lower2 = math.atan((epsilon_lower2 - ionpot_ev) / J)
+            contribution[i, secondintegralstartindex:] -= np.where(
+                epsilon_lower2 <= epsilon_uppers[secondintegralstartindex:],
+                prefactors[secondintegralstartindex:] * (int_eps_uppers[secondintegralstartindex:] - int_eps_lower2),
+                0.0,
+            )
+    return contribution
+
+
+def test_ionisation_fill_matches_masked_reference() -> None:
+    # _add_ionisation_shell writes only each row's non-empty integral range, located by
+    # forward-only cut pointers that evaluate the same comparisons the per-row np.where masks
+    # used. The resulting matrix must be bit-identical to the masked full-tail construction.
+    for emin, emax, npts, Z, ion_stage in [
+        (1.0, 300.0, 193, 8, 2),
+        (7.9, 16000.0, 217, 26, 2),  # emin well above 1 eV and a heavy ion with many shells
+        (1.0, 3000.0, 149, 2, 1),  # helium: J takes the Opal et al. 1971 special-case value
+    ]:
+        with pynonthermal.SpencerFanoSolver(emin_ev=emin, emax_ev=emax, npts=npts) as sf:
+            n_ion = 1e5
+            sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
+            expected = np.zeros((npts, npts))
+            # same shell rows in the same order as add_ionisation iterates them
+            shells = sf.dfcollion.filter((pl.col("Z") == Z) & (pl.col("ion_stage") == ion_stage)).to_dicts()
+            for shell in shells:
+                expected += _reference_ionisation_fill(sf, n_ion, shell)
+            assert sf.sfmatrix.tobytes() == expected.tobytes(), f"mismatch for {Z=} {ion_stage=}"
+
+
+def test_solve_upper_triangular_diag_add() -> None:
+    # solve() passes the free-electron loss function as a separate diagonal vector instead of
+    # copying the whole matrix to add it, so the diag_add path must reproduce the added-in-place
+    # result exactly
+    rng = np.random.default_rng(7)
+    n = 40
+    a = np.triu(rng.random((n, n))) + np.diag(np.full(n, 2.0))
+    b = rng.random(n)
+    d = rng.random(n)
+    expected = spencerfano.solve_upper_triangular(a + np.diag(d), b)
+    assert np.array_equal(spencerfano.solve_upper_triangular(a, b, diag_add=d), expected)
+
+    # the singularity check applies to the summed diagonal: a zero on the matrix diagonal is
+    # fine when diag_add makes the sum non-zero...
+    a_zerodiag = a.copy()
+    a_zerodiag[3, 3] = 0.0
+    assert np.isfinite(spencerfano.solve_upper_triangular(a_zerodiag, b, diag_add=d)).all()
+
+    # ...and a cancellation to exactly zero is singular
+    d_cancel = d.copy()
+    d_cancel[3] = -a[3, 3]
+    with pytest.raises(np.linalg.LinAlgError, match="singular"):
+        spencerfano.solve_upper_triangular(a, b, diag_add=d_cancel)
+
+    with pytest.raises(ValueError, match="finite"):
+        spencerfano.solve_upper_triangular(a, b, diag_add=np.array([math.nan] + [0.0] * (n - 1)))

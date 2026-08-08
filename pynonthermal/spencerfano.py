@@ -72,15 +72,27 @@ SUBSHELLNAMES = [
 ]
 
 
-def solve_upper_triangular(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-    """Solve a x = b for upper-triangular a by back-substitution."""
+def solve_upper_triangular(
+    a: npt.NDArray[np.float64],
+    b: npt.NDArray[np.float64],
+    diag_add: npt.NDArray[np.float64] | None = None,
+) -> npt.NDArray[np.float64]:
+    """Solve (a + diag(diag_add)) x = b for upper-triangular a by back-substitution.
+
+    diag_add lets a purely diagonal term (like the free-electron loss function) be applied
+    without copying a into a second npts x npts matrix just to modify its diagonal.
+    """
     # scipy.linalg.solve_triangular rejected these by default (check_finite and the LAPACK
     # singularity flag); without the checks, bad inputs would propagate nan/inf into the
     # solution silently instead of raising
     if not np.isfinite(a).all() or not np.isfinite(b).all():
         msg = "matrix and right-hand side must be finite (no nan or inf entries)"
         raise ValueError(msg)
-    if np.any(np.diagonal(a) == 0.0):
+    if diag_add is not None and not np.isfinite(diag_add).all():
+        msg = "diagonal addition must be finite (no nan or inf entries)"
+        raise ValueError(msg)
+    diag = np.diagonal(a) if diag_add is None else np.diagonal(a) + diag_add
+    if np.any(diag == 0.0):
         msg = "matrix is singular: zero on the diagonal"
         raise np.linalg.LinAlgError(msg)
     n = b.shape[0]
@@ -90,7 +102,7 @@ def solve_upper_triangular(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64
         # diagonal: a[i, i+1:] @ x[i+1:] is a dot product (@ is numpy matrix multiplication,
         # which for two 1-D vectors is their inner product) of the row's off-diagonal
         # coefficients with the already-solved higher-index part of x
-        x[i] = (b[i] - a[i, i + 1 :] @ x[i + 1 :]) / a[i, i]
+        x[i] = (b[i] - a[i, i + 1 :] @ x[i + 1 :]) / diag[i]
     return x
 
 
@@ -351,15 +363,59 @@ class SpencerFanoSolver:
         # grid (the excitation integral is truncated at the grid boundary)
         delta_en_actuals = np.minimum(self.engrid + epsilon_trans_ev - self.engrid[stopindices], self.deltaen)
 
-        for i in range(npts):
+        # the value written at (i, j) is vec[j], independent of the row: row i covers columns
+        # [max(i, xsstartindex), stopindex(i)) at full weight plus a partial final bin at
+        # stopindex(i), and on the uniform grid stopindex(i) = min(i + k, npts - 1). The whole
+        # contribution is therefore a constant-width band of one 1D vector, written here as a
+        # single strided-view addition (plus one strided diagonal for the partial bins) instead
+        # of npts row slices. Only the rows truncated by the excitation threshold (i < r0) or by
+        # the top of the grid (i > r1) need the row-by-row fill.
+        vec = vec_xs_excitation_levelnumberdensity_deltae
+        k = int(stopindices[0])
+        if np.array_equal(stopindices, np.minimum(np.arange(npts) + k, npts - 1)):
+            r1 = npts - 1 - k  # last row whose stop index is not clipped at the top of the grid
+            r0 = min(xsstartindex, r1 + 1)  # first row with an untruncated full-weight window
+            self._excitation_fill_rows(range(r0), vec, xsstartindex, stopindices, delta_en_actuals)
+            nrows = r1 - r0 + 1
+            itemsize = self.sfmatrix.itemsize
+            rowstride = (npts + 1) * itemsize  # one row down and one column right per band row
+            if nrows > 0:
+                if k > 0:
+                    # every element (r0 + r, r0 + r + d) for d < k is addressed exactly once, so the
+                    # in-place add on the strided view is safe; the vec windows may alias each other
+                    # (they are read-only inputs)
+                    band = np.lib.stride_tricks.as_strided(
+                        self.sfmatrix[r0:, r0:], shape=(nrows, k), strides=(rowstride, itemsize)
+                    )
+                    windows = np.lib.stride_tricks.as_strided(vec[r0:], shape=(nrows, k), strides=(itemsize, itemsize))
+                    band += windows
+                fracdiag = np.lib.stride_tricks.as_strided(
+                    self.sfmatrix[r0:, r0 + k :], shape=(nrows,), strides=(rowstride,)
+                )
+                fracdiag += vec[r0 + k : r1 + k + 1] * delta_en_actuals[r0 : r1 + 1] / self.deltaen
+            self._excitation_fill_rows(range(r1 + 1, npts), vec, xsstartindex, stopindices, delta_en_actuals)
+        else:
+            # float rounding in the stop indices broke the constant band width; fall back to the
+            # row-by-row fill, which makes no assumption about the band structure
+            self._excitation_fill_rows(range(npts), vec, xsstartindex, stopindices, delta_en_actuals)
+
+    def _excitation_fill_rows(
+        self,
+        rows: range,
+        vec: npt.NDArray[np.float64],
+        xsstartindex: int,
+        stopindices: npt.NDArray[np.int64],
+        delta_en_actuals: npt.NDArray[np.float64],
+    ) -> None:
+        # row-by-row reference fill for one excitation transition, used for the rows the banded
+        # fast path in add_excitation cannot cover (and by tests as the reference implementation)
+        for i in rows:
             stopindex = stopindices[i]
             startindex = max(i, xsstartindex)
-            self.sfmatrix[i, startindex:stopindex] += vec_xs_excitation_levelnumberdensity_deltae[startindex:stopindex]
+            self.sfmatrix[i, startindex:stopindex] += vec[startindex:stopindex]
 
             # do the last bit separately because we're not using the full deltaen interval
-            self.sfmatrix[i, stopindex] += (
-                vec_xs_excitation_levelnumberdensity_deltae[stopindex] * delta_en_actuals[i] / self.deltaen
-            )
+            self.sfmatrix[i, stopindex] += vec[stopindex] * delta_en_actuals[i] / self.deltaen
 
     def add_ion_ltepopexcitation(
         self,
@@ -501,10 +557,22 @@ class SpencerFanoSolver:
         epsilon_uppers = np.minimum((self.engrid + ionpot_ev) / 2, self.engrid)
         int_eps_uppers = np.arctan((epsilon_uppers - ionpot_ev) / J)
 
-        # for the resulting arrays, use index j - i corresponding to energy endash - en
+        # for the resulting arrays, use index j - i corresponding to energy endash - en.
+        # Every entry of this shell's contribution is prefactors[j] * (int_eps_uppers[j] -
+        # int_eps_lowers1[j - i]) minus the separable second-integral term, so the whole
+        # npts x npts contribution is determined by these 1D column and offset vectors.
         epsilon_lowers1 = np.maximum(self.engrid - self.engrid[0], ionpot_ev)
         int_eps_lowers1 = np.arctan((epsilon_lowers1 - ionpot_ev) / J)
 
+        # each integral is non-empty (epsilon_lower <= epsilon_upper) on a contiguous column
+        # range whose boundary can only move right as the row energy increases: epsilon_lowers1
+        # rises with j at the full grid spacing once past its ionpot_ev plateau while
+        # epsilon_uppers rises at half that, so they cross at most once per row, and raising en
+        # relaxes the first condition and tightens the second monotonically. The two forward-only
+        # pointers below evaluate the same comparisons the per-row masks used, but only at the
+        # boundaries, and the slice writes touch only the non-zero range of each row.
+        cut1 = xsstartindex  # end of the first integral's non-empty column range
+        jstart2 = 0  # start of the second integral's non-empty column range
         for i, en in enumerate(self.engrid):
             # endash ranges from en to SF_EMAX, but skip over the zero-cross section points
             jstart = max(i, xsstartindex)
@@ -513,11 +581,13 @@ class SpencerFanoSolver:
             # at each endash (columns j >= jstart), the integral in epsilon ranges from
             # epsilon_lower = max(endash - en, ionpot_ev)
             # epsilon_upper = min((endash + ionpot_ev) / 2, endash)]
-            self.sfmatrix[i, jstart:] += np.where(
-                epsilon_lowers1[jstart - i : npts - i] <= epsilon_uppers[jstart:],
-                prefactors[jstart:] * (int_eps_uppers[jstart:] - int_eps_lowers1[jstart - i : npts - i]),
-                0.0,
-            )
+            cut1 = max(cut1, jstart)
+            while cut1 < npts and epsilon_lowers1[cut1 - i] <= epsilon_uppers[cut1]:
+                cut1 += 1
+            if cut1 > jstart:
+                self.sfmatrix[i, jstart:cut1] += prefactors[jstart:cut1] * (
+                    int_eps_uppers[jstart:cut1] - int_eps_lowers1[jstart - i : cut1 - i]
+                )
 
             if 2 * en + ionpot_ev < self.engrid[-1] + deltaen:
                 secondintegralstartindex = self.get_energyindex_lteq(float(2 * en + ionpot_ev))
@@ -528,12 +598,11 @@ class SpencerFanoSolver:
                 # epsilon_upper = min((endash + ionpot_ev) / 2, endash)]
                 epsilon_lower2 = en + ionpot_ev
                 int_eps_lower2 = math.atan((epsilon_lower2 - ionpot_ev) / J)
-                self.sfmatrix[i, secondintegralstartindex:] -= np.where(
-                    epsilon_lower2 <= epsilon_uppers[secondintegralstartindex:],
-                    prefactors[secondintegralstartindex:]
-                    * (int_eps_uppers[secondintegralstartindex:] - int_eps_lower2),
-                    0.0,
-                )
+                jstart2 = max(jstart2, secondintegralstartindex)
+                while jstart2 < npts and epsilon_lower2 > epsilon_uppers[jstart2]:
+                    jstart2 += 1
+                if jstart2 < npts:
+                    self.sfmatrix[i, jstart2:] -= prefactors[jstart2:] * (int_eps_uppers[jstart2:] - int_eps_lower2)
 
     def add_ionisation(self, Z: int, ion_stage: int, n_ion: float) -> None:
         self._require_not_solved("add ionisation")
@@ -647,16 +716,16 @@ class SpencerFanoSolver:
             print(f"       x_e: {x_e:.2e} [/cm3]        (electrons per nucleus)")
             print(f"deposition: {self.depositionratedensity_ev:7.2f}  [eV/s/cm3]")
 
-        sfmatrix_with_electronloss = self.sfmatrix.copy()
-        for i in range(npts):
-            sfmatrix_with_electronloss[i, i] += electronlossfunction(self.engrid[i], n_e)
+        # the free-electron loss term is diagonal-only, so it is passed to the solver as a 1D
+        # vector rather than copying the whole npts x npts matrix just to modify its diagonal
+        lossvec = np.array([electronlossfunction(self.engrid[i], n_e) for i in range(npts)])
 
         # every process moves electrons to lower energies, so y(E) depends only on y at higher
         # energies (Kozma & Fransson 1992): only matrix columns j >= i are populated and the
         # matrix is upper triangular. K&F invert it with an unspecified "standard matrix
         # technique"; back-substitution from the highest energy downward (the scheme K&F credit
         # to Xu 1989) exploits the triangularity and is much faster than a general LU solve.
-        yvec_reference = solve_upper_triangular(sfmatrix_with_electronloss, self.rhsvec)
+        yvec_reference = solve_upper_triangular(self.sfmatrix, self.rhsvec, diag_add=lossvec)
         self.yvec = np.array(yvec_reference * self.depositionratedensity_ev / self.E_init_ev, dtype=np.float64)
         self._solved = True
 
