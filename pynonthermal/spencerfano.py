@@ -314,6 +314,21 @@ class SpencerFanoSolver:
         transitionkey:
             any key to uniquely identify the transition so that the rate coefficient can be retrieved later
         """
+        vec, k, frac = self._store_excitation(Z, ion_stage, levelnumberdensity, xs_vec, epsilon_trans_ev, transitionkey)
+        self._add_excitation_band(vec, vec * frac, k)
+
+    def _store_excitation(
+        self,
+        Z: int,
+        ion_stage: int,
+        levelnumberdensity: float,
+        xs_vec: npt.NDArray[np.float64],
+        epsilon_trans_ev: float,
+        transitionkey: t.Any | None,
+    ) -> tuple[npt.NDArray[np.float64], int, float]:
+        # validate and record one transition, and describe its matrix band: the values vec[j]
+        # (zeroed below the threshold index, where no grid electron can drive the transition),
+        # the band width k in whole bins, and the weight frac of the partial final bin
         self._require_not_solved("add excitation")
         if len(xs_vec) != len(self.engrid):
             msg = f"xs_vec has {len(xs_vec)} points but engrid has {len(self.engrid)}"
@@ -354,50 +369,33 @@ class SpencerFanoSolver:
             epsilon_trans_ev,
         )
         vec = levelnumberdensity * self.deltaen * xs_vec  # cross section times level density times bin width
-        xsstartindex = self.get_energyindex_lteq(en_ev=epsilon_trans_ev)
-        npts = len(self.engrid)
-
-        # row i's integral runs over [E_i, E_i + epsilon_trans_ev]: k full-width bins and a
-        # partial final bin covering frac of a cell, truncated where the window leaves the top
-        # of the grid. The uniform grid makes k and frac the same for every row, and the value
-        # written at (i, j) is vec[j], independent of the row, so the whole contribution is a
-        # constant-width band of one 1D vector: one windowed addition for the full-weight band
-        # and one matrix diagonal for the partial bins, with a row-by-row fill only for the
-        # rows truncated by the excitation threshold (i < r0) or clipped at the top of the
-        # grid (i >= bandstop).
+        vec[: self.get_energyindex_lteq(en_ev=epsilon_trans_ev)] = 0.0
         k = int(epsilon_trans_ev / self.deltaen)
         frac = epsilon_trans_ev / self.deltaen - k
+        return vec, k, frac
+
+    def _add_excitation_band(self, vec: npt.NDArray[np.float64], fracvec: npt.NDArray[np.float64], k: int) -> None:
+        # add one excitation band to the matrix. Row i's integral runs over
+        # [E_i, E_i + epsilon_trans_ev]: k full-width bins taking vec[j] at columns
+        # j in [i, i + k), plus a partial final bin taking fracvec[i + k], truncated where the
+        # window leaves the top of the grid (every remaining bin then counts at full width).
+        # The uniform grid makes the band geometry the same for every row, so the whole
+        # contribution is one windowed addition plus one matrix diagonal, with a row loop only
+        # for the clipped rows. The band values add linearly, so vec and fracvec may also hold
+        # the pre-summed contributions of many transitions that share the same k.
+        npts = len(self.engrid)
         bandstop = max(npts - k, 0)  # rows from here on have their window clipped at the top of the grid
-        r0 = min(xsstartindex, bandstop)  # first row with an untruncated full-weight window
-        nrows = bandstop - r0
-        self._excitation_fill_rows(range(r0), vec, xsstartindex, k, frac)
         # sfmatrix is C-contiguous (np.zeros), so element (i, i + d) sits at flat index
         # i * (npts + 1) + d; copy=False makes reshape raise rather than silently write to a copy
         flat = self.sfmatrix.reshape(-1, copy=False)
-        flatstart = r0 * (npts + 1)
         if 0 < k < npts:
-            # rows of this view are the band segments sfmatrix[i, i:i+k] for i in [r0, bandstop)
-            band = flat[flatstart : flatstart + nrows * (npts + 1)].reshape(nrows, npts + 1)[:, :k]
-            band += np.lib.stride_tricks.sliding_window_view(vec[r0:], k)[:nrows]
-        fracdiag = flat[flatstart + k :: npts + 1][:nrows]  # elements sfmatrix[i, i + k]
-        fracdiag += vec[r0 + k : bandstop + k] * frac
-        self._excitation_fill_rows(range(bandstop, npts), vec, xsstartindex, k, frac)
-
-    def _excitation_fill_rows(
-        self, rows: range, vec: npt.NDArray[np.float64], xsstartindex: int, k: int, frac: float
-    ) -> None:
-        # row-by-row fill for one excitation transition, for the rows the banded fast path in
-        # add_excitation cannot cover: rows truncated by the excitation threshold and rows
-        # whose window is clipped at the top of the grid, where every remaining bin is full width
-        npts = len(self.engrid)
-        for i in rows:
-            startindex = max(i, xsstartindex)
-            if i + k < npts:
-                self.sfmatrix[i, startindex : i + k] += vec[startindex : i + k]
-                # the final bin [E_i + k * deltaen, E_i + epsilon_trans_ev] covers frac of a cell
-                self.sfmatrix[i, i + k] += vec[i + k] * frac
-            else:
-                self.sfmatrix[i, startindex:] += vec[startindex:]
+            # rows of this view are the band segments sfmatrix[i, i:i+k] for i in [0, bandstop)
+            band = flat[: bandstop * (npts + 1)].reshape(bandstop, npts + 1)[:, :k]
+            band += np.lib.stride_tricks.sliding_window_view(vec, k)[:bandstop]
+        fracdiag = flat[k :: npts + 1][:bandstop]  # elements sfmatrix[i, i + k]
+        fracdiag += fracvec[k : bandstop + k]
+        for i in range(bandstop, npts):
+            self.sfmatrix[i, i:] += vec[i:]
 
     def add_ion_ltepopexcitation(
         self,
@@ -492,19 +490,32 @@ class SpencerFanoSolver:
                     f" {maxnlevelsupper})"
                 )
 
+            # writing a band sweeps a strip of the whole npts x npts matrix and dominates the
+            # cost of this method when done once per transition. Transitions with the same
+            # band width k share identical matrix geometry and their band values add
+            # linearly, so each distinct k is written once, with the vectors pre-summed.
+            groups: dict[int, tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]] = {}
+            npts = len(self.engrid)
             for transition in dftransitions.iter_rows(named=True):
-                epsilon_trans_ev = transition["epsilon_trans_ev"]
                 xs_vec = pynonthermal.excitation.get_xs_excitation_vector(
                     self.engrid, transition, use_collstrengths=use_collstrengths
                 )
-                self.add_excitation(
+                vec, k, frac = self._store_excitation(
                     Z,
                     ion_stage,
                     transition["lower_pop"],
                     xs_vec,
-                    epsilon_trans_ev,
+                    transition["epsilon_trans_ev"],
                     transitionkey=(transition["lower"], transition["upper"]),
                 )
+                if k not in groups:
+                    groups[k] = (np.zeros(npts), np.zeros(npts))
+                groupvec, groupfracvec = groups[k]
+                groupvec += vec
+                groupfracvec += vec * frac
+
+            for k, (groupvec, groupfracvec) in sorted(groups.items()):
+                self._add_excitation_band(groupvec, groupfracvec, k)
 
     def _add_ionisation_shell(self, n_ion: float, shell: dict[str, int | float]) -> None:
         # add the terms related to ionisation cross sections for one shell

@@ -627,6 +627,20 @@ def _reference_ionisation_fill(
     return contribution
 
 
+def test_ltepop_excitation_grouped_fill() -> None:
+    # add_ion_ltepopexcitation writes the matrix once per distinct band width, with the vectors
+    # of same-width transitions pre-summed. Rebuilding from the stored per-transition data must
+    # agree to within summation-order rounding.
+    npts = 400
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=npts) as sf:
+        sf.add_ion_ltepopexcitation(2, 1, n_ion=1.0, use_collstrengths=False)
+        assert len(sf.excitationlists[(2, 1)]) > 100  # the grouping must actually see many transitions
+        expected = np.zeros((npts, npts))
+        for levelnumberdensity, xs_vec, epsilon_trans_ev in sf.excitationlists[(2, 1)].values():
+            expected += _reference_excitation_fill(sf, levelnumberdensity, xs_vec, epsilon_trans_ev)
+        assert np.allclose(sf.sfmatrix, expected, rtol=1e-12, atol=0.0)
+
+
 def test_ionisation_fill_matches_masked_reference() -> None:
     # _add_ionisation_shell writes only each row's non-empty integral range, located by
     # forward-only cut pointers that evaluate the same comparisons the per-row np.where masks
