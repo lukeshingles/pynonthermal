@@ -74,6 +74,15 @@ SUBSHELLNAMES = [
 
 def solve_upper_triangular(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     """Solve a x = b for upper-triangular a by back-substitution."""
+    # scipy.linalg.solve_triangular rejected these by default (check_finite and the LAPACK
+    # singularity flag); without the checks, bad inputs would propagate nan/inf into the
+    # solution silently instead of raising
+    if not np.isfinite(a).all() or not np.isfinite(b).all():
+        msg = "matrix and right-hand side must be finite (no nan or inf entries)"
+        raise ValueError(msg)
+    if np.any(np.diagonal(a) == 0.0):
+        msg = "matrix is singular: zero on the diagonal"
+        raise np.linalg.LinAlgError(msg)
     n = b.shape[0]
     x = np.zeros(n, dtype=np.float64)
     for i in range(n - 1, -1, -1):
@@ -601,13 +610,15 @@ class SpencerFanoSolver:
         # every fraction and rate coefficient is divided by the deposition rate density. A zero gave a bare
         # ZeroDivisionError from inside the analysis, and a negative one silently flipped the sign of yvec
         # and of every rate coefficient while leaving the energy fractions summing to one.
-        if depositionratedensity_ev <= 0.0:
-            msg = f"depositionratedensity_ev must be greater than zero but is {depositionratedensity_ev}"
+        # the chained comparison (not a "<= 0.0" test) also rejects nan, whose comparisons are
+        # always False, and inf, which would scale yvec to inf without ever raising
+        if not 0.0 < depositionratedensity_ev < math.inf:
+            msg = f"depositionratedensity_ev must be greater than zero and finite but is {depositionratedensity_ev}"
             raise ValueError(msg)
 
         self.depositionratedensity_ev = depositionratedensity_ev
-        if override_n_e is not None and override_n_e <= 0.0:
-            msg = f"override_n_e must be greater than zero but is {override_n_e}"
+        if override_n_e is not None and not 0.0 < override_n_e < math.inf:
+            msg = f"override_n_e must be greater than zero and finite but is {override_n_e}"
             raise ValueError(msg)
 
         # None clears any previously-set override, so that n_e is calculated on demand from ion populations
