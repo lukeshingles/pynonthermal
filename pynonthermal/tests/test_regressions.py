@@ -596,7 +596,7 @@ def _reference_ionisation_fill(
     deltaen = sf.deltaen
     ionpot_ev = float(shell["ionpot_ev"])
     J = pynonthermal.collion.get_J(int(shell["Z"]), int(shell["ion_stage"]), ionpot_ev)
-    ar_xs_array = sf._get_shell_xs(shell)
+    ar_xs_array = sf._get_shell_xs(shell)  # pyright: ignore[reportPrivateUsage]
     xsstartindex = 0 if ionpot_ev <= engrid[0] else sf.get_energyindex_gteq(en_ev=ionpot_ev)
     atan_epsilon = np.arctan((engrid - ionpot_ev) / 2.0 / J)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -654,7 +654,7 @@ def test_ionisation_fill_matches_masked_reference() -> None:
             n_ion = 1e5
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
             expected = np.zeros((npts, npts))
-            for shell in sf._get_ion_collion_rows(Z, ion_stage):
+            for shell in sf._get_ion_collion_rows(Z, ion_stage):  # pyright: ignore[reportPrivateUsage]
                 expected += _reference_ionisation_fill(sf, n_ion, shell)
             assert sf.sfmatrix.tobytes() == expected.tobytes(), f"mismatch for {Z=} {ion_stage=}"
 

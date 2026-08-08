@@ -589,7 +589,7 @@ class SpencerFanoSolver:
                 # at each endash, the integral in epsilon ranges from
                 # epsilon_lower = en + ionpot_ev
                 # epsilon_upper = min((endash + ionpot_ev) / 2, endash)]
-                epsilon_lower2 = en + ionpot_ev
+                epsilon_lower2 = float(en + ionpot_ev)
                 int_eps_lower2 = math.atan((epsilon_lower2 - ionpot_ev) / J)
                 jstart2 = max(secondintegralstartindex, int(np.searchsorted(epsilon_uppers, epsilon_lower2)))
                 self.sfmatrix[i, jstart2:] -= prefactors[jstart2:] * (int_eps_uppers[jstart2:] - int_eps_lower2)
