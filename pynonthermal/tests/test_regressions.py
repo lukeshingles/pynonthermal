@@ -538,46 +538,45 @@ def _reference_excitation_fill(
     xs_vec: npt.NDArray[np.float64],
     epsilon_trans_ev: float,
 ) -> npt.NDArray[np.float64]:
-    # a standalone copy of the row-by-row fill (the production _excitation_fill_rows), kept
-    # independent so that a regression in the production helper or the banded fast path that
-    # calls it cannot hide here
+    # straightforward row-by-row construction of one transition's contribution: row i covers k
+    # full-width bins from max(i, threshold index) plus a partial final bin of weight frac,
+    # truncated at the top of the grid where every remaining bin is full width. Kept independent
+    # of the production code so that a regression in the banded fill cannot hide here.
     engrid = sf.engrid
     npts = len(engrid)
     deltaen = sf.deltaen
     contribution = np.zeros((npts, npts))
     vec = levelnumberdensity * deltaen * xs_vec
     xsstartindex = sf.get_energyindex_lteq(en_ev=epsilon_trans_ev)
-    stopindices = np.array([sf.get_energyindex_lteq(float(en + epsilon_trans_ev)) for en in engrid])
-    delta_en_actuals = np.minimum(engrid + epsilon_trans_ev - engrid[stopindices], deltaen)
+    k = int(epsilon_trans_ev / deltaen)
+    frac = epsilon_trans_ev / deltaen - k
     for i in range(npts):
-        stopindex = stopindices[i]
         startindex = max(i, xsstartindex)
-        contribution[i, startindex:stopindex] += vec[startindex:stopindex]
-        contribution[i, stopindex] += vec[stopindex] * delta_en_actuals[i] / deltaen
+        if i + k < npts:
+            contribution[i, startindex : i + k] += vec[startindex : i + k]
+            contribution[i, i + k] += vec[i + k] * frac
+        else:
+            contribution[i, startindex:] += vec[startindex:]
     return contribution
 
 
 def test_excitation_band_fill_matches_rowwise() -> None:
-    # add_excitation writes each transition as one strided band plus a partial-bin diagonal
+    # add_excitation writes each transition as one windowed band plus a partial-bin diagonal
     # (every row repeats the same vec[j] values over the overlap of its window with the next
     # row's). The result must be bit-identical to the row-by-row fill, including the rows
     # truncated by the excitation threshold and the rows clipped at the top of the grid.
-    npts = 157
-    emin, emax = 1.0, 300.0
     rng = np.random.default_rng(42)
-    # the grid spacing must come from the solver's np.linspace grid: recomputing it as
-    # (emax - emin) / (npts - 1) differs by one ulp, enough to change the band width by one
-    # for the grid-aligned cases below
-    with pynonthermal.SpencerFanoSolver(emin_ev=emin, emax_ev=emax, npts=npts) as sf_grid:
-        deltaen = sf_grid.deltaen
-    epsilons = [
-        0.5 * deltaen,  # narrower than one grid cell: band width zero, partial bins only
-        5 * deltaen,  # an exact multiple of the grid spacing
-        13.3,  # a typical transition energy, not aligned with the grid
-        299.0,  # band nearly as wide as the whole grid
-        emax,  # at the top of the grid: every row's window is clipped
+    npts = 157
+    deltaen = (300.0 - 1.0) / (npts - 1)  # approximate spacing, only used to place the cases below
+    cases = [
+        (1.0, 300.0, 0.5 * deltaen),  # narrower than one grid cell: band width zero, partial bins only
+        (1.0, 300.0, 5 * deltaen),  # within rounding of an exact multiple of the grid spacing
+        (1.0, 300.0, 13.3),  # a typical transition energy, not aligned with the grid
+        (1.0, 300.0, 299.0),  # band nearly as wide as the whole grid
+        (1.0, 300.0, 300.0),  # at the top of the grid: every row's window is clipped
+        (200.0, 300.0, 250.0),  # band wider than the whole grid: every row is clipped and truncated
     ]
-    for epsilon_trans_ev in epsilons:
+    for emin, emax, epsilon_trans_ev in cases:
         with pynonthermal.SpencerFanoSolver(emin_ev=emin, emax_ev=emax, npts=npts) as sf:
             # nonzero cross sections below threshold too: the caller is not required to zero them,
             # and the partial-bin term is written for every row

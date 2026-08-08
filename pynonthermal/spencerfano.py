@@ -357,60 +357,47 @@ class SpencerFanoSolver:
         xsstartindex = self.get_energyindex_lteq(en_ev=epsilon_trans_ev)
         npts = len(self.engrid)
 
-        # the uniform grid makes every row's stop index expressible in one vectorised operation
-        stopindices = np.clip(
-            np.floor((self.engrid + epsilon_trans_ev - self.engrid[0]) / self.deltaen).astype(np.int64), 0, npts - 1
-        )
-        # clamp to deltaen for rows where en + epsilon_trans_ev extends beyond the top of the
-        # grid (the excitation integral is truncated at the grid boundary)
-        delta_en_actuals = np.minimum(self.engrid + epsilon_trans_ev - self.engrid[stopindices], self.deltaen)
-
-        # the value written at (i, j) is vec[j], independent of the row: row i covers columns
-        # [max(i, xsstartindex), stopindex(i)) at full weight plus a partial final bin at
-        # stopindex(i), and on the uniform grid stopindex(i) = min(i + k, npts - 1). The whole
-        # contribution is therefore a constant-width band of one 1D vector, written below as one
-        # windowed addition (plus one matrix diagonal for the partial bins) instead of npts row
-        # slices. Only the rows truncated by the excitation threshold (i < r0) or clipped at the
-        # top of the grid (i >= bandstop) need the row-by-row fill.
-        k = int(stopindices[0])
-        if np.array_equal(stopindices, np.minimum(np.arange(npts) + k, npts - 1)):
-            bandstop = npts - k  # rows before this have their stop index unclipped at min(i + k, npts - 1) = i + k
-            r0 = min(xsstartindex, bandstop)  # first row with an untruncated full-weight window
-            nrows = bandstop - r0
-            self._excitation_fill_rows(range(r0), vec, xsstartindex, stopindices, delta_en_actuals)
-            # sfmatrix is C-contiguous (np.zeros), so element (i, i + d) sits at flat index
-            # i * (npts + 1) + d; copy=False makes reshape raise rather than silently write to a copy
-            flat = self.sfmatrix.reshape(-1, copy=False)
-            flatstart = r0 * (npts + 1)
-            if k > 0:
-                # rows of this view are the band segments sfmatrix[i, i:i+k] for i in [r0, bandstop)
-                band = flat[flatstart : flatstart + nrows * (npts + 1)].reshape(nrows, npts + 1)[:, :k]
-                band += np.lib.stride_tricks.sliding_window_view(vec[r0:], k)[:nrows]
-            fracdiag = flat[flatstart + k :: npts + 1][:nrows]  # elements sfmatrix[i, i + k]
-            fracdiag += vec[r0 + k : bandstop + k] * delta_en_actuals[r0:bandstop] / self.deltaen
-            self._excitation_fill_rows(range(bandstop, npts), vec, xsstartindex, stopindices, delta_en_actuals)
-        else:
-            # float rounding in the stop indices broke the constant band width; fall back to the
-            # row-by-row fill, which makes no assumption about the band structure
-            self._excitation_fill_rows(range(npts), vec, xsstartindex, stopindices, delta_en_actuals)
+        # row i's integral runs over [E_i, E_i + epsilon_trans_ev]: k full-width bins and a
+        # partial final bin covering frac of a cell, truncated where the window leaves the top
+        # of the grid. The uniform grid makes k and frac the same for every row, and the value
+        # written at (i, j) is vec[j], independent of the row, so the whole contribution is a
+        # constant-width band of one 1D vector: one windowed addition for the full-weight band
+        # and one matrix diagonal for the partial bins, with a row-by-row fill only for the
+        # rows truncated by the excitation threshold (i < r0) or clipped at the top of the
+        # grid (i >= bandstop).
+        k = int(epsilon_trans_ev / self.deltaen)
+        frac = epsilon_trans_ev / self.deltaen - k
+        bandstop = max(npts - k, 0)  # rows from here on have their window clipped at the top of the grid
+        r0 = min(xsstartindex, bandstop)  # first row with an untruncated full-weight window
+        nrows = bandstop - r0
+        self._excitation_fill_rows(range(r0), vec, xsstartindex, k, frac)
+        # sfmatrix is C-contiguous (np.zeros), so element (i, i + d) sits at flat index
+        # i * (npts + 1) + d; copy=False makes reshape raise rather than silently write to a copy
+        flat = self.sfmatrix.reshape(-1, copy=False)
+        flatstart = r0 * (npts + 1)
+        if 0 < k < npts:
+            # rows of this view are the band segments sfmatrix[i, i:i+k] for i in [r0, bandstop)
+            band = flat[flatstart : flatstart + nrows * (npts + 1)].reshape(nrows, npts + 1)[:, :k]
+            band += np.lib.stride_tricks.sliding_window_view(vec[r0:], k)[:nrows]
+        fracdiag = flat[flatstart + k :: npts + 1][:nrows]  # elements sfmatrix[i, i + k]
+        fracdiag += vec[r0 + k : bandstop + k] * frac
+        self._excitation_fill_rows(range(bandstop, npts), vec, xsstartindex, k, frac)
 
     def _excitation_fill_rows(
-        self,
-        rows: range,
-        vec: npt.NDArray[np.float64],
-        xsstartindex: int,
-        stopindices: npt.NDArray[np.int64],
-        delta_en_actuals: npt.NDArray[np.float64],
+        self, rows: range, vec: npt.NDArray[np.float64], xsstartindex: int, k: int, frac: float
     ) -> None:
-        # row-by-row fill for one excitation transition, used for the rows the banded fast path
-        # in add_excitation cannot cover and as its fallback
+        # row-by-row fill for one excitation transition, for the rows the banded fast path in
+        # add_excitation cannot cover: rows truncated by the excitation threshold and rows
+        # whose window is clipped at the top of the grid, where every remaining bin is full width
+        npts = len(self.engrid)
         for i in rows:
-            stopindex = stopindices[i]
             startindex = max(i, xsstartindex)
-            self.sfmatrix[i, startindex:stopindex] += vec[startindex:stopindex]
-
-            # do the last bit separately because we're not using the full deltaen interval
-            self.sfmatrix[i, stopindex] += vec[stopindex] * delta_en_actuals[i] / self.deltaen
+            if i + k < npts:
+                self.sfmatrix[i, startindex : i + k] += vec[startindex : i + k]
+                # the final bin [E_i + k * deltaen, E_i + epsilon_trans_ev] covers frac of a cell
+                self.sfmatrix[i, i + k] += vec[i + k] * frac
+            else:
+                self.sfmatrix[i, startindex:] += vec[startindex:]
 
     def add_ion_ltepopexcitation(
         self,
