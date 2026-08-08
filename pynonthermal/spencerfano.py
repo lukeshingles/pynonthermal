@@ -77,6 +77,10 @@ def solve_upper_triangular(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64
     n = b.shape[0]
     x = np.zeros(n, dtype=np.float64)
     for i in range(n - 1, -1, -1):
+        # move the known terms of row i's equation to the right-hand side and divide by the
+        # diagonal: a[i, i+1:] @ x[i+1:] is a dot product (@ is numpy matrix multiplication,
+        # which for two 1-D vectors is their inner product) of the row's off-diagonal
+        # coefficients with the already-solved higher-index part of x
         x[i] = (b[i] - a[i, i + 1 :] @ x[i + 1 :]) / a[i, i]
     return x
 
