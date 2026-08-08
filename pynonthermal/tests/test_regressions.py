@@ -538,15 +538,16 @@ def _reference_excitation_fill(
     xs_vec: npt.NDArray[np.float64],
     epsilon_trans_ev: float,
 ) -> npt.NDArray[np.float64]:
-    # the row-by-row construction of one transition's matrix contribution that predates the
-    # strided band fill, kept verbatim as the reference the fast path must reproduce exactly
+    # a standalone copy of the row-by-row fill (the production _excitation_fill_rows), kept
+    # independent so that a regression in the production helper or the banded fast path that
+    # calls it cannot hide here
     engrid = sf.engrid
     npts = len(engrid)
     deltaen = sf.deltaen
     contribution = np.zeros((npts, npts))
     vec = levelnumberdensity * deltaen * xs_vec
     xsstartindex = sf.get_energyindex_lteq(en_ev=epsilon_trans_ev)
-    stopindices = np.clip(np.floor((engrid + epsilon_trans_ev - engrid[0]) / deltaen).astype(np.int64), 0, npts - 1)
+    stopindices = np.array([sf.get_energyindex_lteq(float(en + epsilon_trans_ev)) for en in engrid])
     delta_en_actuals = np.minimum(engrid + epsilon_trans_ev - engrid[stopindices], deltaen)
     for i in range(npts):
         stopindex = stopindices[i]
@@ -563,8 +564,12 @@ def test_excitation_band_fill_matches_rowwise() -> None:
     # truncated by the excitation threshold and the rows clipped at the top of the grid.
     npts = 157
     emin, emax = 1.0, 300.0
-    deltaen = (emax - emin) / (npts - 1)
     rng = np.random.default_rng(42)
+    # the grid spacing must come from the solver's np.linspace grid: recomputing it as
+    # (emax - emin) / (npts - 1) differs by one ulp, enough to change the band width by one
+    # for the grid-aligned cases below
+    with pynonthermal.SpencerFanoSolver(emin_ev=emin, emax_ev=emax, npts=npts) as sf_grid:
+        deltaen = sf_grid.deltaen
     epsilons = [
         0.5 * deltaen,  # narrower than one grid cell: band width zero, partial bins only
         5 * deltaen,  # an exact multiple of the grid spacing
@@ -592,7 +597,7 @@ def _reference_ionisation_fill(
     deltaen = sf.deltaen
     ionpot_ev = float(shell["ionpot_ev"])
     J = pynonthermal.collion.get_J(int(shell["Z"]), int(shell["ion_stage"]), ionpot_ev)
-    ar_xs_array = pynonthermal.collion.get_arxs_array_shell(engrid, shell)
+    ar_xs_array = sf._get_shell_xs(shell)
     xsstartindex = 0 if ionpot_ev <= engrid[0] else sf.get_energyindex_gteq(en_ev=ionpot_ev)
     atan_epsilon = np.arctan((engrid - ionpot_ev) / 2.0 / J)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -636,9 +641,7 @@ def test_ionisation_fill_matches_masked_reference() -> None:
             n_ion = 1e5
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
             expected = np.zeros((npts, npts))
-            # same shell rows in the same order as add_ionisation iterates them
-            shells = sf.dfcollion.filter((pl.col("Z") == Z) & (pl.col("ion_stage") == ion_stage)).to_dicts()
-            for shell in shells:
+            for shell in sf._get_ion_collion_rows(Z, ion_stage):
                 expected += _reference_ionisation_fill(sf, n_ion, shell)
             assert sf.sfmatrix.tobytes() == expected.tobytes(), f"mismatch for {Z=} {ion_stage=}"
 

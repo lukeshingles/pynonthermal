@@ -91,7 +91,9 @@ def solve_upper_triangular(
     if diag_add is not None and not np.isfinite(diag_add).all():
         msg = "diagonal addition must be finite (no nan or inf entries)"
         raise ValueError(msg)
-    diag = np.diagonal(a) if diag_add is None else np.diagonal(a) + diag_add
+    diag = np.diagonal(a)
+    if diag_add is not None:
+        diag = diag + diag_add
     if np.any(diag == 0.0):
         msg = "matrix is singular: zero on the diagonal"
         raise np.linalg.LinAlgError(msg)
@@ -351,7 +353,7 @@ class SpencerFanoSolver:
             xs_vec,
             epsilon_trans_ev,
         )
-        vec_xs_excitation_levelnumberdensity_deltae = levelnumberdensity * self.deltaen * xs_vec
+        vec = levelnumberdensity * self.deltaen * xs_vec  # cross section times level density times bin width
         xsstartindex = self.get_energyindex_lteq(en_ev=epsilon_trans_ev)
         npts = len(self.engrid)
 
@@ -366,34 +368,27 @@ class SpencerFanoSolver:
         # the value written at (i, j) is vec[j], independent of the row: row i covers columns
         # [max(i, xsstartindex), stopindex(i)) at full weight plus a partial final bin at
         # stopindex(i), and on the uniform grid stopindex(i) = min(i + k, npts - 1). The whole
-        # contribution is therefore a constant-width band of one 1D vector, written here as a
-        # single strided-view addition (plus one strided diagonal for the partial bins) instead
-        # of npts row slices. Only the rows truncated by the excitation threshold (i < r0) or by
-        # the top of the grid (i > r1) need the row-by-row fill.
-        vec = vec_xs_excitation_levelnumberdensity_deltae
+        # contribution is therefore a constant-width band of one 1D vector, written below as one
+        # windowed addition (plus one matrix diagonal for the partial bins) instead of npts row
+        # slices. Only the rows truncated by the excitation threshold (i < r0) or clipped at the
+        # top of the grid (i >= bandstop) need the row-by-row fill.
         k = int(stopindices[0])
         if np.array_equal(stopindices, np.minimum(np.arange(npts) + k, npts - 1)):
-            r1 = npts - 1 - k  # last row whose stop index is not clipped at the top of the grid
-            r0 = min(xsstartindex, r1 + 1)  # first row with an untruncated full-weight window
+            bandstop = npts - k  # rows before this have their stop index unclipped at min(i + k, npts - 1) = i + k
+            r0 = min(xsstartindex, bandstop)  # first row with an untruncated full-weight window
+            nrows = bandstop - r0
             self._excitation_fill_rows(range(r0), vec, xsstartindex, stopindices, delta_en_actuals)
-            nrows = r1 - r0 + 1
-            itemsize = self.sfmatrix.itemsize
-            rowstride = (npts + 1) * itemsize  # one row down and one column right per band row
-            if nrows > 0:
-                if k > 0:
-                    # every element (r0 + r, r0 + r + d) for d < k is addressed exactly once, so the
-                    # in-place add on the strided view is safe; the vec windows may alias each other
-                    # (they are read-only inputs)
-                    band = np.lib.stride_tricks.as_strided(
-                        self.sfmatrix[r0:, r0:], shape=(nrows, k), strides=(rowstride, itemsize)
-                    )
-                    windows = np.lib.stride_tricks.as_strided(vec[r0:], shape=(nrows, k), strides=(itemsize, itemsize))
-                    band += windows
-                fracdiag = np.lib.stride_tricks.as_strided(
-                    self.sfmatrix[r0:, r0 + k :], shape=(nrows,), strides=(rowstride,)
-                )
-                fracdiag += vec[r0 + k : r1 + k + 1] * delta_en_actuals[r0 : r1 + 1] / self.deltaen
-            self._excitation_fill_rows(range(r1 + 1, npts), vec, xsstartindex, stopindices, delta_en_actuals)
+            # sfmatrix is C-contiguous (np.zeros), so element (i, i + d) sits at flat index
+            # i * (npts + 1) + d; copy=False makes reshape raise rather than silently write to a copy
+            flat = self.sfmatrix.reshape(-1, copy=False)
+            flatstart = r0 * (npts + 1)
+            if k > 0:
+                # rows of this view are the band segments sfmatrix[i, i:i+k] for i in [r0, bandstop)
+                band = flat[flatstart : flatstart + nrows * (npts + 1)].reshape(nrows, npts + 1)[:, :k]
+                band += np.lib.stride_tricks.sliding_window_view(vec[r0:], k)[:nrows]
+            fracdiag = flat[flatstart + k :: npts + 1][:nrows]  # elements sfmatrix[i, i + k]
+            fracdiag += vec[r0 + k : bandstop + k] * delta_en_actuals[r0:bandstop] / self.deltaen
+            self._excitation_fill_rows(range(bandstop, npts), vec, xsstartindex, stopindices, delta_en_actuals)
         else:
             # float rounding in the stop indices broke the constant band width; fall back to the
             # row-by-row fill, which makes no assumption about the band structure
@@ -407,8 +402,8 @@ class SpencerFanoSolver:
         stopindices: npt.NDArray[np.int64],
         delta_en_actuals: npt.NDArray[np.float64],
     ) -> None:
-        # row-by-row reference fill for one excitation transition, used for the rows the banded
-        # fast path in add_excitation cannot cover (and by tests as the reference implementation)
+        # row-by-row fill for one excitation transition, used for the rows the banded fast path
+        # in add_excitation cannot cover and as its fallback
         for i in rows:
             stopindex = stopindices[i]
             startindex = max(i, xsstartindex)
@@ -557,22 +552,23 @@ class SpencerFanoSolver:
         epsilon_uppers = np.minimum((self.engrid + ionpot_ev) / 2, self.engrid)
         int_eps_uppers = np.arctan((epsilon_uppers - ionpot_ev) / J)
 
-        # for the resulting arrays, use index j - i corresponding to energy endash - en.
-        # Every entry of this shell's contribution is prefactors[j] * (int_eps_uppers[j] -
-        # int_eps_lowers1[j - i]) minus the separable second-integral term, so the whole
-        # npts x npts contribution is determined by these 1D column and offset vectors.
+        # for the resulting arrays, use index j - i corresponding to energy endash - en, so each
+        # entry depends only on the column j and the offset j - i
         epsilon_lowers1 = np.maximum(self.engrid - self.engrid[0], ionpot_ev)
         int_eps_lowers1 = np.arctan((epsilon_lowers1 - ionpot_ev) / J)
 
         # each integral is non-empty (epsilon_lower <= epsilon_upper) on a contiguous column
-        # range whose boundary can only move right as the row energy increases: epsilon_lowers1
-        # rises with j at the full grid spacing once past its ionpot_ev plateau while
-        # epsilon_uppers rises at half that, so they cross at most once per row, and raising en
-        # relaxes the first condition and tightens the second monotonically. The two forward-only
-        # pointers below evaluate the same comparisons the per-row masks used, but only at the
-        # boundaries, and the slice writes touch only the non-zero range of each row.
-        cut1 = xsstartindex  # end of the first integral's non-empty column range
-        jstart2 = 0  # start of the second integral's non-empty column range
+        # range located below without evaluating per-row masks, so the slice writes touch only
+        # the non-zero part of each row. For the first integral: every written column has
+        # engrid[j] >= ionpot_ev, so the range is non-empty while epsilon_lowers1 sits on its
+        # ionpot_ev plateau, and past the plateau it rises with j at the full grid spacing
+        # against half that for epsilon_uppers, giving at most one non-empty-to-empty switch
+        # per row; raising en only moves that switch right, so a forward-only pointer tracks it
+        # with the same comparisons the mask would make. For the second integral the lower
+        # limit is constant along the row, so the range start is a searchsorted into the
+        # non-decreasing epsilon_uppers.
+        cut1 = 0  # end of the first integral's non-empty column range, clamped to jstart per row
+        top_en_plus_deltaen = self.engrid[-1] + deltaen
         for i, en in enumerate(self.engrid):
             # endash ranges from en to SF_EMAX, but skip over the zero-cross section points
             jstart = max(i, xsstartindex)
@@ -584,12 +580,11 @@ class SpencerFanoSolver:
             cut1 = max(cut1, jstart)
             while cut1 < npts and epsilon_lowers1[cut1 - i] <= epsilon_uppers[cut1]:
                 cut1 += 1
-            if cut1 > jstart:
-                self.sfmatrix[i, jstart:cut1] += prefactors[jstart:cut1] * (
-                    int_eps_uppers[jstart:cut1] - int_eps_lowers1[jstart - i : cut1 - i]
-                )
+            self.sfmatrix[i, jstart:cut1] += prefactors[jstart:cut1] * (
+                int_eps_uppers[jstart:cut1] - int_eps_lowers1[jstart - i : cut1 - i]
+            )
 
-            if 2 * en + ionpot_ev < self.engrid[-1] + deltaen:
+            if 2 * en + ionpot_ev < top_en_plus_deltaen:
                 secondintegralstartindex = self.get_energyindex_lteq(float(2 * en + ionpot_ev))
 
                 # endash ranges from 2 * en + ionpot_ev to SF_EMAX
@@ -598,11 +593,8 @@ class SpencerFanoSolver:
                 # epsilon_upper = min((endash + ionpot_ev) / 2, endash)]
                 epsilon_lower2 = en + ionpot_ev
                 int_eps_lower2 = math.atan((epsilon_lower2 - ionpot_ev) / J)
-                jstart2 = max(jstart2, secondintegralstartindex)
-                while jstart2 < npts and epsilon_lower2 > epsilon_uppers[jstart2]:
-                    jstart2 += 1
-                if jstart2 < npts:
-                    self.sfmatrix[i, jstart2:] -= prefactors[jstart2:] * (int_eps_uppers[jstart2:] - int_eps_lower2)
+                jstart2 = max(secondintegralstartindex, int(np.searchsorted(epsilon_uppers, epsilon_lower2)))
+                self.sfmatrix[i, jstart2:] -= prefactors[jstart2:] * (int_eps_uppers[jstart2:] - int_eps_lower2)
 
     def add_ionisation(self, Z: int, ion_stage: int, n_ion: float) -> None:
         self._require_not_solved("add ionisation")
@@ -694,7 +686,6 @@ class SpencerFanoSolver:
         self._n_e_override = override_n_e
         self._n_e = None
 
-        npts = len(self.engrid)
         n_e = self.get_n_e()
         if n_e <= 0.0:
             # without free electrons there is no thermal loss channel, so electrons below the lowest
@@ -718,7 +709,7 @@ class SpencerFanoSolver:
 
         # the free-electron loss term is diagonal-only, so it is passed to the solver as a 1D
         # vector rather than copying the whole npts x npts matrix just to modify its diagonal
-        lossvec = np.array([electronlossfunction(self.engrid[i], n_e) for i in range(npts)])
+        lossvec = np.array([electronlossfunction(en_ev, n_e) for en_ev in self.engrid])
 
         # every process moves electrons to lower energies, so y(E) depends only on y at higher
         # energies (Kozma & Fransson 1992): only matrix columns j >= i are populated and the

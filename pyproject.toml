@@ -173,6 +173,7 @@ unfixable = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+"pynonthermal/tests/*" = ["SLF001"] # tests may use private members to compare against production inputs
 
 [tool.ruff.lint.isort]
 force-single-line = true
