@@ -95,7 +95,7 @@ def get_Zbar(ions: Sequence[tuple[int, int]], ionpopdict: dict[tuple[int, int], 
     return Zbar
 
 
-def get_energyindex(en_ev: float, engrid: npt.NDArray[np.float64], round_up: bool) -> int:
+def _get_energyindex(en_ev: float, engrid: npt.NDArray[np.float64], round_up: bool) -> int:
     # index of the energy bin holding en_ev, clamped into the grid at both ends
     offset = (en_ev - float(engrid[0])) / (float(engrid[1]) - float(engrid[0]))
     index = math.ceil(offset) if round_up else math.floor(offset)
@@ -105,9 +105,9 @@ def get_energyindex(en_ev: float, engrid: npt.NDArray[np.float64], round_up: boo
 
 def get_energyindex_lteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
     """Get the index of the energy bin whose lower boundary is less than or equal to en_ev."""
-    return get_energyindex(en_ev, engrid, round_up=False)
+    return _get_energyindex(en_ev, engrid, round_up=False)
 
 
 def get_energyindex_gteq(en_ev: float, engrid: npt.NDArray[np.float64]) -> int:
     """Get the index of the energy bin whose lower boundary is greater than or equal to en_ev."""
-    return get_energyindex(en_ev, engrid, round_up=True)
+    return _get_energyindex(en_ev, engrid, round_up=True)

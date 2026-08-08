@@ -532,7 +532,7 @@ def test_lossfunction_plasma_energy_guard() -> None:
     assert all(b < a for a, b in itertools.pairwise(arr_loss))
 
 
-def reference_excitation_fill(
+def _reference_excitation_fill(
     sf: pynonthermal.SpencerFanoSolver,
     levelnumberdensity: float,
     xs_vec: npt.NDArray[np.float64],
@@ -582,11 +582,11 @@ def test_excitation_band_fill_matches_rowwise() -> None:
             # and the partial-bin term is written for every row
             xs_vec = rng.random(npts) * 1e-16
             sf.add_excitation(8, 2, levelnumberdensity=1e5, xs_vec=xs_vec, epsilon_trans_ev=epsilon_trans_ev)
-            expected = reference_excitation_fill(sf, 1e5, xs_vec, epsilon_trans_ev)
+            expected = _reference_excitation_fill(sf, 1e5, xs_vec, epsilon_trans_ev)
             assert sf.sfmatrix.tobytes() == expected.tobytes(), f"mismatch for {epsilon_trans_ev=}"
 
 
-def reference_ionisation_fill(
+def _reference_ionisation_fill(
     sf: pynonthermal.SpencerFanoSolver, n_ion: float, shell: dict[str, int | float]
 ) -> npt.NDArray[np.float64]:
     # the masked full-tail construction of one shell's matrix contribution that predates the
@@ -596,7 +596,7 @@ def reference_ionisation_fill(
     deltaen = sf.deltaen
     ionpot_ev = float(shell["ionpot_ev"])
     J = pynonthermal.collion.get_J(int(shell["Z"]), int(shell["ion_stage"]), ionpot_ev)
-    ar_xs_array = sf.get_shell_xs(shell)
+    ar_xs_array = sf._get_shell_xs(shell)
     xsstartindex = 0 if ionpot_ev <= engrid[0] else sf.get_energyindex_gteq(en_ev=ionpot_ev)
     atan_epsilon = np.arctan((engrid - ionpot_ev) / 2.0 / J)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -628,7 +628,7 @@ def reference_ionisation_fill(
 
 
 def test_ionisation_fill_matches_masked_reference() -> None:
-    # add_ionisation_shell writes only each row's non-empty integral range, located by
+    # _add_ionisation_shell writes only each row's non-empty integral range, located by
     # forward-only cut pointers that evaluate the same comparisons the per-row np.where masks
     # used. The resulting matrix must be bit-identical to the masked full-tail construction.
     for emin, emax, npts, Z, ion_stage in [
@@ -640,8 +640,8 @@ def test_ionisation_fill_matches_masked_reference() -> None:
             n_ion = 1e5
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
             expected = np.zeros((npts, npts))
-            for shell in sf.get_ion_collion_rows(Z, ion_stage):
-                expected += reference_ionisation_fill(sf, n_ion, shell)
+            for shell in sf._get_ion_collion_rows(Z, ion_stage):
+                expected += _reference_ionisation_fill(sf, n_ion, shell)
             assert sf.sfmatrix.tobytes() == expected.tobytes(), f"mismatch for {Z=} {ion_stage=}"
 
 
