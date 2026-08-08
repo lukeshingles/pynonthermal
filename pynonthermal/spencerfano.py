@@ -112,9 +112,9 @@ class SpencerFanoSolver:
 
     def __init__(
         self,
-        emin_ev: float = 1,
-        emax_ev: float = 3000,
-        npts: int = 4000,
+        emin_ev: float = 1.0,
+        emax_ev: float = 3000.0,
+        npts: int = 4096,
         verbose: bool = False,
         use_ar1985: bool = False,
     ) -> None:

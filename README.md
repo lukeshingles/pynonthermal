@@ -24,7 +24,7 @@ pynonthermal is a Spencer-Fano equation solver for non-thermal electron energy d
 ```python
 import pynonthermal
 
-sf = pynonthermal.SpencerFanoSolver(emin_ev=1.0, emax_ev=3000.0, npts=4000)
+sf = pynonthermal.SpencerFanoSolver(emin_ev=1.0, emax_ev=3000.0, npts=4096)
 
 # Add ions that can be non-thermally ionised.
 # Here: O II (ion_stage=2, i.e. charge +1) with number density in cm^-3.
