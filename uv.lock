@@ -952,7 +952,6 @@ dependencies = [
     { name = "matplotlib-inline" },
     { name = "numpy" },
     { name = "polars" },
-    { name = "scipy" },
 ]
 
 [package.dev-dependencies]
@@ -977,7 +976,6 @@ requires-dist = [
     { name = "matplotlib-inline", specifier = ">=0.2.1" },
     { name = "numpy", specifier = ">=2.4.4" },
     { name = "polars", specifier = ">=1.40.1" },
-    { name = "scipy", specifier = ">=1.17.1" },
 ]
 
 [package.metadata.requires-dev]

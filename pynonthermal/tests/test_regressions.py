@@ -83,6 +83,39 @@ def test_deposition_rate_validated() -> None:
         assert sf.get_ionisation_ratecoeff(8, 2) > 0.0
 
 
+def test_solve_inputs_reject_nonfinite() -> None:
+    # nan slipped past the old "<= 0.0" guards because nan comparisons are always False, and inf
+    # passed them outright; either then contaminated the solution without any exception being raised
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=300, npts=100) as sf:
+        sf.add_ionisation(8, 2, n_ion=1e8)
+        for badvalue in (math.nan, math.inf):
+            with pytest.raises(ValueError, match="depositionratedensity_ev must be greater than zero and finite"):
+                sf.solve(depositionratedensity_ev=badvalue)
+            with pytest.raises(ValueError, match="override_n_e must be greater than zero and finite"):
+                sf.solve(depositionratedensity_ev=1e8, override_n_e=badvalue)
+
+
+def test_solve_upper_triangular_guards() -> None:
+    # scipy.linalg.solve_triangular raised on non-finite entries and zero diagonals; the numpy
+    # back-substitution that replaced it must do the same rather than return nan/inf solutions
+    a = np.triu(np.ones((3, 3)))
+    b = np.ones(3)
+    assert np.allclose(spencerfano.solve_upper_triangular(a, b), [0.0, 0.0, 1.0])
+
+    a_nonfinite = a.copy()
+    a_nonfinite[0, 2] = math.nan
+    with pytest.raises(ValueError, match="finite"):
+        spencerfano.solve_upper_triangular(a_nonfinite, b)
+
+    with pytest.raises(ValueError, match="finite"):
+        spencerfano.solve_upper_triangular(a, np.array([1.0, math.inf, 1.0]))
+
+    a_singular = a.copy()
+    a_singular[1, 1] = 0.0
+    with pytest.raises(np.linalg.LinAlgError, match="singular"):
+        spencerfano.solve_upper_triangular(a_singular, b)
+
+
 def test_excitation_inputs_validated() -> None:
     npts = 100
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=300, npts=npts) as sf:

@@ -11,8 +11,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import polars as pl
-from scipy import integrate
-from scipy import linalg
 
 import pynonthermal
 from pynonthermal.axelrod import get_workfn_ev
@@ -72,6 +70,40 @@ SUBSHELLNAMES = [
     "P4",
     "Q1",
 ]
+
+
+def solve_upper_triangular(a: npt.NDArray[np.float64], b: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    """Solve a x = b for upper-triangular a by back-substitution."""
+    # scipy.linalg.solve_triangular rejected these by default (check_finite and the LAPACK
+    # singularity flag); without the checks, bad inputs would propagate nan/inf into the
+    # solution silently instead of raising
+    if not np.isfinite(a).all() or not np.isfinite(b).all():
+        msg = "matrix and right-hand side must be finite (no nan or inf entries)"
+        raise ValueError(msg)
+    if np.any(np.diagonal(a) == 0.0):
+        msg = "matrix is singular: zero on the diagonal"
+        raise np.linalg.LinAlgError(msg)
+    n = b.shape[0]
+    x = np.zeros(n, dtype=np.float64)
+    for i in range(n - 1, -1, -1):
+        # move the known terms of row i's equation to the right-hand side and divide by the
+        # diagonal: a[i, i+1:] @ x[i+1:] is a dot product (@ is numpy matrix multiplication,
+        # which for two 1-D vectors is their inner product) of the row's off-diagonal
+        # coefficients with the already-solved higher-index part of x
+        x[i] = (b[i] - a[i, i + 1 :] @ x[i + 1 :]) / a[i, i]
+    return x
+
+
+def integrate_simpson_uniform(y: npt.NDArray[np.float64], x: npt.NDArray[np.float64]) -> float:
+    """Composite Simpson's rule on a uniformly-spaced grid with an odd number of points."""
+    npts = x.shape[0]
+    assert npts >= 3
+    assert npts % 2 == 1
+    weights = np.full(npts, 2.0, dtype=np.float64)
+    weights[1::2] = 4.0
+    weights[0] = weights[-1] = 1.0
+    h = (x[-1] - x[0]) / (npts - 1)
+    return float(h / 3.0 * (weights @ y))
 
 
 class SpencerFanoSolver:
@@ -578,13 +610,15 @@ class SpencerFanoSolver:
         # every fraction and rate coefficient is divided by the deposition rate density. A zero gave a bare
         # ZeroDivisionError from inside the analysis, and a negative one silently flipped the sign of yvec
         # and of every rate coefficient while leaving the energy fractions summing to one.
-        if depositionratedensity_ev <= 0.0:
-            msg = f"depositionratedensity_ev must be greater than zero but is {depositionratedensity_ev}"
+        # the chained comparison (not a "<= 0.0" test) also rejects nan, whose comparisons are
+        # always False, and inf, which would scale yvec to inf without ever raising
+        if not 0.0 < depositionratedensity_ev < math.inf:
+            msg = f"depositionratedensity_ev must be greater than zero and finite but is {depositionratedensity_ev}"
             raise ValueError(msg)
 
         self.depositionratedensity_ev = depositionratedensity_ev
-        if override_n_e is not None and override_n_e <= 0.0:
-            msg = f"override_n_e must be greater than zero but is {override_n_e}"
+        if override_n_e is not None and not 0.0 < override_n_e < math.inf:
+            msg = f"override_n_e must be greater than zero and finite but is {override_n_e}"
             raise ValueError(msg)
 
         # None clears any previously-set override, so that n_e is calculated on demand from ion populations
@@ -617,13 +651,12 @@ class SpencerFanoSolver:
         for i in range(npts):
             sfmatrix_with_electronloss[i, i] += electronlossfunction(self.engrid[i], n_e)
 
-        # every process moves electrons to lower energies, so only matrix columns j >= i are
-        # populated and the matrix is upper triangular. Solving by back-substitution
-        # (as in Kozma & Fransson 1992) is much faster than a general LU decomposition.
-        yvec_reference = np.array(
-            linalg.solve_triangular(sfmatrix_with_electronloss, self.rhsvec, lower=False),
-            dtype=np.float64,
-        )
+        # every process moves electrons to lower energies, so y(E) depends only on y at higher
+        # energies (Kozma & Fransson 1992): only matrix columns j >= i are populated and the
+        # matrix is upper triangular. K&F invert it with an unspecified "standard matrix
+        # technique"; back-substitution from the highest energy downward (the scheme K&F credit
+        # to Xu 1989) exploits the triangularity and is much faster than a general LU solve.
+        yvec_reference = solve_upper_triangular(sfmatrix_with_electronloss, self.rhsvec)
         self.yvec = np.array(yvec_reference * self.depositionratedensity_ev / self.E_init_ev, dtype=np.float64)
         self._solved = True
 
@@ -813,8 +846,7 @@ class SpencerFanoSolver:
         # half a node too much at each end of the interval.
         arr_en = np.linspace(0.0, E_0, num=NPTS_SUB_E0_INTEGRAL, endpoint=True, dtype=np.float64)
         arr_en_N_e = np.array([en_ev * self.calculate_N_e(en_ev) for en_ev in arr_en], dtype=np.float64)
-        # cast because scipy.integrate.simpson is untyped, so its result is Any to the type checkers
-        integral_e_n_e = t.cast("float", integrate.simpson(arr_en_N_e, x=arr_en))
+        integral_e_n_e = integrate_simpson_uniform(arr_en_N_e, arr_en)
         frac_heating_N_e = integral_e_n_e / self.depositionratedensity_ev
 
         if self.verbose:
