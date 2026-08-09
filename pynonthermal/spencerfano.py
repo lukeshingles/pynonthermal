@@ -141,7 +141,8 @@ class SpencerFanoSolver:
     - the excitation term, for each transition the level population times the integral of
       y(E') sigma(E') dE' over E' in [E, E + epsilon_trans]: add_excitation() and
       add_ion_ltepopexcitation(), with cross sections from pynonthermal.excitation
-      (Li et al. 2012 equation 11 from a collision strength, or Mewe 1972 equation 4)
+      (Li et al. 2012 equation 11 from a collision strength, or the van Regemorter 1962
+      approximation with the Mewe 1972 g-bar factor)
     - the ionisation term, integrals of y(E') sigma_ic(E') P(E', epsilon - I) with the shell's
       total ionisation cross section sigma_ic (pynonthermal.collion) and the secondary-electron
       energy distribution P of KF92 equation 4: add_ionisation(), via _add_ionisation_shell()
