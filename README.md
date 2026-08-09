@@ -168,7 +168,7 @@ sf.plot_channels(xscalelog=True)  # energy going to each channel vs electron ene
 sf.plot_spec_channels("channels.pdf")  # both panels in one figure, saved to file
 ```
 
-Each method shows the figure interactively, or saves it when `outputfilename` is given; pass a Matplotlib `axis` to draw into an existing figure.
+Each method shows the figure interactively, or saves it when `outputfilename` is given; `plot_yspectrum()` and `plot_channels()` also accept a Matplotlib `axis` to draw into an existing figure.
 
 ## Complete example: pure-oxygen plasma
 

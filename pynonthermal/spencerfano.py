@@ -465,8 +465,9 @@ class SpencerFanoSolver:
             "transitions" frames. Once given, it is kept for later calls on this solver.
         use_collstrengths:
             compute cross sections from tabulated collision strengths where available (Li et al.
-            2012 equation 11); when False, or for permitted transitions without one, the oscillator
-            strength is used via the van Regemorter approximation
+            2012 equation 11). Permitted transitions without one (or all permitted transitions,
+            when False) instead use the oscillator strength via the van Regemorter approximation;
+            forbidden transitions outside the collision-strength path get a zero cross section
         maxnlevelslower, maxnlevelsupper:
             include only transitions whose lower level index is below maxnlevelslower and whose
             upper level index is below maxnlevelsupper; None disables that cutoff
@@ -1287,7 +1288,7 @@ class SpencerFanoSolver:
         """Plot the solved degradation spectrum y(E) against electron energy.
 
         en_y_on_d_en:
-            plot log d(E y)/dE instead of log y
+            plot log(E y(E)), the spectrum per unit log energy, instead of log y(E)
         xscalelog:
             use a logarithmic energy axis
         outputfilename:
@@ -1312,7 +1313,7 @@ class SpencerFanoSolver:
 
         if en_y_on_d_en:
             arr_y = np.log10(self.yvec * self.engrid)
-            ax.set_ylabel(r"log d(E y)/dE", fontsize=fs)
+            ax.set_ylabel(r"log(E y(E))", fontsize=fs)
         else:
             arr_y = np.log10(self.yvec)
             ax.set_ylabel(r"log y [y (e$^-$ / cm$^2$ / s / eV)]", fontsize=fs)
