@@ -16,7 +16,13 @@ from pynonthermal.constants import QE
 def get_xs_excitation_vector(
     engrid: npt.NDArray[np.float64], row: dict[str, t.Any], use_collstrengths: bool = True
 ) -> npt.NDArray[np.float64]:
-    """Get an array containing the excitation cross section in cm^2 at every energy in the array engrid (eV)."""
+    """Get an array containing the excitation cross section in cm^2 at every energy in the array engrid (eV).
+
+    This is the sigma of the excitation term in the degradation equation (Kozma & Fransson 1992
+    equation 7): computed from the transition's collision strength via Li et al. 2012 equation 11
+    when one is available, and otherwise from the oscillator strength of a permitted E1 transition
+    via the g-bar approximation of Mewe 1972 equation 4.
+    """
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
     npts = len(engrid)
     xs_excitation_vec = np.empty(npts)

@@ -27,8 +27,10 @@ def get_betasq(en_ev: npt.NDArray[np.float64] | float) -> npt.NDArray[np.float64
 
 
 def electronlossfunction(energy_ev: float, n_e_cgs: float) -> float:
-    # free-electron plasma loss rate (as in Kozma & Fransson 1992)
-    # - dE / dX [eV / cm]
+    # the loss function L(E) in the Spencer-Fano equation: the energy loss rate - dE / dX
+    # [eV / cm] of a non-thermal electron to the free thermal electrons, following Kozma &
+    # Fransson 1992: their equation 1 above 14 eV and equation 2 below it, with the plasma
+    # energy zeta_e of their equation 3 in the high-energy Coulomb logarithm
     # returns a positive number
 
     # return math.log(energy_ev) / energy_ev

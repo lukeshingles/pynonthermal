@@ -130,6 +130,10 @@ def get_sum_q_over_binding_energy(atomic_number: int, ion_stage: int, ionpot_ev:
 
 
 def get_workfn_ev(atomic_number: int, ion_stage: int, ionpot_ev: float, Zbar: float) -> float:
+    # the Axelrod 1980 high-energy-limit approximation to the work per ion pair W, an estimate
+    # of the effective ionisation potential without solving the Spencer-Fano equation:
+    # 1/W = sigma / L with both taken in their high-energy limits and losses to the free
+    # electrons neglected, which reduces to the shell-occupancy-over-binding-energy sum
     binding = get_sum_q_over_binding_energy(atomic_number, ion_stage, ionpot_ev)
     Aconst = 1.33e-14 * EV * EV
     oneoverW = Aconst * binding / Zbar / (2 * math.pi * pow(QE, 4))
