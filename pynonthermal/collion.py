@@ -13,8 +13,8 @@ from pynonthermal.constants import EV
 
 
 @lru_cache
-def get_nist_ionization_energies_ev() -> dict[tuple[int, int], float]:
-    """Get a dictionary where dictioniz[(atomic_number, ion_sage)] = ionization_energy_ev."""
+def get_nist_ionisation_energies_ev() -> dict[tuple[int, int], float]:
+    """Get a dictionary of ionisation_energy [eV] keyed by (atomic_number, ion_stage)."""
     dfnist = (
         pl.read_csv(
             Path(pynonthermal.DATADIR / "nist_ionization.txt.zst"),
@@ -23,15 +23,21 @@ def get_nist_ionization_energies_ev() -> dict[tuple[int, int], float]:
             columns=["At. num", "Ion Charge", "Ionization Energy (a) (eV)"],
             ignore_errors=True,
         )
-        .rename({"At. num": "Z", "Ionization Energy (a) (eV)": "ioniz_ev"})
+        .rename({"At. num": "Z", "Ionization Energy (a) (eV)": "ionisation_energy_ev"})
         .with_columns(ion_stage=pl.col("Ion Charge").cast(pl.Int64) + 1)
         .drop("Ion Charge")
         .drop_nulls()
     )
 
     return {
-        (atomic_number, ion_stage): ioniz_ev
-        for atomic_number, ion_stage, ioniz_ev in dfnist.select(["Z", "ion_stage", "ioniz_ev"]).iter_rows(named=False)
+        (atomic_number, ion_stage): ionisation_energy_ev
+        for atomic_number, ion_stage, ionisation_energy_ev in dfnist.select(
+            [
+                "Z",
+                "ion_stage",
+                "ionisation_energy_ev",
+            ]
+        ).iter_rows(named=False)
     }
 
 
@@ -56,7 +62,7 @@ def read_colliondata(collionfilename: str | Path = "collion.txt") -> pl.DataFram
         },
     )
 
-    nist_ionisation_energies_ev = get_nist_ionization_energies_ev()
+    nist_ionisation_energies_ev = get_nist_ionisation_energies_ev()
     elements_electron_binding = get_binding_energies()
     all_shells_q = get_shell_configs()
     covered_z_nelec = set(dfcollion.select(["Z", "nelec"]).iter_rows())

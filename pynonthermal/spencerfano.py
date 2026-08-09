@@ -590,7 +590,7 @@ class SpencerFanoSolver:
         # from becoming unphysical. This insight came from reading the
         # CMFGEN Fortran source code (Li, Dessart, Hillier 2012, doi:10.1111/j.1365-2966.2012.21198.x)
         # I had neglected this, so the limits of integration were incorrect. The fix didn't massively affect
-        # ionisation rates or spectra, but it was a source of error that let to energy fractions not adding up to 100%.
+        # ionisation rates or spectra, but it was a source of error that led to energy fractions not adding up to 100%.
 
         epsilon_uppers = np.minimum((self.engrid + ionpot_ev) / 2, self.engrid)
         int_eps_uppers = np.arctan((epsilon_uppers - ionpot_ev) / J)
@@ -620,7 +620,7 @@ class SpencerFanoSolver:
             # across en by the energy loss epsilon of an ionisation event.
             # at each endash (columns j >= jstart), the integral in epsilon ranges from
             # epsilon_lower = max(endash - en, ionpot_ev)
-            # epsilon_upper = min((endash + ionpot_ev) / 2, endash)]
+            # epsilon_upper = min((endash + ionpot_ev) / 2, endash)
             cut1 = max(cut1, jstart)
             while cut1 < npts and epsilon_lowers1[cut1 - i] <= epsilon_uppers[cut1]:
                 cut1 += 1
@@ -638,7 +638,7 @@ class SpencerFanoSolver:
                 # endash ranges from 2 * en + ionpot_ev to SF_EMAX
                 # at each endash, the integral in epsilon ranges from
                 # epsilon_lower = en + ionpot_ev
-                # epsilon_upper = min((endash + ionpot_ev) / 2, endash)]
+                # epsilon_upper = min((endash + ionpot_ev) / 2, endash)
                 epsilon_lower2 = float(en + ionpot_ev)
                 int_eps_lower2 = math.atan((epsilon_lower2 - ionpot_ev) / J)
                 jstart2 = max(secondintegralstartindex, int(np.searchsorted(epsilon_uppers, epsilon_lower2)))
@@ -688,7 +688,7 @@ class SpencerFanoSolver:
             self._add_ionisation_shell(n_ion, shell)
 
     def calculate_free_electron_density(self) -> float:
-        # number density of free electrons [cm-^3]
+        # number density of free electrons [cm^-3]
         n_e = 0.0
         for Z, ion_stage in self.ionpopdict:
             charge = ion_stage - 1
@@ -752,7 +752,7 @@ class SpencerFanoSolver:
             x_e = n_e / n_ion_tot
             print(f" n_ion_tot: {n_ion_tot:.2e} [/cm3]        (total ion density)")
             print(f"       n_e: {n_e:.2e} [/cm3]        (free electron density)")
-            print(f"       x_e: {x_e:.2e} [/cm3]        (electrons per nucleus)")
+            print(f"       x_e: {x_e:.2e}               (electrons per nucleus)")
             print(f"deposition: {self.depositionratedensity_ev:7.2f}  [eV/s/cm3]")
 
         # the free-electron loss term is diagonal-only, so it is passed to the solver as a 1D
