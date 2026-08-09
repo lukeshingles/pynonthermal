@@ -126,6 +126,9 @@ def Psecondary_vec(
 ) -> npt.NDArray[np.float64]:
     """Evaluate the secondary-electron energy distribution over arrays of e_p and/or e_s.
 
+    This is the Lorentzian distribution of Kozma & Fransson 1992 equation 4 (a fit by Opal,
+    Peterson & Beaty 1971 to their measurements), with the width parameter J from get_J().
+
     e_p is the primary electron energy [eV] and e_s the secondary electron energy [eV]. The two
     arguments broadcast against each other, so either may be a scalar. Psecondary() is the scalar form.
 
@@ -175,6 +178,11 @@ def get_J(Z: int, ion_stage: int, ionpot_ev: float) -> float:
 
 
 def get_arxs_array_shell(arr_enev: npt.NDArray[np.float64], shell: dict[str, int | float]) -> npt.NDArray[np.float64]:
+    # the shell's total impact-ionisation cross section in cm^2 at each energy [eV]: the
+    # sigma_ic of Kozma & Fransson 1992 (equations 5, 10, and 11 and the ionisation term of
+    # equation 7). Shells with fit data use the formula of Younger 1981 with the A-D
+    # coefficients of the Arnaud & Rothenflug 1985 compilation; shells marked n < 0 have no
+    # fit data and use the Lotz approximation instead.
     if shell["n"] < 0:
         return get_lotz_xs_ionisation_vec(shell, arr_en_ev=arr_enev)
 

@@ -20,7 +20,7 @@ from pynonthermal.base import get_Zbar
 from pynonthermal.constants import CLIGHT
 from pynonthermal.constants import K_B
 
-# Nodes for the sub-grids that resolve the parts of the Kozma & Fransson equation 6 integrals that the
+# Nodes for the sub-grids that resolve the parts of the Kozma & Fransson equation 11 integrals that the
 # solver's own energy grid cannot. Both integrands vary on the scale of J = 0.6 * ionpot_ev, so the node
 # count is set from the domain width in units of J, with a floor for the narrow domains that
 # calculate_frac_heating produces and a cap for the wide ones a direct calculate_N_e call can ask for.
@@ -28,8 +28,9 @@ NPTS_SUBGRID_MIN: int = 65
 NPTS_SUBGRID_MAX: int = 1025
 NPTS_SUBGRID_PER_J: int = 32
 
-# how many whole grid cells above the lower limit of the second equation 6 integral get the sub-grid
-# treatment. The integrand is steepest at that limit and smooth a few J above it.
+# how many whole grid cells above the lower limit of equation 11's secondary-electron integral (the
+# one from 2E + I) get the sub-grid treatment. The integrand is steepest at that limit and smooth a
+# few J above it.
 NCELLS_SECOND_INTEGRAL_SUBGRID: int = 2
 
 # Number of nodes for the integral over E in [0, E_0] of Kozma & Fransson equation 8. This one is not
@@ -123,10 +124,37 @@ def integrate_simpson_uniform(y: npt.NDArray[np.float64], x: npt.NDArray[np.floa
 class SpencerFanoSolver:
     """Solve the Spencer-Fano equation for non-thermal heating, ionisation, and excitation.
 
-    The Spencer-Fano equation is a differential equation that describes the energy deposition
-    of non-thermal electrons in a plasma. The solution of the Spencer-Fano equation gives the
-    energy density of the non-thermal electrons as a function of energy. The energy density
-    can be used to calculate the heating rate, ionisation rate, and excitation rate of the plasma.
+    The Spencer-Fano equation describes the energy distribution y(E) of non-thermal electrons
+    in a plasma as they degrade from a high-energy source (such as radioactive-decay products)
+    by heating the free thermal electrons and by ionising and exciting ions. It is the form of
+    the Boltzmann equation first written down for electron slowing-down by Spencer & Fano
+    (1954, Phys. Rev., 93, 1172). This solver follows the supernova application of Kozma &
+    Fransson (1992, ApJ 390, 602; KF92 below) as implemented in ARTIS (Shingles et al. 2020):
+    the integral form of the degradation equation (KF92 equation 7; also equation 2 of Li,
+    Dessart & Hillier 2012) is discretised on a uniform energy grid as an upper-triangular
+    matrix equation for y at each grid energy.
+
+    Each part of KF92 equation 7 maps onto the code as follows:
+
+    - the thermal-electron loss term y(E) L(E): electronlossfunction() in pynonthermal.base
+      (KF92 equations 1 and 2), applied along the matrix diagonal in solve()
+    - the excitation term, for each transition the level population times the integral of
+      y(E') sigma(E') dE' over E' in [E, E + epsilon_trans]: add_excitation() and
+      add_ion_ltepopexcitation(), with cross sections from pynonthermal.excitation
+      (Li et al. 2012 equation 11 from a collision strength, or Mewe 1972 equation 4)
+    - the ionisation term, integrals of y(E') sigma_ic(E') P(E', epsilon - I) with the shell's
+      total ionisation cross section sigma_ic (pynonthermal.collion) and the secondary-electron
+      energy distribution P of KF92 equation 4: add_ionisation(), via _add_ionisation_shell()
+    - the right-hand side, the integral of the source function from E to E_max: rhsvec,
+      built in __init__ for a source spread over the top of the energy grid
+
+    After solve(), the KF92 deposition fractions and rate coefficients are available:
+    the heating fraction (KF92 equation 8) from get_frac_heating(), the excitation channels
+    (KF92 equation 9) from get_frac_excitation_tot() and get_excitation_ratecoeff(), and the
+    ionisation fractions (KF92 equation 10) through the effective ionisation potential
+    (KF92 equation 12, summed over shells in analyse_ntspectrum()) with rate coefficients
+    from get_ionisation_ratecoeff() (KF92 equation 13). calculate_N_e() evaluates N(E) of
+    KF92 equation 11, the rate at which electrons appear below the solved grid.
     """
 
     _solved: bool
@@ -210,7 +238,8 @@ class SpencerFanoSolver:
         source_emin = self.engrid[np.flatnonzero(sourcevec)[0]]
         source_emax = self.engrid[np.flatnonzero(sourcevec)[-1]]
 
-        # integral of the source from each energy to the top of the grid
+        # integral of the source from each energy to the top of the grid: the right-hand side
+        # of the integral form of the degradation equation (Kozma & Fransson 1992 equation 7)
         self.rhsvec = np.cumsum((sourcevec * self.deltaen)[::-1])[::-1]
 
         # E_init_ev is the deposition rate density that we assume when solving the SF equation.
@@ -304,6 +333,10 @@ class SpencerFanoSolver:
         transitionkey: t.Any | None = None,
     ) -> None:
         """Add a bound-bound non-thermal collisional excitation to the solver.
+
+        The transition contributes its part of the excitation term of the degradation equation
+        (Kozma & Fransson 1992 equation 7) to the matrix: the level population times the
+        integral of y(E') sigma(E') dE' over E' in [E, E + epsilon_trans] for each energy E.
 
         levelnumberdensity:
             the level population density in cm^-3
@@ -524,7 +557,12 @@ class SpencerFanoSolver:
                     self._add_excitation_band(groupvec, groupfracvec, k)
 
     def _add_ionisation_shell(self, n_ion: float, shell: dict[str, int | float]) -> None:
-        # add the terms related to ionisation cross sections for one shell
+        # add one shell's contribution to the ionisation term of the degradation equation
+        # (Kozma & Fransson 1992 equation 7): integrals of y(E') sigma_ic(E') P(E', epsilon - I),
+        # using their equation 5 factorisation of the differential cross section into the shell's
+        # total cross section sigma_ic (from _get_shell_xs) times the secondary-electron energy
+        # distribution P of KF92 equation 4, whose integrals over epsilon are taken analytically
+        # via the arctan antiderivative below
         self._require_not_solved("add ionisation")
         deltaen = self.deltaen
         ionpot_ev = float(shell["ionpot_ev"])
@@ -577,7 +615,8 @@ class SpencerFanoSolver:
             # endash ranges from en to SF_EMAX, but skip over the zero-cross section points
             jstart = max(i, xsstartindex)
 
-            # KF 92 limit
+            # first integral of the KF92 equation 7 ionisation term: primaries at endash carried
+            # across en by the energy loss epsilon of an ionisation event.
             # at each endash (columns j >= jstart), the integral in epsilon ranges from
             # epsilon_lower = max(endash - en, ionpot_ev)
             # epsilon_upper = min((endash + ionpot_ev) / 2, endash)]
@@ -591,6 +630,10 @@ class SpencerFanoSolver:
             if 2 * en + ionpot_ev < top_en_plus_deltaen:
                 secondintegralstartindex = self.get_energyindex_lteq(float(2 * en + ionpot_ev))
 
+                # second integral of the KF92 equation 7 ionisation term, subtracted: an
+                # ionisation by a primary above 2 * en + ionpot_ev leaves the secondary with
+                # more energy than en, adding to the electrons that cross en like an extra
+                # source above it.
                 # endash ranges from 2 * en + ionpot_ev to SF_EMAX
                 # at each endash, the integral in epsilon ranges from
                 # epsilon_lower = en + ionpot_ev
@@ -715,11 +758,14 @@ class SpencerFanoSolver:
         # vector rather than copying the whole npts x npts matrix just to modify its diagonal
         lossvec = np.array([electronlossfunction(en_ev, n_e) for en_ev in self.engrid])
 
-        # every process moves electrons to lower energies, so y(E) depends only on y at higher
-        # energies (Kozma & Fransson 1992): only matrix columns j >= i are populated and the
-        # matrix is upper triangular. K&F invert it with an unspecified "standard matrix
-        # technique"; back-substitution from the highest energy downward (the scheme K&F credit
-        # to Xu 1989) exploits the triangularity and is much faster than a general LU solve.
+        # each matrix row is the integral form of the degradation equation (Kozma & Fransson
+        # 1992 equation 7; equation 2 of Li et al. 2012) at one grid energy, with rhsvec
+        # holding the integrated source term. Every process moves electrons to lower energies,
+        # so y(E) depends only on y at higher energies (Kozma & Fransson 1992): only matrix
+        # columns j >= i are populated and the matrix is upper triangular. K&F invert it with
+        # an unspecified "standard matrix technique"; back-substitution from the highest energy
+        # downward (the scheme K&F credit to Xu 1989) exploits the triangularity and is much
+        # faster than a general LU solve.
         yvec_reference = solve_upper_triangular(self.sfmatrix, self.rhsvec, diag_add=lossvec)
         self.yvec = np.array(yvec_reference * self.depositionratedensity_ev / self.E_init_ev, dtype=np.float64)
         self._solved = True
@@ -770,8 +816,12 @@ class SpencerFanoSolver:
         return float(np.trapezoid(arr_y * arr_xs * arr_psecondary, arr_e_p))
 
     def calculate_N_e(self, energy_ev: float) -> float:
-        # Kozma & Fransson equation 6.
-        # Something related to a number of electrons, needed to calculate the heating fraction in equation 3
+        # N(E) of Kozma & Fransson 1992 equation 11: the rate at which electrons appear at an
+        # energy E below the solved grid. Its three terms are electrons that excited an ion
+        # from E + epsilon_trans, primaries degraded by an ionisation energy loss (with the
+        # equation's lambda limit computed as enlambda below), and the secondaries of
+        # ionisations by primaries above 2E + I. calculate_frac_heating() integrates
+        # E * N(E) over [0, E_0] for the energy that thermalises below the grid.
         # not valid for energy > E_0
         if energy_ev == 0.0:
             return 0.0
@@ -885,7 +935,11 @@ class SpencerFanoSolver:
         return N_e
 
     def calculate_frac_heating(self) -> float:
-        # Kozma & Fransson equation 8
+        # fraction of the deposited energy that heats the free thermal electrons: Kozma &
+        # Fransson 1992 equation 8. Its three parts below are the loss-function integral over
+        # the solved grid, the boundary term E_0 y(E_0) L(E_0) for the electrons flowing
+        # through the bottom of the grid, and the energy of the electrons that first appear
+        # below E_0 (N(E) of KF92 equation 11), all divided by the deposition rate density.
         frac_heating = 0.0
         E_0 = self.engrid[0]
         n_e = self.get_n_e()
@@ -968,6 +1022,9 @@ class SpencerFanoSolver:
             for shell in collionrows:
                 ar_xs_array = self._get_shell_xs(shell)
 
+                # the shell's part of the ionisation fraction eta_ic of Kozma & Fransson 1992
+                # equation 10: n_ion * ionpot * the integral of y(E) sigma_ic(E) dE, divided
+                # by the deposition rate density
                 frac_ionisation_shell = (
                     n_ion
                     * shell["ionpot_ev"]
@@ -999,6 +1056,10 @@ class SpencerFanoSolver:
 
             self._frac_ionisation_tot += self._frac_ionisation_ion[(Z, ion_stage)]
 
+            # the ion's effective ionisation potential (Kozma & Fransson 1992 equation 12,
+            # modified to a sum over the ion's shells): the shell ionisation rates add, and
+            # each is inversely proportional to its potential, so the ion's rate follows from
+            # X_ion / eff_ionpot = eta_shell_a / ionpot_a + eta_shell_b / ionpot_b + ...
             eff_ionpot = float(X_ion / eta_over_ionpot_sum) if eta_over_ionpot_sum else float("inf")
             self._eff_ionpot[(Z, ion_stage)] = eff_ionpot
 
@@ -1025,6 +1086,9 @@ class SpencerFanoSolver:
             if self.verbose and frac_excitation_thision > 0.0:
                 print(f"     frac_excitation: {self._frac_excitation_ion[(Z, ion_stage)]:.4f}")
 
+            # ionisation rate coefficient from the effective potential (Kozma & Fransson 1992
+            # equation 13, with the deposition rate density per ion in place of their gamma-ray
+            # energy absorption rate 4 pi J_gamma sigma_gamma)
             self._nt_ionisation_ratecoeff[(Z, ion_stage)] = (
                 self.depositionratedensity_ev / n_ion_tot / eff_ionpot if n_ion_tot > 0.0 else 0.0
             )
@@ -1105,6 +1169,7 @@ class SpencerFanoSolver:
         return self._frac_ionisation_ion[(Z, ion_stage)]
 
     def get_eff_ionpot(self, Z: int, ion_stage: int) -> float:
+        """Get the ion's effective ionisation potential in eV (Kozma & Fransson 1992 equation 12)."""
         self._require_solved()
         if not self._analysed:
             self.analyse_ntspectrum()
@@ -1114,7 +1179,9 @@ class SpencerFanoSolver:
     def get_ionisation_ratecoeff(self, Z: int, ion_stage: int) -> float:
         """Get the non-thermal ionisation rate coefficient in s^-1 for one ion.
 
-        This scales with depositionratedensity_ev.
+        This is Kozma & Fransson 1992 equation 13 with the deposition rate density per ion in
+        place of their gamma-ray energy absorption rate, divided by the effective ionisation
+        potential. It scales with depositionratedensity_ev.
         """
         self._require_solved()
         if not self._analysed:
