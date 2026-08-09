@@ -21,7 +21,8 @@ def get_xs_excitation_vector(
     This is the sigma of the excitation term in the degradation equation (Kozma & Fransson 1992
     equation 7): computed from the transition's collision strength via Li et al. 2012 equation 11
     when one is available, and otherwise from the oscillator strength of a permitted E1 transition
-    via the g-bar approximation of Mewe 1972 equation 4.
+    via the van Regemorter 1962 approximation, with the g-bar factor from the first two terms of the
+    fitting formula in equation 5 of Mewe 1972 (see Shingles et al. 2020, section 2.5).
     """
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
     npts = len(engrid)
@@ -59,7 +60,8 @@ def get_xs_excitation_vector(
         B = 0.15
 
         prefactor = 45.585750051
-        # Eq 4 of Mewe 1972, possibly from Seaton 1962?
+        # van Regemorter (1962) approximation with the g_bar below from the first two terms of the
+        # fitting formula in equation 5 of Mewe (1972); see Shingles et al. (2020), section 2.5
         constantfactor = prefactor * A_naught_squared * pow(H_ionpot / epsilon_trans, 2) * fij
 
         U = engrid[startindex:] / epsilon_trans_ev
