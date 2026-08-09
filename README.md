@@ -139,21 +139,21 @@ The solution spectrum is stored as `sf.yvec` over `sf.engrid` (see [Method backg
 All getters require `solve()` to have been called first. Deposition fractions:
 
 ```python
-sf.get_frac_heating()                 # energy fraction to thermal electron heating
-sf.get_frac_ionisation_tot()          # energy fraction to ionisation (all ions)
-sf.get_frac_excitation_tot()          # energy fraction to excitation (all ions)
-sf.get_frac_sum()                     # sum of the above; ~1.0 if numerically accurate
-sf.get_frac_ionisation_ion(Z, ion_stage)   # one ion's share of the ionisation fraction
+sf.get_frac_heating()  # energy fraction to thermal electron heating
+sf.get_frac_ionisation_tot()  # energy fraction to ionisation (all ions)
+sf.get_frac_excitation_tot()  # energy fraction to excitation (all ions)
+sf.get_frac_sum()  # sum of the above; ~1.0 if numerically accurate
+sf.get_frac_ionisation_ion(Z, ion_stage)  # one ion's share of the ionisation fraction
 ```
 
 Rate coefficients and derived quantities:
 
 ```python
-sf.get_ionisation_ratecoeff(Z, ion_stage)      # non-thermal ionisation rate coefficient [s^-1]
+sf.get_ionisation_ratecoeff(Z, ion_stage)  # non-thermal ionisation rate coefficient [s^-1]
 sf.get_excitation_ratecoeff(Z, ion_stage, transitionkey)  # excitation rate coefficient [s^-1]
-sf.get_eff_ionpot(Z, ion_stage)      # effective ionisation potential [eV] (KF92 eq. 12)
-sf.get_n_e()                         # free (thermal) electron density [cm^-3]
-sf.get_n_e_nt()                      # non-thermal electron density [cm^-3]
+sf.get_eff_ionpot(Z, ion_stage)  # effective ionisation potential [eV] (KF92 eq. 12)
+sf.get_n_e()  # free (thermal) electron density [cm^-3]
+sf.get_n_e_nt()  # non-thermal electron density [cm^-3]
 ```
 
 Multiply `get_ionisation_ratecoeff()` by the ion's number density to get ionisations per second per cm^3, and `get_excitation_ratecoeff()` by the lower level's population density to get excitations per second per cm^3. For excitations added by `add_ion_ltepopexcitation()`, the `transitionkey` is the tuple `(lower_level_index, upper_level_index)`, e.g. `(0, 8)` for ground level to the eighth excited level.
@@ -163,9 +163,9 @@ Call `sf.analyse_ntspectrum()` (with `verbose=True` on the solver) to print a de
 ### 6. Plot the solution
 
 ```python
-sf.plot_yspectrum()                   # degradation spectrum y(E)
-sf.plot_channels(xscalelog=True)      # energy going to each channel vs electron energy
-sf.plot_spec_channels("channels.pdf") # both panels in one figure, saved to file
+sf.plot_yspectrum()  # degradation spectrum y(E)
+sf.plot_channels(xscalelog=True)  # energy going to each channel vs electron energy
+sf.plot_spec_channels("channels.pdf")  # both panels in one figure, saved to file
 ```
 
 Each method shows the figure interactively, or saves it when `outputfilename` is given; pass a Matplotlib `axis` to draw into an existing figure.
@@ -177,14 +177,14 @@ This reproduces Figure 2 of Kozma & Fransson (1992): a pure-oxygen plasma with e
 ```python
 import pynonthermal
 
-n_e = 1e8    # free electron density [cm^-3]
-x_e = 1e-2   # ionisation fraction n_OII / (n_OI + n_OII)
+n_e = 1e8  # free electron density [cm^-3]
+x_e = 1e-2  # ionisation fraction n_OII / (n_OI + n_OII)
 n_oxygen = n_e / x_e
 
 ions = [
     # (Z, ion_stage, number_density)
     (8, 1, n_oxygen * (1 - x_e)),  # O I
-    (8, 2, n_oxygen * x_e),        # O II
+    (8, 2, n_oxygen * x_e),  # O II
 ]
 
 sf = pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=4096, verbose=True)
