@@ -5,19 +5,52 @@
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/pynonthermal)](https://pypi.org/project/pynonthermal/)
 [![Build and test](https://github.com/lukeshingles/pynonthermal/actions/workflows/pytest.yml/badge.svg)](https://github.com/lukeshingles/pynonthermal/actions/workflows/pytest.yml)
 
-pynonthermal is a Spencer-Fano equation solver for non-thermal electron energy deposition in plasmas. It computes how deposited energy is partitioned into heating, ionisation, and excitation, and provides non-thermal ionisation and excitation rate coefficients.
+pynonthermal is a Python solver for the Spencer-Fano equation, which describes the energy distribution of non-thermal (fast) electrons slowing down in a plasma. When high-energy leptons — such as the Compton, photoelectric, and pair-production electrons and positrons produced by radioactive decay in supernova ejecta — are injected into a partially ionised gas, they lose energy through three competing channels: Coulomb heating of the free thermal electrons, collisional ionisation, and collisional excitation of bound states.
+
+Given a set of ions (with number densities) and an energy deposition rate, pynonthermal computes:
+
+- the **degradation spectrum** y(E) of the non-thermal electron population,
+- the **fraction of deposited energy** going to heating, ionisation, and excitation (per channel and per ion),
+- **non-thermal ionisation rate coefficients** for each ion and **excitation rate coefficients** for individual bound-bound transitions, ready to be used in non-LTE plasma modelling.
+
+These quantities are important, for example, in modelling the late-time spectra and light curves of Type Ia and core-collapse supernovae, where non-thermal ionisation can dominate over photoionisation. The solver follows the method of [Kozma & Fransson (1992)](https://ui.adsabs.harvard.edu/abs/1992ApJ...390..602K/abstract) (see [Method background](#method-background) for details and further references) and ships with the atomic data needed to run out of the box: ionisation cross sections for a wide range of ions, and level/transition data for bound-bound excitation.
 
 ## Contents
-- [Quick start](#quick-start)
 - [Installation](#installation)
-- [Usage](#usage)
+- [Quick start](#quick-start)
+- [Usage guide](#usage-guide)
+- [Complete example: pure-oxygen plasma](#complete-example-pure-oxygen-plasma)
 - [Units and conventions](#units-and-conventions)
-- [Example output](#example-output)
 - [Method background](#method-background)
 - [Cross-section datasets](#cross-section-datasets)
 - [Advanced usage: custom excitation cross sections](#advanced-usage-custom-excitation-cross-sections)
 - [Citing pynonthermal](#citing-pynonthermal)
 - [License](#license)
+
+## Installation
+
+Released package (recommended for most users):
+
+```sh
+pip install pynonthermal
+```
+
+Development install with [uv](https://docs.astral.sh/uv/):
+
+```sh
+git clone https://github.com/lukeshingles/pynonthermal.git
+cd pynonthermal
+uv sync --frozen
+source ./.venv/bin/activate
+uv pip install --editable .
+prek install
+```
+
+Run the test suite with:
+
+```sh
+uv run -- python3 -m pytest
+```
 
 ## Quick start
 
@@ -43,40 +76,132 @@ print("ionisation rate coeff [s^-1]:", sf.get_ionisation_ratecoeff(Z=8, ion_stag
 The [quickstart notebook](https://github.com/lukeshingles/pynonthermal/blob/main/quickstart.ipynb) contains a fuller worked example, and can be launched on Binder:
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/lukeshingles/pynonthermal/HEAD?filepath=quickstart.ipynb)
 
-## Installation
+## Usage guide
 
-Released package (recommended for most users):
+All ionisation and excitation channels must be added before calling `solve()`.
 
-```sh
-pip install pynonthermal
+### 1. Create the solver
+
+```python
+sf = pynonthermal.SpencerFanoSolver(emin_ev=1.0, emax_ev=3000.0, npts=4096, verbose=False)
 ```
 
-Development install with uv:
+- `emin_ev`, `emax_ev`: bounds of the uniform energy grid in eV. Electrons that degrade below `emin_ev` are assumed to have thermalised, and their energy is counted as heating.
+- `npts`: number of energy grid points. More points give better accuracy at the cost of memory and time; check `get_frac_sum()` after solving.
+- `verbose`: print details of the setup, each added channel, and a per-ion, per-shell breakdown during analysis.
+- `use_ar1985`: use the original Arnaud & Rothenflug (1985) ionisation cross sections (see [Cross-section datasets](#cross-section-datasets)).
 
-```sh
-git clone https://github.com/lukeshingles/pynonthermal.git
-cd pynonthermal
-uv sync --frozen
-source ./.venv/bin/activate
-uv pip install --editable .
-prek install
+The grid is available as `sf.engrid` (a NumPy array), which is needed if you supply [custom excitation cross sections](#advanced-usage-custom-excitation-cross-sections).
+
+### 2. Add ionisation channels
+
+```python
+sf.add_ionisation(Z=8, ion_stage=2, n_ion=1.0e8)
 ```
 
-Run the test suite with:
+Adds every ionisation shell of the ion to the equation, using the built-in cross-section data. `Z` is the atomic number, `ion_stage` is one more than the ion charge (so `ion_stage=1` is neutral), and `n_ion` is the ion number density in cm^-3.
 
-```sh
-uv run -- python3 -m pytest
+Each ion may be added once; an ion with `n_ion=0.0` is silently skipped. If any of the ion's shells has an ionisation potential below `emin_ev`, a `ValueError` explains which lower `emin_ev` to use.
+
+The free electron density is computed automatically from the charges and densities of the added ions (`sf.get_n_e()`). At least one ionised species (or an explicit `override_n_e` in `solve()`) is required.
+
+### 3. Add excitation channels (optional)
+
+For bound-bound excitation using the built-in atomic database (levels and transitions from the CMFGEN compilation), with LTE level populations at a chosen temperature:
+
+```python
+sf.add_ion_ltepopexcitation(Z=8, ion_stage=1, n_ion=1.0e10, temperature=6000)
 ```
 
-## Usage
+Optional parameters:
 
-Typical solver workflow:
+- `temperature`: excitation temperature in K for the LTE Boltzmann level populations (default 3000).
+- `maxnlevelslower`, `maxnlevelsupper`: only include transitions from the lowest `maxnlevelslower` levels up to the lowest `maxnlevelsupper` levels (defaults 5 and 250, matching ARTIS). Pass `None` to include all.
+- `use_collstrengths`: use tabulated collision strengths where available (default `True`); otherwise cross sections come from the oscillator strength via the van Regemorter approximation.
 
-1. Create `SpencerFanoSolver` with an energy grid (`emin_ev`, `emax_ev`, `npts`).
-2. Add ionisation channels with `add_ionisation(Z, ion_stage, n_ion)`.
-3. Optionally add excitation channels with `add_excitation(...)` or `add_ion_ltepopexcitation(...)`.
-4. Call `solve(depositionratedensity_ev=..., override_n_e=...)`.
-5. Query outputs such as `get_frac_heating()`, `get_frac_ionisation_tot()`, `get_frac_excitation_tot()`, `get_ionisation_ratecoeff(Z, ion_stage)`, and `get_excitation_ratecoeff(Z, ion_stage, transitionkey)`.
+Transitions with energies outside the energy grid are dropped. If the internal database has no data for the ion, a `ValueError` is raised — you can then either supply your own level/transition table via `adata_polars` or add [custom cross sections](#advanced-usage-custom-excitation-cross-sections) with `add_excitation()`.
+
+An ion added only for excitation still contributes its charge to the free electron density.
+
+### 4. Solve
+
+```python
+sf.solve(depositionratedensity_ev=1.0e8)
+```
+
+- `depositionratedensity_ev`: the rate of energy deposition per volume in eV s^-1 cm^-3 (must be positive and finite). The energy *fractions* are independent of this value; the *rate coefficients* scale linearly with it.
+- `override_n_e`: optionally override the free electron density (cm^-3) instead of deriving it from the ion populations.
+
+The solution spectrum is stored as `sf.yvec` over `sf.engrid` (see [Method background](#method-background) for the numerical scheme).
+
+### 5. Read the results
+
+All getters require `solve()` to have been called first. Deposition fractions:
+
+```python
+sf.get_frac_heating()                 # energy fraction to thermal electron heating
+sf.get_frac_ionisation_tot()          # energy fraction to ionisation (all ions)
+sf.get_frac_excitation_tot()          # energy fraction to excitation (all ions)
+sf.get_frac_sum()                     # sum of the above; ~1.0 if numerically accurate
+sf.get_frac_ionisation_ion(Z, ion_stage)   # one ion's share of the ionisation fraction
+```
+
+Rate coefficients and derived quantities:
+
+```python
+sf.get_ionisation_ratecoeff(Z, ion_stage)      # non-thermal ionisation rate coefficient [s^-1]
+sf.get_excitation_ratecoeff(Z, ion_stage, transitionkey)  # excitation rate coefficient [s^-1]
+sf.get_eff_ionpot(Z, ion_stage)      # effective ionisation potential [eV] (KF92 eq. 12)
+sf.get_n_e()                         # free (thermal) electron density [cm^-3]
+sf.get_n_e_nt()                      # non-thermal electron density [cm^-3]
+```
+
+Multiply `get_ionisation_ratecoeff()` by the ion's number density to get ionisations per second per cm^3, and `get_excitation_ratecoeff()` by the lower level's population density to get excitations per second per cm^3. For excitations added by `add_ion_ltepopexcitation()`, the `transitionkey` is the tuple `(lower_level_index, upper_level_index)`, e.g. `(0, 8)` for ground level to the eighth excited level.
+
+Call `sf.analyse_ntspectrum()` (with `verbose=True` on the solver) to print a detailed per-ion and per-shell breakdown.
+
+### 6. Plot the solution
+
+```python
+sf.plot_yspectrum()                   # degradation spectrum y(E)
+sf.plot_channels(xscalelog=True)      # energy going to each channel vs electron energy
+sf.plot_spec_channels("channels.pdf") # both panels in one figure, saved to file
+```
+
+Each method shows the figure interactively, or saves it when `outputfilename` is given; pass a Matplotlib `axis` to draw into an existing figure.
+
+## Complete example: pure-oxygen plasma
+
+This reproduces Figure 2 of Kozma & Fransson (1992): a pure-oxygen plasma with electron fraction x_e = 0.01, including both ionisation and excitation channels. With `verbose=True` the solver prints its setup and a per-ion, per-shell breakdown as it runs.
+
+```python
+import pynonthermal
+
+n_e = 1e8    # free electron density [cm^-3]
+x_e = 1e-2   # ionisation fraction n_OII / (n_OI + n_OII)
+n_oxygen = n_e / x_e
+
+ions = [
+    # (Z, ion_stage, number_density)
+    (8, 1, n_oxygen * (1 - x_e)),  # O I
+    (8, 2, n_oxygen * x_e),        # O II
+]
+
+sf = pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=4096, verbose=True)
+for Z, ion_stage, n_ion in ions:
+    sf.add_ionisation(Z, ion_stage, n_ion)
+    sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion, temperature=6000)
+
+# any positive deposition rate works here: the energy fractions are independent of it
+sf.solve(depositionratedensity_ev=2950.49 * n_oxygen)
+sf.analyse_ntspectrum()  # print the full breakdown
+
+sf.plot_channels(xscalelog=True)
+```
+
+The resulting plot shows the energy distribution of contributions to ionisation, excitation, and heating; the area under each curve gives the fraction of deposited energy in that channel:
+
+![Energy deposition channels for a pure oxygen plasma](https://raw.githubusercontent.com/lukeshingles/pynonthermal/main/docs/oxygen_channels.svg)
 
 ## Units and conventions
 
@@ -85,19 +210,9 @@ Typical solver workflow:
 - Cross sections are in cm^2.
 - `ion_stage = charge + 1` (for example, Fe I has `ion_stage=1`, Fe II has `ion_stage=2`).
 - `depositionratedensity_ev` in `solve()` is in eV s^-1 cm^-3.
-- `get_ionisation_ratecoeff()` and `get_excitation_ratecoeff()` both return rates in s^-1, and both scale linearly with `depositionratedensity_ev`.
-
-## Example output
-
-The following plot shows the energy distribution of contributions to ionisation, excitation, and heating for a pure oxygen plasma (electron fraction 0.01), reproducing Figure 2 of Kozma and Fransson (1992). The area under each curve gives the fraction of deposited energy in that channel.
-
-![Emission plot](https://raw.githubusercontent.com/lukeshingles/pynonthermal/main/docs/oxygen_channels.svg)
-
-This figure is generated from the same solver setup demonstrated in the quickstart workflow.
+- `get_ionisation_ratecoeff()` and `get_excitation_ratecoeff()` both return rates in s^-1.
 
 ## Method background
-
-When high-energy leptons (electrons and positrons) are injected into a plasma, they lose energy through ionisation, excitation, and Coulomb interactions with thermal electrons. Tracking these rates is important, for example, in late-time Type Ia supernova modelling.
 
 The numerical solver is similar to the Spencer-Fano implementation in the [ARTIS](https://github.com/artis-mcrt/artis) radiative transfer code ([Shingles et al. 2020](https://ui.adsabs.harvard.edu/abs/2020MNRAS.492.2029S/abstract)), itself an independent implementation of [Kozma and Fransson (1992, ApJ, 390, 602)](https://ui.adsabs.harvard.edu/abs/1992ApJ...390..602K/abstract), based on the electron slowing-down equation of [Spencer and Fano (1954, Phys. Rev., 93, 1172)](https://ui.adsabs.harvard.edu/abs/1954PhRv...93.1172S/abstract). A similar approach is used in [CMFGEN](https://kookaburra.phyast.pitt.edu/hillier/web/CMFGEN.htm).
 
@@ -106,7 +221,10 @@ The integral form of the Kozma and Fransson degradation equation (their equation
 If internal level/transition data are used (for example, via `add_ion_ltepopexcitation()`), they are imported from the CMFGEN atomic data compilation (see the source data files for references), with excitation cross sections computed from the tabulated collision strengths ([Li, Dessart and Hillier 2012, equation 11](https://doi.org/10.1111/j.1365-2966.2012.21198.x)) or, for permitted transitions without one, from the oscillator strength via the van Regemorter (1962) approximation with the g-bar factor of [Mewe (1972)](https://ui.adsabs.harvard.edu/abs/1972A%26A....20..215M/abstract), as described in [Shingles et al. (2020, section 2.5)](https://ui.adsabs.harvard.edu/abs/2020MNRAS.492.2029S/abstract).
 
 ## Cross-section datasets
+
 Ionization cross sections from H (Z=1) to Ni (Z=28) use the shell-resolved analytical fits compiled by [Arnaud and Rothenflug (1985, A&AS, 60, 425)](https://ui.adsabs.harvard.edu/abs/1985A%26AS...60..425A/abstract), with updates to Fe from [Arnaud and Raymond (1992, ApJ, 398, 394)](https://ui.adsabs.harvard.edu/abs/1992ApJ...398..394A/abstract). For heavier elements (Z>28) and any other ions missing from the fit data, the approximation of [Axelrod (1980, PhD thesis, Eq. 3.38)](https://ui.adsabs.harvard.edu/abs/1980PhDT.........1A/abstract) is used — the high-energy limit of the [Lotz (1967, Z. Phys., 206, 205)](https://doi.org/10.1007/BF01325928) formula with relativistic corrections — with subshell binding energies from [Lotz (1970, J. Opt. Soc. Am., 60, 206)](https://doi.org/10.1364/JOSA.60.000206).
+
+Passing `use_ar1985=True` to the solver selects the original Arnaud and Rothenflug (1985) compilation without the Fe updates, which can be useful for comparison with older published results.
 
 ## Advanced usage: custom excitation cross sections
 
@@ -128,12 +246,7 @@ Transitions below `emin_ev` are allowed here, but `add_ion_ltepopexcitation()` d
 Fransson (1992) take every electron below `emin_ev` to have thermalised, so that energy is accounted for
 as heating instead.
 
-Retrieve the non-thermal excitation rate coefficient [s^-1] with:
-
-```python
-nt_exc = sf.get_excitation_ratecoeff(Z, ion_stage, transitionkey)
-```
-
+Retrieve the rate coefficient afterwards with `get_excitation_ratecoeff()` as in [step 5](#5-read-the-results).
 
 ## Citing pynonthermal
 
