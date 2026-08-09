@@ -444,12 +444,33 @@ class SpencerFanoSolver:
     ) -> None:
         """Add bound-bound excitations of one ion, with LTE level populations at the given temperature.
 
+        Each added transition is keyed by (lower level index, upper level index), the key to pass to
+        get_excitation_ratecoeff() after solving.
+
         Transitions whose energy lies outside the solver's energy grid are dropped: above emax_ev no
         electron the solver represents can drive them, and below emin_ev Kozma & Fransson 1992 take every
         electron to have thermalised already, so their energy is accounted for as heating instead. Unlike
         the equivalent case in add_ionisation(), this cannot be raised as an error, because real ions have
         fine-structure transitions far below any usable emin_ev. Pass verbose=True to the solver to see how
         many transitions were dropped.
+
+        n_ion:
+            the ion number density in cm^-3
+        temperature:
+            the excitation temperature in K for the LTE Boltzmann level populations
+        adata_polars:
+            a levels/transitions table to use instead of the internal database (the CMFGEN-derived
+            ARTIS atomic data), in the format returned by artistools.atomic.get_levels() with
+            get_transitions=True: one row per ion with Z, ion_stage, and nested "levels" and
+            "transitions" frames. Once given, it is kept for later calls on this solver.
+        use_collstrengths:
+            compute cross sections from tabulated collision strengths where available (Li et al.
+            2012 equation 11). Permitted transitions without one (or all permitted transitions,
+            when False) instead use the oscillator strength via the van Regemorter approximation;
+            forbidden transitions outside the collision-strength path get a zero cross section
+        maxnlevelslower, maxnlevelsupper:
+            include only transitions whose lower level index is below maxnlevelslower and whose
+            upper level index is below maxnlevelsupper; None disables that cutoff
         """
         self._require_not_solved("add excitation")
         if adata_polars is not None:
@@ -467,7 +488,11 @@ class SpencerFanoSolver:
 
         ion = self.adata_polars.filter(pl.col("Z") == Z).filter(pl.col("ion_stage") == ion_stage)
         if ion.is_empty():
-            msg = f"No excitation data for Z={Z} ion_stage {ion_stage} in internal database."
+            msg = (
+                f"No excitation data for Z={Z} ion_stage {ion_stage} in internal database."
+                " Supply a custom level/transition table via adata_polars, or add cross"
+                " sections directly with add_excitation()."
+            )
             raise ValueError(msg)
 
         # register the population so that this ion counts towards n_e and n_ion_tot even when
@@ -645,6 +670,16 @@ class SpencerFanoSolver:
                 self.sfmatrix[i, jstart2:] -= prefactors[jstart2:] * (int_eps_uppers[jstart2:] - int_eps_lower2)
 
     def add_ionisation(self, Z: int, ion_stage: int, n_ion: float) -> None:
+        """Add collisional ionisation of one ion, contributing every shell with cross-section data.
+
+        The shells enter the ionisation term of the degradation equation (Kozma & Fransson 1992
+        equation 7). Each ion may be added only once; an ion with n_ion of exactly zero is skipped
+        without being registered. A ValueError is raised if any shell's ionisation potential lies
+        below the energy grid's emin_ev (the message gives the emin_ev to use instead).
+
+        n_ion:
+            the ion number density in cm^-3
+        """
         self._require_not_solved("add ionisation")
         if (Z, ion_stage) in self._ionisation_ions:
             msg = f"Can't add Z={Z} ion_stage {ion_stage} twice"
@@ -1196,6 +1231,9 @@ class SpencerFanoSolver:
 
         This is the integral of y(E) * sigma(E) dE in Kozma & Fransson equation 9, matching the
         convention of get_ionisation_ratecoeff(). It scales with depositionratedensity_ev.
+
+        transitionkey is the key given to add_excitation(); for transitions added by
+        add_ion_ltepopexcitation() it is (lower level index, upper level index).
         """
         self._require_solved()
         _levelnumberdensity, xsvec, _epsilon_trans_ev = self.excitationlists[(Z, ion_stage)][transitionkey]
@@ -1247,6 +1285,18 @@ class SpencerFanoSolver:
         outputfilename: Path | str | None = None,
         axis: mplax.Axes | None = None,
     ) -> None:
+        """Plot the solved degradation spectrum y(E) against electron energy.
+
+        en_y_on_d_en:
+            plot log(E y(E)), the spectrum per unit log energy, instead of log y(E)
+        xscalelog:
+            use a logarithmic energy axis
+        outputfilename:
+            save the figure to this path; None shows it interactively instead
+        axis:
+            draw into this existing matplotlib Axes instead of creating (and saving or
+            showing) a new figure
+        """
         self._require_solved()
         fs = 12
         fig = None
@@ -1263,7 +1313,7 @@ class SpencerFanoSolver:
 
         if en_y_on_d_en:
             arr_y = np.log10(self.yvec * self.engrid)
-            ax.set_ylabel(r"log d(E y)/dE", fontsize=fs)
+            ax.set_ylabel(r"log(E y(E))", fontsize=fs)
         else:
             arr_y = np.log10(self.yvec)
             ax.set_ylabel(r"log y [y (e$^-$ / cm$^2$ / s / eV)]", fontsize=fs)
@@ -1290,6 +1340,19 @@ class SpencerFanoSolver:
     def plot_channels(
         self, outputfilename: Path | str | None = None, axis: mplax.Axes | None = None, xscalelog: bool = False
     ) -> None:
+        """Plot each electron energy's contribution to ionisation, excitation, and heating.
+
+        The curves are E d(eta)/dE for each deposition channel, scaled so the largest peak is one
+        (compare Kozma & Fransson 1992 figure 2).
+
+        outputfilename:
+            save the figure to this path; None shows it interactively instead
+        axis:
+            draw into this existing matplotlib Axes instead of creating (and saving or
+            showing) a new figure
+        xscalelog:
+            use a logarithmic energy axis
+        """
         self._require_solved()
         fs = 12
         fig = None
@@ -1391,7 +1454,14 @@ class SpencerFanoSolver:
             else:
                 plt.show()
 
-    def plot_spec_channels(self, outputfilename: Path | str | None, xscalelog: bool = False) -> None:
+    def plot_spec_channels(self, outputfilename: Path | str | None = None, xscalelog: bool = False) -> None:
+        """Plot the degradation spectrum and the deposition channels as two stacked panels.
+
+        outputfilename:
+            save the figure to this path; None shows it interactively instead
+        xscalelog:
+            use a logarithmic energy axis
+        """
         fig, axes = plt.subplots(
             nrows=2,
             ncols=1,
