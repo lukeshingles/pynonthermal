@@ -807,7 +807,8 @@ class SpencerFanoSolver:
         ionpot_ev: float,
         J: float,
     ) -> float:
-        # The integrand shared by both integrals of Kozma & Fransson equation 6: y(E') sigma(E') P(e_s, E')
+        # The integrand shared by both ionisation integrals of Kozma & Fransson equation 11 (the same
+        # integrals appear in their differential equation 6): y(E') sigma(E') P(e_s, E')
         # over the primary energies arr_e_p. Both use E' as the variable of integration, since the first
         # one's epsilon differs from it only by a constant. Each caller supplies y and the cross section
         # however is cheapest for its own nodes: off the grid they have to be evaluated, but on it the

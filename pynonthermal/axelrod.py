@@ -18,7 +18,7 @@ from pynonthermal.constants import QE
 
 @lru_cache
 def get_binding_energies() -> npt.NDArray[np.float64]:
-    collionfilepath = Path(pynonthermal.DATADIR, "binding_energies_lotz_tab1and2.txt")
+    collionfilepath = Path(pynonthermal.DATADIR, "binding_energies_lotz1970.txt")
 
     with collionfilepath.open() as f:
         line = f.readline()

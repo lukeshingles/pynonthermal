@@ -21,8 +21,9 @@ def get_xs_excitation_vector(
     This is the sigma of the excitation term in the degradation equation (Kozma & Fransson 1992
     equation 7): computed from the transition's collision strength via Li et al. 2012 equation 11
     when one is available, and otherwise from the oscillator strength of a permitted E1 transition
-    via the van Regemorter 1962 approximation, with the g-bar factor from the first two terms of the
-    fitting formula in equation 5 of Mewe 1972 (see Shingles et al. 2020, section 2.5).
+    via the van Regemorter 1962 approximation, with the g-bar factor g_bar = 0.15 + 0.28 ln(U)
+    built from the A and D ln(U) terms of the fitting formula in equation 5 of Mewe 1972
+    (described as its "first two terms" by Shingles et al. 2020, section 2.5).
     """
     A_naught_squared = 2.800285203e-17  # Bohr radius squared in cm^2
     npts = len(engrid)
@@ -56,17 +57,20 @@ def get_xs_excitation_vector(
         fij = g * ME * pow(CLIGHT, 3) / (8 * pow(QE * nu_trans * math.pi, 2)) * row["A"]
         # permitted E1 electric dipole transitions
 
-        A = 0.28
-        B = 0.15
+        # Mewe (1972) equation 5 fits g(U) = A + B/U + C/U^2 + D*ln(U); keep the A and D ln(U)
+        # terms, with the D = sqrt(3)/(2 pi) that Mewe recommends for all optically allowed
+        # transitions rounded to 0.28 (Shingles et al. 2020, section 2.5, where this pair is
+        # described as the formula's "first two terms")
+        mewe_A = 0.15
+        mewe_D = 0.28
 
         prefactor = 45.585750051
-        # van Regemorter (1962) approximation with the g_bar below from the first two terms of the
-        # fitting formula in equation 5 of Mewe (1972); see Shingles et al. (2020), section 2.5
+        # van Regemorter (1962) approximation with the g_bar below from Mewe (1972)
         constantfactor = prefactor * A_naught_squared * pow(H_ionpot / epsilon_trans, 2) * fij
 
         U = engrid[startindex:] / epsilon_trans_ev
         # g_bar = 0.2
-        g_bar = A * np.log(U) + B
+        g_bar = mewe_D * np.log(U) + mewe_A
 
         xs_excitation_vec[startindex:] = constantfactor * g_bar / U
     else:
