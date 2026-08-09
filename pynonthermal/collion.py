@@ -132,8 +132,9 @@ def Psecondary_vec(
 ) -> npt.NDArray[np.float64]:
     """Evaluate the secondary-electron energy distribution over arrays of e_p and/or e_s.
 
-    This is the Lorentzian distribution of Kozma & Fransson 1992 equation 4 (a fit by Opal,
-    Peterson & Beaty 1971 to their measurements), with the width parameter J from get_J().
+    This is the Lorentzian distribution of Kozma & Fransson 1992 equation 4, their analytically
+    integrable adaptation of the shape Opal, Peterson & Beaty 1971 fitted to their measurements
+    (whose published exponent is 2.1 rather than 2), with the width parameter J from get_J().
 
     e_p is the primary electron energy [eV] and e_s the secondary electron energy [eV]. The two
     arguments broadcast against each other, so either may be a scalar. Psecondary() is the scalar form.
