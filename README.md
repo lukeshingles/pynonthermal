@@ -14,7 +14,8 @@ pynonthermal is a Spencer-Fano equation solver for non-thermal electron energy d
 - [Units and conventions](#units-and-conventions)
 - [Example output](#example-output)
 - [Method background](#method-background)
-- [Cross-section dataset choice](#cross-section-dataset-choice)
+- [Cross-section datasets](#cross-section-datasets)
+- [Advanced usage: custom excitation cross sections](#advanced-usage-custom-excitation-cross-sections)
 - [Citing pynonthermal](#citing-pynonthermal)
 - [License](#license)
 
@@ -61,6 +62,12 @@ uv pip install --editable .
 prek install
 ```
 
+Run the test suite with:
+
+```sh
+uv run -- python3 -m pytest
+```
+
 ## Usage
 
 Typical solver workflow:
@@ -94,12 +101,12 @@ When high-energy leptons (electrons and positrons) are injected into a plasma, t
 
 The numerical solver is similar to the Spencer-Fano implementation in the [ARTIS](https://github.com/artis-mcrt/artis) radiative transfer code ([Shingles et al. 2020](https://ui.adsabs.harvard.edu/abs/2020MNRAS.492.2029S/abstract)), itself an independent implementation of [Kozma and Fransson (1992, ApJ, 390, 602)](https://ui.adsabs.harvard.edu/abs/1992ApJ...390..602K/abstract), based on the electron slowing-down equation of [Spencer and Fano (1954, Phys. Rev., 93, 1172)](https://ui.adsabs.harvard.edu/abs/1954PhRv...93.1172S/abstract). A similar approach is used in [CMFGEN](https://kookaburra.phyast.pitt.edu/hillier/web/CMFGEN.htm).
 
-Impact ionisation cross sections use fits from [Arnaud and Rothenflug (1985)](https://ui.adsabs.harvard.edu/abs/1985A%26AS...60..425A/abstract) and [Arnaud and Raymond (1992)](https://ui.adsabs.harvard.edu/abs/1992ApJ...398..394A/abstract) for Z=1 to 28 (H to Ni). Heavier elements use the approximation of [Axelrod (1980), Eq. 3.38](https://ui.adsabs.harvard.edu/abs/1980PhDT.........1A/abstract) with [Lotz (1967)](https://doi.org/10.1007/BF01325928).
+The integral form of the Kozma and Fransson degradation equation (their equation 7) is discretised on a uniform energy grid as an upper-triangular matrix equation and solved by back-substitution from the highest energy downward. The `SpencerFanoSolver` class docstring maps each term of the equation to the method that implements it, and the code comments cite the specific Kozma and Fransson equations at each site. The secondary-electron energy distribution follows [Opal, Peterson and Beaty (1971)](https://ui.adsabs.harvard.edu/abs/1971JChPh..55.4100O/abstract) as applied by Kozma and Fransson, and the energy loss rate to thermal electrons uses their Coulomb-logarithm prescription (after [Schunk and Hays 1971](https://ui.adsabs.harvard.edu/abs/1971P%26SS...19..113S/abstract)).
 
-If internal level/transition data are used (for example, via `add_ion_ltepopexcitation()`), they are imported from the CMFGEN atomic data compilation. See source data files for references.
+If internal level/transition data are used (for example, via `add_ion_ltepopexcitation()`), they are imported from the CMFGEN atomic data compilation (see the source data files for references), with excitation cross sections computed from the tabulated collision strengths ([Li, Dessart and Hillier 2012, equation 11](https://doi.org/10.1111/j.1365-2966.2012.21198.x)) or, for permitted transitions without one, from the oscillator strength via the g-bar approximation of [Mewe (1972)](https://ui.adsabs.harvard.edu/abs/1972A%26A....20..215M/abstract).
 
 ## Cross-section datasets
-Ionization cross sections from H (Z=1) to Ni (Z=28) are sourced from the analytical fits to data from M. Arnaud & R. Rothenflug (1985, A&AS, 60, 425), with updates to Fe from M. Arnaud & J. Raymond (1992, ApJ, 398, 394). For heavier elements (Z>28), the approximation of Axelrod (1980, PhD thesis, Eq. 3.38) is used, with Lotz (1967, Z. Phys., 206, 205) for the required parameters.
+Ionization cross sections from H (Z=1) to Ni (Z=28) use the shell-resolved analytical fits compiled by [Arnaud and Rothenflug (1985, A&AS, 60, 425)](https://ui.adsabs.harvard.edu/abs/1985A%26AS...60..425A/abstract), with updates to Fe from [Arnaud and Raymond (1992, ApJ, 398, 394)](https://ui.adsabs.harvard.edu/abs/1992ApJ...398..394A/abstract). For heavier elements (Z>28) and any other ions missing from the fit data, the approximation of [Axelrod (1980, PhD thesis, Eq. 3.38)](https://ui.adsabs.harvard.edu/abs/1980PhDT.........1A/abstract) is used, with [Lotz (1967, Z. Phys., 206, 205)](https://doi.org/10.1007/BF01325928) for the required parameters.
 
 ## Advanced usage: custom excitation cross sections
 
@@ -130,7 +137,7 @@ nt_exc = sf.get_excitation_ratecoeff(Z, ion_stage, transitionkey)
 
 ## Citing pynonthermal
 
-If you use pynonthermal, please cite it via the [Zenodo record](https://zenodo.org/badge/latestdoi/359805556).
+If you use pynonthermal, please cite it via the [Zenodo record](https://zenodo.org/badge/latestdoi/359805556). Please also consider citing the papers describing the method: [Kozma and Fransson (1992)](https://ui.adsabs.harvard.edu/abs/1992ApJ...390..602K/abstract) and [Shingles et al. (2020)](https://ui.adsabs.harvard.edu/abs/2020MNRAS.492.2029S/abstract).
 
 ## License
 
