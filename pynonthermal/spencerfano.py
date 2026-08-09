@@ -1454,7 +1454,7 @@ class SpencerFanoSolver:
             else:
                 plt.show()
 
-    def plot_spec_channels(self, outputfilename: Path | str | None, xscalelog: bool = False) -> None:
+    def plot_spec_channels(self, outputfilename: Path | str | None = None, xscalelog: bool = False) -> None:
         """Plot the degradation spectrum and the deposition channels as two stacked panels.
 
         outputfilename:
