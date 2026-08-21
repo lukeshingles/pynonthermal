@@ -69,16 +69,10 @@ ignore = [
     "COM812",  # missing-trailing-comma
     "CPY001",  # missing-copyright-notice
     "D100",    # undocumented-public-module
-    "D101",    # undocumented-public-class
     "D102",    # undocumented-public-method
     "D103",    # undocumented-public-function
-    "D104",    # undocumented-public-package
-    "D107",    # undocumented-public-init
     "D203",    # one-blank-line-before-class
     "D213",    # multi-line-summary-second-line
-    "D417",    # undocumented-param
-    "E501",    # Line too long
-    "E741",    # mixed-case-variable-in-global-scope
     "ERA001",  # commented-out-code
     "FBT",
     "FIX002",  # line contains TODO
@@ -93,8 +87,6 @@ ignore = [
     "PLR2004", # magic-value-comparison
     "S101",    # Use of assert detected
     "T201",    # print found
-    "TD002",   # missing-todo-author
-    "TD003",   # missing-todo-link
 ]
 fixable = ["ALL"]
 unfixable = [

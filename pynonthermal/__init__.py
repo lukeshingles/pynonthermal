@@ -1,3 +1,5 @@
+"""A non-thermal electron deposition (Spencer-Fano equation) solver."""
+
 from pynonthermal import axelrod as axelrod
 from pynonthermal import base as base
 from pynonthermal import collion as collion

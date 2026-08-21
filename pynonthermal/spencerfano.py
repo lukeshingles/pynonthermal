@@ -193,6 +193,7 @@ class SpencerFanoSolver:
         verbose: bool = False,
         use_ar1985: bool = False,
     ) -> None:
+        """Make a solver with a logarithmic energy grid and the given options."""
         if npts < 2:
             msg = f"npts must be at least 2 to define an energy grid spacing but is {npts}"
             raise ValueError(msg)
@@ -1391,7 +1392,8 @@ class SpencerFanoSolver:
 
         # delta_E_y_on_dE = np.zeros(npts)
         # for i in range(len(engrid) - 1):
-        #     # delta_E_y_on_dE[i] = ((yvec[i + 1] * engrid[i + 1]) - (yvec[i] * engrid[i])) / (engrid[i + 1] - engrid[i])
+        #     # delta_E_y_on_dE[i] = ((yvec[i + 1] * engrid[i + 1]) - (yvec[i] * engrid[i]))
+        #     #     / (engrid[i + 1] - engrid[i])
         #     delta_E_y_on_dE[i] = yvec[i] * engrid[i]
         # axes[0].plot(engrid, np.log10(delta_E_y_on_dE), marker="None", lw=1.5, color='black', label='')
         # axes[0].set_ylabel(r'log d(E y(E)) / dE', fontsize=fs)

@@ -25,6 +25,8 @@ def test_lotz_heavy_element() -> None:
 
 
 class CountingAnalysisSolver(pynonthermal.SpencerFanoSolver):
+    """A solver that counts the calls to analyse_ntspectrum."""
+
     analyse_count: int = 0
 
     def analyse_ntspectrum(self) -> None:
