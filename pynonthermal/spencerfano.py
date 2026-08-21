@@ -193,7 +193,7 @@ class SpencerFanoSolver:
         verbose: bool = False,
         use_ar1985: bool = False,
     ) -> None:
-        """Make a solver with a logarithmic energy grid and the given options."""
+        """Make a solver with a uniform linear energy grid and the given options."""
         if npts < 2:
             msg = f"npts must be at least 2 to define an energy grid spacing but is {npts}"
             raise ValueError(msg)
