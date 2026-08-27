@@ -1,4 +1,5 @@
 import math
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -152,6 +153,56 @@ def test_helium() -> None:
         sf.plot_spec_channels(outputfilename=outputfolder / "spec_channels.pdf", xscalelog=True)
         sf.plot_yspectrum(outputfilename=outputfolder / "yspectrum.pdf")
         sf.plot_channels(outputfilename=outputfolder / "channels.pdf", xscalelog=True)
+
+
+def test_heating_only_approximation() -> None:
+    # with heating_only_approximation=True, the matrix contains no excitation or ionisation loss
+    # terms, but the analysis still calculates the channel rates from the heating-only solution
+    x_e = 1e-4
+    ions = [
+        # Z ion_stage numberdensity
+        (2, 1, 1.0 - x_e),
+        (2, 2, x_e),
+    ]
+
+    def build_solver(heating_only_approximation: bool) -> pynonthermal.SpencerFanoSolver:
+        # the assertions are qualitative, so a coarse grid is enough (test_helium covers npts=2000)
+        sf = pynonthermal.SpencerFanoSolver(
+            emin_ev=1, emax_ev=3000, npts=512, heating_only_approximation=heating_only_approximation
+        )
+        for Z, ion_stage, n_ion in ions:
+            sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
+            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
+        return sf
+
+    with (
+        build_solver(heating_only_approximation=True) as sf_heat,
+        build_solver(heating_only_approximation=False) as sf_full,
+    ):
+        # the excitation and ionisation terms stay out of the matrix
+        assert not sf_heat.sfmatrix.any()
+        assert sf_full.sfmatrix.any()
+
+        sf_heat.solve(depositionratedensity_ev=100)
+        sf_full.solve(depositionratedensity_ev=100)
+
+        # the analysis of the heating-only solution must not show a solver warning
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            sf_heat.analyse_ntspectrum()
+
+        # heating takes almost all of the deposited energy
+        assert math.isclose(sf_heat.get_frac_heating(), 1.0, rel_tol=0.05)
+
+        # the channel rates are still available from the stored data
+        assert sf_heat.get_frac_ionisation_tot() > 0.0
+        assert sf_heat.get_frac_excitation_tot() > 0.0
+        assert sf_heat.get_ionisation_ratecoeff(2, 1) > 0.0
+        assert sf_heat.get_frac_ionisation_ion(2, 1) > 0.0
+
+        # without the competing loss terms, y(E) is larger, so the rates are larger
+        assert sf_heat.get_frac_ionisation_tot() > sf_full.get_frac_ionisation_tot()
+        assert sf_heat.get_frac_excitation_tot() > sf_full.get_frac_excitation_tot()
 
 
 def test_iron() -> None:
