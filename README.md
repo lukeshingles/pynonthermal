@@ -90,6 +90,7 @@ sf = pynonthermal.SpencerFanoSolver(emin_ev=1.0, emax_ev=3000.0, npts=4096, verb
 - `npts`: number of energy grid points. More points give better accuracy at the cost of memory and time; check `get_frac_sum()` after solving.
 - `verbose`: print details of the setup, each added channel, and a per-ion, per-shell breakdown during analysis.
 - `use_ar1985`: use the original Arnaud & Rothenflug (1985) ionisation cross sections (see [Cross-section datasets](#cross-section-datasets)).
+- `heating_only_approximation`: remove the excitation and ionisation loss terms from the matrix and solve with the heating loss only. The solver still calculates the excitation and ionisation rates from this approximate solution, so the channel fractions do not sum to one.
 
 The grid is available as `sf.engrid` (a NumPy array), which is needed if you supply [custom excitation cross sections](#advanced-usage-custom-excitation-cross-sections).
 

@@ -156,6 +156,12 @@ class SpencerFanoSolver:
     (KF92 equation 12, summed over shells in analyse_ntspectrum()) with rate coefficients
     from get_ionisation_ratecoeff() (KF92 equation 13). calculate_N_e() evaluates N(E) of
     KF92 equation 11, the rate at which electrons appear below the solved grid.
+
+    If heating_only_approximation is True, the solver removes the excitation and ionisation
+    loss terms from the matrix and keeps only the heating loss. The solver still stores the
+    excitation transitions and the ionisation cross sections, and it calculates the channel
+    fractions and rate coefficients from the heating-only solution. The channel fractions
+    then do not sum to one.
     """
 
     _solved: bool
@@ -174,6 +180,7 @@ class SpencerFanoSolver:
     ionpopdict: dict[tuple[int, int], float]
     excitationlists: dict[tuple[int, int], dict[t.Any, tuple[float, npt.NDArray[np.float64], float]]]
     verbose: bool
+    heating_only_approximation: bool
     _n_e: float | None
     _n_e_override: float | None
     engrid: npt.NDArray[np.float64]
@@ -192,8 +199,13 @@ class SpencerFanoSolver:
         npts: int = 4096,
         verbose: bool = False,
         use_ar1985: bool = False,
+        heating_only_approximation: bool = False,
     ) -> None:
-        """Make a solver with a uniform linear energy grid and the given options."""
+        """Make a solver with a uniform linear energy grid and the given options.
+
+        If heating_only_approximation is True, the solver removes the excitation and
+        ionisation loss terms from the matrix and keeps only the heating loss.
+        """
         if npts < 2:
             msg = f"npts must be at least 2 to define an energy grid spacing but is {npts}"
             raise ValueError(msg)
@@ -220,6 +232,7 @@ class SpencerFanoSolver:
         self.excitationlists = {}
 
         self.verbose = verbose
+        self.heating_only_approximation = heating_only_approximation
         self.engrid = np.linspace(emin_ev, emax_ev, num=npts, endpoint=True, dtype=float)
         self.deltaen = self.engrid[1] - self.engrid[0]
 
@@ -418,6 +431,9 @@ class SpencerFanoSolver:
         # contribution is one windowed addition plus one matrix diagonal, with a row loop only
         # for the clipped rows. The band values add linearly, so vec and fracvec may also hold
         # the pre-summed contributions of many transitions that share the same k.
+        if self.heating_only_approximation:
+            # keep the stored transitions but leave the excitation loss out of the matrix
+            return
         npts = len(self.engrid)
         bandstop = max(npts - k, 0)  # rows from here on have their window clipped at the top of the grid
         # sfmatrix is C-contiguous (np.zeros), so element (i, i + d) sits at flat index
@@ -569,6 +585,9 @@ class SpencerFanoSolver:
                         transition["epsilon_trans_ev"],
                         transitionkey=(transition["lower"], transition["upper"]),
                     )
+                    if self.heating_only_approximation:
+                        # the matrix takes no excitation band, so skip the band accumulation
+                        continue
                     if k not in groups:
                         groups[k] = (np.zeros(npts), np.zeros(npts))
                     groupvec, groupfracvec = groups[k]
@@ -591,6 +610,10 @@ class SpencerFanoSolver:
         # distribution P of KF92 equation 4, whose integrals over epsilon are taken analytically
         # via the arctan antiderivative below
         self._require_not_solved("add ionisation")
+        if self.heating_only_approximation:
+            # leave the ionisation loss out of the matrix. add_ionisation keeps the ion
+            # registration and the shell data that the analysis reads.
+            return
         deltaen = self.deltaen
         ionpot_ev = float(shell["ionpot_ev"])
         J = pynonthermal.collion.get_J(int(shell["Z"]), int(shell["ion_stage"]), ionpot_ev)
@@ -996,19 +1019,23 @@ class SpencerFanoSolver:
         # if self.verbose:
         #     print(f"            frac_heating E_0 * y * l(E_0) part: {frac_heating_E_0_part:.5f}")
 
-        # E * N_e(E) is smooth over [0, E_0], so Simpson's rule earns its extra order here: it reaches
-        # 5e-5 of the converged value at 9 nodes where the trapezoid rule needs several hundred, and
-        # every node costs a full calculate_N_e(). Summing the nodes, as the code did before, counted
-        # half a node too much at each end of the interval.
-        arr_en = np.linspace(0.0, E_0, num=NPTS_SUB_E0_INTEGRAL, endpoint=True, dtype=np.float64)
-        arr_en_N_e = np.array([en_ev * self.calculate_N_e(en_ev) for en_ev in arr_en], dtype=np.float64)
-        integral_e_n_e = integrate_simpson_uniform(arr_en_N_e, arr_en)
-        frac_heating_N_e = integral_e_n_e / self.depositionratedensity_ev
+        # the heating-only matrix routes all deposited energy through the loss function, so the
+        # N_e term below E_0 would count the same energy twice. calculate_N_e() itself still
+        # gives the secondary-electron rate of the approximate solution.
+        if not self.heating_only_approximation:
+            # E * N_e(E) is smooth over [0, E_0], so Simpson's rule earns its extra order here: it
+            # reaches 5e-5 of the converged value at 9 nodes where the trapezoid rule needs several
+            # hundred, and every node costs a full calculate_N_e(). Summing the nodes, as the code
+            # did before, counted half a node too much at each end of the interval.
+            arr_en = np.linspace(0.0, E_0, num=NPTS_SUB_E0_INTEGRAL, endpoint=True, dtype=np.float64)
+            arr_en_N_e = np.array([en_ev * self.calculate_N_e(en_ev) for en_ev in arr_en], dtype=np.float64)
+            integral_e_n_e = integrate_simpson_uniform(arr_en_N_e, arr_en)
+            frac_heating_N_e = integral_e_n_e / self.depositionratedensity_ev
 
-        if self.verbose:
-            print(f" frac_heating(E<EMIN): {frac_heating_N_e:.5f}")
+            if self.verbose:
+                print(f" frac_heating(E<EMIN): {frac_heating_N_e:.5f}")
 
-        frac_heating += frac_heating_N_e
+            frac_heating += frac_heating_N_e
 
         self._frac_heating = frac_heating
         return frac_heating
@@ -1083,7 +1110,11 @@ class SpencerFanoSolver:
                         f" {shell['ionpot_ev']:.2f} eV)"
                     )
 
-                if not 0.0 <= frac_ionisation_shell <= 1.0:
+                # the heating-only approximation lets the fractions exceed one, so in that mode
+                # only a negative or NaN value is invalid (NaN fails every comparison)
+                if not frac_ionisation_shell >= 0.0 or (
+                    not self.heating_only_approximation and frac_ionisation_shell > 1.0
+                ):
                     warnings.warn(
                         f"invalid frac_ionisation_shell of {frac_ionisation_shell} included in the total",
                         stacklevel=2,
@@ -1110,7 +1141,9 @@ class SpencerFanoSolver:
 
             frac_excitation_thision = self.calculate_nt_frac_excitation_ion(Z, ion_stage)
 
-            if not 0.0 <= frac_excitation_thision <= 1.0:
+            if not frac_excitation_thision >= 0.0 or (
+                not self.heating_only_approximation and frac_excitation_thision > 1.0
+            ):
                 # keep it in the total, as for frac_ionisation_shell, so that the energy conservation
                 # check below still sees the problem instead of a total that silently lost a channel
                 warnings.warn(
@@ -1162,8 +1195,17 @@ class SpencerFanoSolver:
 
         # every deposited eV must end up in exactly one of the three channels. The tolerance is loose
         # enough to absorb the discretisation error of a coarse energy grid, so a warning here means
-        # a channel is being double counted or omitted rather than merely under-resolved.
-        if not math.isclose(frac_sum, 1.0, rel_tol=0.05):
+        # a channel is being double counted or omitted rather than merely under-resolved. The
+        # heating-only approximation makes the sum exceed one, so there the conserved quantity
+        # is the heating fraction alone, which must be close to one.
+        if self.heating_only_approximation:
+            if not math.isclose(frac_heating, 1.0, rel_tol=0.05):
+                warnings.warn(
+                    f"the heating fraction is {frac_heating:.4f} instead of 1 with the heating-only"
+                    f" approximation. Try a finer energy grid (npts is {len(self.engrid)}).",
+                    stacklevel=2,
+                )
+        elif not math.isclose(frac_sum, 1.0, rel_tol=0.05):
             warnings.warn(
                 f"the energy fractions sum to {frac_sum:.4f} instead of 1: heating {frac_heating:.4f},"
                 f" ionisation {self._frac_ionisation_tot:.4f}, excitation {self._frac_excitation_tot:.4f}."
