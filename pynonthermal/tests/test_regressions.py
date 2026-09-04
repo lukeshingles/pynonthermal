@@ -410,9 +410,9 @@ def test_excitation_xs_zero_above_grid() -> None:
         sf.add_ionisation(26, 3, n_ion=0.7)
         sf.add_ion_ltepopexcitation(26, 3, n_ion=0.7)
         for transitions in sf.excitationlists.values():
-            for _levelpop, xs_vec, epsilon_trans_ev in transitions.values():
-                assert epsilon_trans_ev <= sf.engrid[-1]
-                assert (xs_vec >= 0.0).all()
+            for trans in transitions.values():
+                assert trans.epsilon_trans_ev <= sf.engrid[-1]
+                assert (trans.xs_vec >= 0.0).all()
 
 
 def test_excitation_only_ion_counted() -> None:
@@ -587,16 +587,16 @@ def test_excitation_band_fill_matches_rowwise() -> None:
 
 
 def _reference_ionisation_fill(
-    sf: pynonthermal.SpencerFanoSolver, n_ion: float, shell: dict[str, int | float]
+    sf: pynonthermal.SpencerFanoSolver, n_ion: float, channel: pynonthermal.IonisationChannel
 ) -> npt.NDArray[np.float64]:
-    # the masked full-tail construction of one shell's matrix contribution that predates the
+    # the masked full-tail construction of one channel's matrix contribution that predates the
     # forward-only cut pointers, kept verbatim as the reference the slice fill must reproduce
     engrid = sf.engrid
     npts = len(engrid)
     deltaen = sf.deltaen
-    ionpot_ev = float(shell["ionpot_ev"])
-    J = pynonthermal.collion.get_J(int(shell["Z"]), int(shell["ion_stage"]), ionpot_ev)
-    ar_xs_array = sf._get_shell_xs(shell)
+    ionpot_ev = channel.ionpot_ev
+    J = channel.J_ev
+    ar_xs_array = channel.xs_grid
     xsstartindex = 0 if ionpot_ev <= engrid[0] else sf.get_energyindex_gteq(en_ev=ionpot_ev)
     atan_epsilon = np.arctan((engrid - ionpot_ev) / 2.0 / J)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -636,13 +636,13 @@ def test_ltepop_excitation_grouped_fill() -> None:
         sf.add_ion_ltepopexcitation(2, 1, n_ion=1.0, use_collstrengths=False)
         assert len(sf.excitationlists[(2, 1)]) > 100  # the grouping must actually see many transitions
         expected = np.zeros((npts, npts))
-        for levelnumberdensity, xs_vec, epsilon_trans_ev in sf.excitationlists[(2, 1)].values():
-            expected += _reference_excitation_fill(sf, levelnumberdensity, xs_vec, epsilon_trans_ev)
+        for trans in sf.excitationlists[(2, 1)].values():
+            expected += _reference_excitation_fill(sf, trans.levelnumberdensity, trans.xs_vec, trans.epsilon_trans_ev)
         assert np.allclose(sf.sfmatrix, expected, rtol=1e-12, atol=0.0)
 
 
 def test_ionisation_fill_matches_masked_reference() -> None:
-    # _add_ionisation_shell writes only each row's non-empty integral range, located by
+    # _add_ionisation_channel_to_matrix writes only each row's non-empty integral range, located by
     # forward-only cut pointers that evaluate the same comparisons the per-row np.where masks
     # used. The resulting matrix must be bit-identical to the masked full-tail construction.
     for emin, emax, npts, Z, ion_stage in [
@@ -654,8 +654,8 @@ def test_ionisation_fill_matches_masked_reference() -> None:
             n_ion = 1e5
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
             expected = np.zeros((npts, npts))
-            for shell in sf._get_ion_collion_rows(Z, ion_stage):
-                expected += _reference_ionisation_fill(sf, n_ion, shell)
+            for channel in sf._ionisation_channels[(Z, ion_stage)]:
+                expected += _reference_ionisation_fill(sf, n_ion, channel)
             assert sf.sfmatrix.tobytes() == expected.tobytes(), f"mismatch for {Z=} {ion_stage=}"
 
 
@@ -685,3 +685,261 @@ def test_solve_upper_triangular_diag_add() -> None:
 
     with pytest.raises(ValueError, match="finite"):
         spencerfano.solve_upper_triangular(a, b, diag_add=np.array([math.nan] + [0.0] * (n - 1)))
+
+
+def _bethe_xs_grid(
+    engrid: npt.NDArray[np.float64], ionpot_ev: float, scale_cm2_ev2: float = 3e-13
+) -> npt.NDArray[np.float64]:
+    # a plain Bethe-like cross section [cm^2] on the solver energy grid, which stands for a custom
+    # cross section. It is zero at and below the ionisation potential, as every channel must be.
+    out = np.zeros_like(engrid)
+    above = engrid > ionpot_ev
+    out[above] = scale_cm2_ev2 * np.log(engrid[above] / ionpot_ev) / (engrid[above] * ionpot_ev)
+    return out
+
+
+def test_custom_ionisation_channel_matches_the_builtin_path() -> None:
+    # a custom channel must take exactly the same path as a shell of the built-in table. Adding the
+    # built-in cross sections back one call at a time must give the same matrix, bit for bit, and
+    # the same energy fractions after the solve.
+    Z, ion_stage, n_ion = 8, 2, 1e8
+    shells = (
+        pynonthermal.collion.read_colliondata()
+        .filter((pl.col("Z") == Z) & (pl.col("ion_stage") == ion_stage))
+        .to_dicts()
+    )
+    assert len(shells) > 1  # the ion must have more than one shell for this to mean anything
+
+    with (
+        pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300) as sf_custom,
+        pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300) as sf_builtin,
+    ):
+        sf_builtin.add_ionisation(Z, ion_stage, n_ion=n_ion)
+        for shell in shells:
+            sf_custom.add_ionisation_channel(
+                Z,
+                ion_stage,
+                n_ion=n_ion,
+                ionpot_ev=float(shell["ionpot_ev"]),
+                xs_vec=pynonthermal.collion.get_arxs_array_shell(sf_custom.engrid, shell),
+            )
+
+        assert sf_custom.sfmatrix.tobytes() == sf_builtin.sfmatrix.tobytes()
+
+        for sf in (sf_custom, sf_builtin):
+            sf.solve(depositionratedensity_ev=1e8)
+
+        assert math.isclose(
+            sf_custom.get_frac_ionisation_ion(Z, ion_stage), sf_builtin.get_frac_ionisation_ion(Z, ion_stage)
+        )
+        # frac_heating differs only through calculate_N_e, which needs the cross section between
+        # the grid points and interpolates the array there instead of using the exact formula
+        assert math.isclose(sf_custom.get_frac_heating(), sf_builtin.get_frac_heating(), rel_tol=1e-5)
+
+
+def test_custom_ionisation_channel_conserves_energy() -> None:
+    # the whole custom path, from the matrix fill to calculate_N_e, must still put every
+    # deposited eV into heating, excitation, or ionisation
+    ionpot_ev = 35.0
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=2000) as sf:
+        sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=ionpot_ev, xs_vec=_bethe_xs_grid(sf.engrid, ionpot_ev))
+        sf.solve(depositionratedensity_ev=1e8)
+
+        assert sf.get_frac_ionisation_tot() > 0.1  # the channel must carry a real share
+        assert math.isclose(sf.get_frac_sum(), 1.0, abs_tol=0.01)
+
+        # calculate_N_e integrates over a domain narrower than one grid cell just above the
+        # ionisation potential, so the channel must give values between the grid points
+        channel = sf._ionisation_channels[(8, 2)][0]
+        off_grid = np.array([ionpot_ev * 1.001, ionpot_ev * 1.002, ionpot_ev * 1.003])
+        assert not np.isin(off_grid, sf.engrid).any()
+        assert (channel.xs(off_grid) > 0.0).all()
+        # and it stays at zero below its own ionisation potential
+        assert not channel.xs(np.array([ionpot_ev * 0.999, ionpot_ev])).any()
+
+
+def test_custom_ionisation_channel_adds_to_the_builtin_shells() -> None:
+    # add_ionisation() and add_ionisation_channel() may both be called for one ion
+    Z, ion_stage, n_ion = 8, 2, 1e8
+    with (
+        pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300) as sf_builtin,
+        pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300) as sf_extra,
+    ):
+        for sf in (sf_builtin, sf_extra):
+            sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
+        sf_extra.add_ionisation_channel(
+            Z,
+            ion_stage,
+            n_ion=n_ion,
+            ionpot_ev=120.0,
+            xs_vec=_bethe_xs_grid(sf_extra.engrid, 120.0),
+            channelkey="my inner shell",
+        )
+
+        assert (
+            len(sf_extra._ionisation_channels[(Z, ion_stage)])
+            == len(sf_builtin._ionisation_channels[(Z, ion_stage)]) + 1
+        )
+        for sf in (sf_builtin, sf_extra):
+            sf.solve(depositionratedensity_ev=1e8)
+        assert sf_extra.get_frac_ionisation_ion(Z, ion_stage) > sf_builtin.get_frac_ionisation_ion(Z, ion_stage)
+
+
+def test_custom_ionisation_channel_validation() -> None:
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=200) as sf:
+        good = _bethe_xs_grid(sf.engrid, 35.0)
+
+        # the cross section must be non-negative, finite, and on the whole grid
+        with pytest.raises(ValueError, match="non-negative"):
+            sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=35.0, xs_vec=-good)
+        with pytest.raises(ValueError, match="finite"):
+            sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=35.0, xs_vec=np.full_like(good, np.inf))
+        with pytest.raises(ValueError, match="one value for each"):
+            sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=35.0, xs_vec=good[:-1])
+
+        # a cross section below the ionisation potential would count towards the ionisation
+        # fraction without a matching loss term in the matrix
+        with pytest.raises(ValueError, match="zero at and below its ionisation potential"):
+            sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=35.0, xs_vec=np.full_like(good, 1e-18))
+
+        # the ionisation potential must lie inside the energy grid
+        with pytest.raises(ValueError, match="below emin_ev"):
+            sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=0.5, xs_vec=_bethe_xs_grid(sf.engrid, 0.5))
+        with pytest.raises(ValueError, match="above the top of the energy grid"):
+            sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=5000.0, xs_vec=np.zeros_like(good))
+        with pytest.raises(ValueError, match="ionpot_ev must be greater than zero"):
+            sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=-1.0, xs_vec=np.zeros_like(good))
+
+        # a nan or infinite population used to reach ionpopdict and make every result nan
+        for bad in (float("nan"), float("inf")):
+            with pytest.raises(ValueError, match="non-negative and finite"):
+                sf.add_ionisation_channel(8, 2, n_ion=bad, ionpot_ev=35.0, xs_vec=good)
+            with pytest.raises(ValueError, match="non-negative and finite"):
+                sf.add_ionisation(8, 2, n_ion=bad)
+
+        # ion_stage below one gives a negative charge, which only a bare assert used to catch
+        with pytest.raises(ValueError, match="ion_stage must be at least 1"):
+            sf.add_ionisation_channel(8, 0, n_ion=1e8, ionpot_ev=35.0, xs_vec=good)
+        with pytest.raises(ValueError, match="Z must be at least 1"):
+            sf.add_ionisation_channel(0, 1, n_ion=1e8, ionpot_ev=35.0, xs_vec=good)
+
+        assert not sf.ionpopdict
+        assert not sf._ionisation_channels
+
+        # a zero population adds no channel, but the cross section is still checked
+        with pytest.raises(ValueError, match="non-negative"):
+            sf.add_ionisation_channel(8, 2, n_ion=0.0, ionpot_ev=35.0, xs_vec=-good)
+        sf.add_ionisation_channel(8, 2, n_ion=0.0, ionpot_ev=35.0, xs_vec=good)
+        assert (8, 2) not in sf.ionpopdict
+        assert not sf.sfmatrix.any()
+
+        # an omitted channelkey gets an automatic index, and a duplicate key is rejected
+        sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=35.0, xs_vec=good)
+        assert sf._ionisation_channels[(8, 2)][0].key == 0
+        with pytest.raises(ValueError, match="already added"):
+            sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=35.0, xs_vec=good, channelkey=0)
+        # the population must agree with the one an earlier call for this ion gave
+        with pytest.raises(ValueError, match="different populations"):
+            sf.add_ionisation_channel(8, 2, n_ion=2e8, ionpot_ev=42.0, xs_vec=_bethe_xs_grid(sf.engrid, 42.0))
+
+        sf.solve(depositionratedensity_ev=1e8)
+        with pytest.raises(RuntimeError, match="after solving"):
+            sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=60.0, xs_vec=good)
+
+
+def test_add_ionisation_is_atomic() -> None:
+    # a key clash inside add_ionisation must leave the solver exactly as it was, so that the
+    # caller can correct the key and try again
+    Z, ion_stage = 8, 2
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=150) as sf:
+        # "n 2 l 0" is the second built-in shell of O II, so the clash comes after the first
+        sf.add_ionisation_channel(
+            Z,
+            ion_stage,
+            n_ion=1e8,
+            ionpot_ev=42.6,
+            xs_vec=_bethe_xs_grid(sf.engrid, 42.6),
+            channelkey="n 2 l 0",
+        )
+        matrix_before = sf.sfmatrix.copy()
+
+        with pytest.raises(ValueError, match="already added"):
+            sf.add_ionisation(Z, ion_stage, n_ion=1e8)
+
+        assert np.array_equal(sf.sfmatrix, matrix_before)
+        assert [channel.key for channel in sf._ionisation_channels[(Z, ion_stage)]] == ["n 2 l 0"]
+
+        # the ion is not poisoned: a call with a free key still works
+        sf.add_ionisation_channel(Z, ion_stage, n_ion=1e8, ionpot_ev=35.1, xs_vec=_bethe_xs_grid(sf.engrid, 35.1))
+        assert len(sf._ionisation_channels[(Z, ion_stage)]) == 2
+
+
+def test_cross_sections_are_copied_from_the_caller() -> None:
+    # the solver keeps a read-only copy of every cross section, so a later write by the caller
+    # cannot silently change the physics it already recorded
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300) as sf:
+        xs_vec = np.where(sf.engrid >= 20.0, 1e-16, 0.0)
+        sf.add_excitation(8, 2, levelnumberdensity=1e8, xs_vec=xs_vec, epsilon_trans_ev=20.0)
+        xs_vec[:] = 0.0
+        assert sf.excitationlists[(8, 2)][0].xs_vec.max() > 0.0
+        assert not sf.excitationlists[(8, 2)][0].xs_vec.flags.writeable
+
+        ion_xs = _bethe_xs_grid(sf.engrid, 35.0)
+        sf.add_ionisation_channel(8, 2, n_ion=1e8, ionpot_ev=35.0, xs_vec=ion_xs)
+        ion_xs[:] = 0.0
+        channel = sf._ionisation_channels[(8, 2)][0]
+        assert channel.xs_grid.max() > 0.0
+        assert not channel.xs_grid.flags.writeable
+        # the interpolation the channel uses off the grid kept the copy too
+        assert channel.xs(np.array([100.5]))[0] > 0.0
+
+    # the built-in shells of one ion must not share an array
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300) as sf_builtin:
+        sf_builtin.add_ionisation(8, 2, n_ion=1e8)
+        channels = sf_builtin._ionisation_channels[(8, 2)]
+        assert len(channels) > 1
+        assert not np.shares_memory(channels[0].xs_grid, channels[1].xs_grid)
+
+
+def test_engrid_is_read_only() -> None:
+    # deltaen is derived from engrid once, so a write in place would leave the two inconsistent
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=100) as sf:
+        assert not sf.engrid.flags.writeable
+        with pytest.raises(ValueError, match="read-only"):
+            sf.engrid[0] = 2.0
+        assert sf.engrid[0] == 1.0
+
+
+def test_excitation_xs_must_be_finite() -> None:
+    # an infinite cross section used to pass the non-negative test and put inf into the matrix
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=100) as sf:
+        xs_vec = np.zeros(100)
+        xs_vec[50:] = np.inf
+        with pytest.raises(ValueError, match="finite"):
+            sf.add_excitation(8, 2, levelnumberdensity=1e8, xs_vec=xs_vec, epsilon_trans_ev=20.0)
+        assert not sf.sfmatrix.any()
+
+        # a cross section of the wrong shape is named, rather than reaching the matrix band
+        with pytest.raises(ValueError, match="one value for each"):
+            sf.add_excitation(8, 2, levelnumberdensity=1e8, xs_vec=np.zeros((100, 1)), epsilon_trans_ev=20.0)
+        assert not sf.excitationlists.get((8, 2))
+
+
+def test_every_builtin_ion_builds_channels() -> None:
+    # the checks in IonisationChannel.from_xs must accept every row of the built-in tables, on both
+    # the Arnaud & Rothenflug fit branch and the Lotz branch
+    engrid = np.linspace(1.0, 3000.0, num=64, dtype=np.float64)
+    for collionfilename in ("collion.txt", "collion-AR1985.txt"):
+        dfcollion = pynonthermal.collion.read_colliondata(collionfilename)
+        n_lotz = 0
+        n_fit = 0
+        for Z, ion_stage in dfcollion.select(["Z", "ion_stage"]).unique().iter_rows():
+            channels = pynonthermal.collion.get_ion_ionisation_channels(dfcollion, Z, ion_stage, engrid)
+            assert channels
+            for channel in channels:
+                if str(channel.key).startswith("Lotz"):
+                    n_lotz += 1
+                else:
+                    n_fit += 1
+        assert n_lotz > 0
+        assert n_fit > 0

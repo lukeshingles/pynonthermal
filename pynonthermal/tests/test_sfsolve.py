@@ -45,8 +45,8 @@ def test_api_guards() -> None:
         with pytest.raises(RuntimeError):
             sf.get_excitation_ratecoeff(2, 1, 0)
 
-        # the same ion can't be added twice
-        with pytest.raises(ValueError, match="twice"):
+        # the same ion can't be added twice: its channel keys are already present
+        with pytest.raises(ValueError, match="already added"):
             sf.add_ionisation(2, 1, n_ion=1.0)
 
         # an ion with no cross-section data (here H II, which has no bound electrons) is rejected

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+from collections.abc import Callable
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -13,6 +14,55 @@ from pynonthermal.constants import ME
 from pynonthermal.constants import QE
 
 DATADIR = Path(__file__).absolute().parent / "data"
+
+# A cross section sigma(E) [cm^2] at an array of electron energies [eV].
+# An IonisationChannel holds one of these, because calculate_N_e() evaluates an ionisation cross
+# section between the points of the solver energy grid. A channel built from an array on that grid
+# interpolates the array there.
+type CrossSectionFunc = Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]]
+
+
+def get_xs_on_grid(
+    xs: npt.NDArray[np.float64] | CrossSectionFunc, engrid: npt.NDArray[np.float64], name: str
+) -> npt.NDArray[np.float64]:
+    """Get the cross sections [cm^2] of xs on the energy grid engrid [eV], and check them.
+
+    xs is either an array on engrid or a function of an array of energies [eV]. name identifies
+    xs in an error message. The result is a new read-only array. A later write to the array of
+    the caller, or to a buffer that the function of the caller keeps, cannot change it.
+    """
+    # isinstance first, because callable() alone leaves the type checkers with an array that
+    # might also be callable
+    if isinstance(xs, np.ndarray):
+        arr_xs = xs
+    elif callable(xs):
+        arr_xs = xs(engrid)
+    else:
+        msg = f"{name} must be a numpy array on the energy grid, but it is a {type(xs).__name__}"
+        raise TypeError(msg)
+
+    # np.array copies, so the checks below hold for the lifetime of the result
+    xs_grid = np.array(arr_xs, dtype=np.float64)
+
+    if xs_grid.shape != engrid.shape:
+        msg = (
+            f"{name} must give one value for each of the {len(engrid)} energies of engrid,"
+            f" but it gave an array of shape {xs_grid.shape}"
+        )
+        raise ValueError(msg)
+
+    if not np.isfinite(xs_grid).all():
+        msg = f"{name} must be finite at every energy of the grid"
+        raise ValueError(msg)
+
+    if not (xs_grid >= 0.0).all():
+        msg = f"{name} must be non-negative but its lowest value is {xs_grid.min()} cm^2"
+        raise ValueError(msg)
+
+    # handed on to the solver, so a write must raise at the mutation site
+    xs_grid.flags.writeable = False
+
+    return xs_grid
 
 
 def get_betasq(en_ev: npt.NDArray[np.float64] | float) -> npt.NDArray[np.float64]:

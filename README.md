@@ -23,7 +23,7 @@ These quantities are important, for example, in modelling the late-time spectra 
 - [Units and conventions](#units-and-conventions)
 - [Method background](#method-background)
 - [Cross-section datasets](#cross-section-datasets)
-- [Advanced usage: custom excitation cross sections](#advanced-usage-custom-excitation-cross-sections)
+- [Advanced usage: custom cross sections](#advanced-usage-custom-cross-sections)
 - [Citing pynonthermal](#citing-pynonthermal)
 - [License](#license)
 
@@ -92,7 +92,7 @@ sf = pynonthermal.SpencerFanoSolver(emin_ev=1.0, emax_ev=3000.0, npts=4096, verb
 - `use_ar1985`: use the original Arnaud & Rothenflug (1985) ionisation cross sections (see [Cross-section datasets](#cross-section-datasets)).
 - `heating_only_approximation`: remove the excitation and ionisation loss terms from the matrix and solve with the heating loss only. The solver still calculates the excitation and ionisation rates from this approximate solution, so the channel fractions do not sum to one.
 
-The grid is available as `sf.engrid` (a NumPy array), which is needed if you supply [custom excitation cross sections](#advanced-usage-custom-excitation-cross-sections).
+The grid is available as `sf.engrid` (a NumPy array), which is needed if you supply [custom excitation cross sections](#custom-excitation-cross-sections).
 
 ### 2. Add ionisation channels
 
@@ -102,7 +102,7 @@ sf.add_ionisation(Z=8, ion_stage=2, n_ion=1.0e8)
 
 Adds every ionisation shell of the ion to the equation, using the built-in cross-section data. `Z` is the atomic number, `ion_stage` is one more than the ion charge (so `ion_stage=1` is neutral), and `n_ion` is the ion number density in cm^-3.
 
-Each ion may be added once; an ion with `n_ion=0.0` is silently skipped. If any of the ion's shells has an ionisation potential below `emin_ev`, a `ValueError` explains which lower `emin_ev` to use.
+Each ion may be added once through this method; an ion with `n_ion=0.0` is silently skipped. If any of the ion's shells has an ionisation potential below `emin_ev`, a `ValueError` explains which lower `emin_ev` to use. To add a channel that the built-in table does not hold, or to replace the built-in shells of an ion, use [`add_ionisation_channel()`](#custom-ionisation-cross-sections).
 
 The free electron density is computed automatically from the charges and densities of the added ions (`sf.get_n_e()`). At least one ionised species (or an explicit `override_n_e` in `solve()`) is required.
 
@@ -120,7 +120,7 @@ Optional parameters:
 - `maxnlevelslower`, `maxnlevelsupper`: only include transitions from the lowest `maxnlevelslower` levels up to the lowest `maxnlevelsupper` levels (defaults 5 and 250, matching ARTIS). Pass `None` to include all.
 - `use_collstrengths`: use tabulated collision strengths where available (default `True`); otherwise cross sections come from the oscillator strength via the van Regemorter approximation.
 
-Transitions with energies outside the energy grid are dropped. If the internal database has no data for the ion, a `ValueError` is raised — you can then either supply your own level/transition table via `adata_polars` or add [custom cross sections](#advanced-usage-custom-excitation-cross-sections) with `add_excitation()`.
+Transitions with energies outside the energy grid are dropped. If the internal database has no data for the ion, a `ValueError` is raised — you can then either supply your own level/transition table via `adata_polars` or add [custom cross sections](#custom-excitation-cross-sections) with `add_excitation()`.
 
 An ion added only for excitation still contributes its charge to the free electron density.
 
@@ -227,18 +227,39 @@ Ionization cross sections from H (Z=1) to Ni (Z=28) use the shell-resolved analy
 
 Passing `use_ar1985=True` to the solver selects the original Arnaud and Rothenflug (1985) compilation without the Fe updates, which can be useful for comparison with older published results.
 
-## Advanced usage: custom excitation cross sections
+## Advanced usage: custom cross sections
 
-You can supply your own excitation cross section table:
+Give a custom cross section as a NumPy array of cross sections (cm^2) at every energy in `sf.engrid` (eV),
+with `add_excitation()` or `add_ionisation_channel()`. Interpolate your own table onto `sf.engrid` first.
+
+A custom cross section follows the same path through the solver as a built-in one. The matrix, the energy
+fractions, and the rate coefficients therefore stay consistent.
+
+The examples below use NumPy:
 
 ```python
-sf.add_excitation(Z, ion_stage, levelnumberdensity, xs_vec, epsilon_trans_ev, transitionkey=(lower, upper))
+import numpy as np
+import pynonthermal
+```
+
+### Custom excitation cross sections
+
+```python
+sf.add_excitation(
+    Z=8,
+    ion_stage=2,
+    levelnumberdensity=1.0e8,
+    epsilon_trans_ev=20.0,
+    transitionkey=(0, 3),
+    xs_vec=np.interp(sf.engrid, my_en_ev, my_xs_cm2, left=0.0, right=0.0),
+)
 ```
 
 - `Z`: atomic number.
 - `ion_stage`: one more than ion charge.
 - `levelnumberdensity`: population density of the lower level (cm^-3), non-negative.
-- `xs_vec`: NumPy array of cross sections (cm^2), non-negative, defined at every energy in `sf.engrid` (eV).
+- `xs_vec`: a NumPy array of cross sections (cm^2), non-negative and finite, at every energy in
+  `sf.engrid` (eV). The solver keeps a read-only copy, so a later write to your own array cannot change it.
 - `epsilon_trans_ev`: transition energy (eV). Must be positive and no greater than `emax_ev`, since no
   electron the solver represents could otherwise drive the transition.
 - `transitionkey`: any unique key within the ion, used to retrieve the excitation rate coefficient.
@@ -248,6 +269,43 @@ Fransson (1992) take every electron below `emin_ev` to have thermalised, so that
 as heating instead.
 
 Retrieve the rate coefficient afterwards with `get_excitation_ratecoeff()` as in [step 5](#5-read-the-results).
+
+### Custom ionisation cross sections
+
+```python
+sf.add_ionisation_channel(
+    Z=8,
+    ion_stage=2,
+    n_ion=1.0e8,
+    ionpot_ev=35.0,
+    xs_vec=np.interp(sf.engrid, my_en_ev, my_xs_cm2, left=0.0, right=0.0),
+)
+```
+
+- `n_ion`: the ion number density (cm^-3). It must agree with the value that any other call for this ion
+  gives.
+- `ionpot_ev`: the ionisation potential of the channel (eV). It must be between `emin_ev` and `emax_ev`,
+  and the cross section must be zero at and below it. Any value in that range is allowed, so a channel need
+  not be a subshell of the built-in table. A total ionisation cross section for the ion works too.
+- `xs_vec`: a NumPy array of cross sections (cm^2), non-negative and finite, at every energy in
+  `sf.engrid` (eV).
+- `channelkey`: any unique key within the ion. The default is the number of channels the ion already has.
+
+Call `add_ionisation_channel()` once for each channel of the ion. To keep the built-in shells as well,
+also call `add_ionisation()` for the ion. To replace them, do not call `add_ionisation()` for it.
+
+A channel with `n_ion=0.0` is checked and then skipped, as `add_ionisation()` skips an ion.
+
+`calculate_N_e()` integrates over a domain just above the ionisation potential that is narrower than one
+grid cell, so the solver interpolates `xs_vec` between the grid points there. Resolve that region with
+`npts` if it matters for your ion: the term it feeds is the energy that thermalises below `emin_ev`, which
+is a small part of the heating fraction.
+
+The solver keeps the Lorentzian secondary-electron distribution of Kozma and Fransson (1992, equation 4),
+whose width comes from `pynonthermal.collion.get_J()`. The matrix fill integrates that distribution
+analytically, so its shape is not adjustable.
+
+Retrieve the rate coefficient afterwards with `get_ionisation_ratecoeff()` as in [step 5](#5-read-the-results).
 
 ## Citing pynonthermal
 
