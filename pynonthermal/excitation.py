@@ -1,5 +1,6 @@
 import math
 import typing as t
+from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
@@ -11,6 +12,25 @@ from pynonthermal.constants import H
 from pynonthermal.constants import H_ionpot
 from pynonthermal.constants import ME
 from pynonthermal.constants import QE
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class ExcitationTransition:
+    """One bound-bound excitation that the solver holds, as SpencerFanoSolver.add_excitation() records it.
+
+    The cross section is an array on the solver energy grid, because every reader needs it only
+    there: the matrix fill, the excitation fraction of Kozma & Fransson 1992 equation 9, and the
+    single interpolated point that calculate_N_e() takes at energy_ev + epsilon_trans_ev.
+    """
+
+    levelnumberdensity: float
+    """The population density of the lower level [cm^-3]."""
+
+    xs_vec: npt.NDArray[np.float64]
+    """The cross section [cm^2] at every energy of SpencerFanoSolver.engrid."""
+
+    epsilon_trans_ev: float
+    """The transition energy [eV]."""
 
 
 def get_xs_excitation_vector(
