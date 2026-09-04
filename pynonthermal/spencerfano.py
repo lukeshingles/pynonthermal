@@ -698,7 +698,7 @@ class SpencerFanoSolver:
         exactly zero is skipped without being registered. A ValueError is raised if any shell's
         ionisation potential lies below the energy grid's emin_ev (the message gives the emin_ev
         to use instead). To add a channel that the built-in table does not hold, or to replace the
-        built-in shells of an ion, use add_ionisation_table() instead.
+        built-in shells of an ion, use add_ionisation_channel() instead.
 
         n_ion:
             the ion number density in cm^-3

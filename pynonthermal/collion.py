@@ -259,7 +259,7 @@ class IonisationChannel:
 
     Build a channel with from_xs(), which evaluates and checks the cross section.
     SpencerFanoSolver makes the built-in channels through get_ion_ionisation_channels(), and a
-    custom channel through SpencerFanoSolver.add_ionisation_table().
+    custom channel through SpencerFanoSolver.add_ionisation_channel().
     """
 
     ionpot_ev: float
