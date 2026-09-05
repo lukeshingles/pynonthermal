@@ -11,7 +11,6 @@ import numpy as np
 import pytest
 
 import pynonthermal
-from pynonthermal import ionbalance
 
 # illustrative recombination rate coefficients [cm^3 s^-1] keyed by the recombining ion stage
 OXYGEN_ALPHAS = {2: 3e-13, 3: 3e-12, 4: 1e-11}
@@ -20,22 +19,22 @@ HELIUM_ALPHAS = {2: 4e-13, 3: 2e-12}
 
 def test_saha_constant() -> None:
     # (2 pi m_e k_B / h^2)^(3/2) = 2.4147e15 cm^-3 K^-3/2
-    assert math.isclose(ionbalance.SAHA_CONST, 2.4147e15, rel_tol=1e-4)
+    assert math.isclose(pynonthermal.ionbalance.SAHA_CONST, 2.4147e15, rel_tol=1e-4)
 
 
 def test_saha_factor() -> None:
     # hydrogen at 10^4 K with U_I = 2 and U_II = 1: 2 * (1/2) * SAHA_CONST * T^1.5 * exp(-13.598 eV / kT)
     T = 1e4
-    expected = ionbalance.SAHA_CONST * T**1.5 * math.exp(-13.598 / (8.617333262145e-5 * T))
-    assert math.isclose(ionbalance.get_saha_factor(T, 13.598, 2.0, 1.0), expected, rel_tol=1e-12)
+    expected = pynonthermal.ionbalance.SAHA_CONST * T**1.5 * math.exp(-13.598 / (8.617333262145e-5 * T))
+    assert math.isclose(pynonthermal.ionbalance.get_saha_factor(T, 13.598, 2.0, 1.0), expected, rel_tol=1e-12)
 
     for bad in (0.0, -1.0, math.nan, math.inf):
         with pytest.raises(ValueError, match="temperature"):
-            ionbalance.get_saha_factor(bad, 13.598, 2.0, 1.0)
+            pynonthermal.ionbalance.get_saha_factor(bad, 13.598, 2.0, 1.0)
         with pytest.raises(ValueError, match="ionpot_ev"):
-            ionbalance.get_saha_factor(T, bad, 2.0, 1.0)
+            pynonthermal.ionbalance.get_saha_factor(T, bad, 2.0, 1.0)
         with pytest.raises(ValueError, match="partition functions"):
-            ionbalance.get_saha_factor(T, 13.598, bad, 1.0)
+            pynonthermal.ionbalance.get_saha_factor(T, 13.598, bad, 1.0)
 
 
 def test_ion_fractions() -> None:
@@ -44,12 +43,12 @@ def test_ion_fractions() -> None:
     c = [2e8, 5e7]
     r1, r2 = c[0] / n_e, c[1] / n_e
     total = 1.0 + r1 + r1 * r2
-    fractions = ionbalance.get_ion_fractions(c, n_e)
+    fractions = pynonthermal.ionbalance.get_ion_fractions(c, n_e)
     assert np.allclose(fractions, [1.0 / total, r1 / total, r1 * r2 / total], rtol=1e-14)
     assert math.isclose(sum(fractions), 1.0, rel_tol=1e-14)
 
     # a zero coefficient makes every higher stage exactly zero
-    fractions = ionbalance.get_ion_fractions([2e8, 0.0, 1e30], n_e)
+    fractions = pynonthermal.ionbalance.get_ion_fractions([2e8, 0.0, 1e30], n_e)
     assert fractions[2] == 0.0
     assert fractions[3] == 0.0
     assert math.isclose(fractions[0] + fractions[1], 1.0, rel_tol=1e-14)
@@ -58,56 +57,61 @@ def test_ion_fractions() -> None:
     # very large and very small coefficients neither overflow nor warn
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        fractions = ionbalance.get_ion_fractions([1e300, 1e300, 1e300], n_e)
+        fractions = pynonthermal.ionbalance.get_ion_fractions([1e300, 1e300, 1e300], n_e)
         assert fractions[3] == 1.0
-        fractions = ionbalance.get_ion_fractions([1e-300, 1e-300], n_e)
+        fractions = pynonthermal.ionbalance.get_ion_fractions([1e-300, 1e-300], n_e)
         assert fractions[0] == 1.0
         assert fractions[1] > 0.0
 
     with pytest.raises(ValueError, match="n_e"):
-        ionbalance.get_ion_fractions([1.0], 0.0)
+        pynonthermal.ionbalance.get_ion_fractions([1.0], 0.0)
     with pytest.raises(ValueError, match="ratio coefficients"):
-        ionbalance.get_ion_fractions([-1.0], n_e)
+        pynonthermal.ionbalance.get_ion_fractions([-1.0], n_e)
 
 
 def test_charge_neutral_n_e_two_stages() -> None:
     # one element with two stages: n_2 n_e = c n_1 and n_e = n_e_fixed + n_2, so
     # n_e^2 - n_e_fixed n_e = c (n_elem - n_e + n_e_fixed) is a quadratic in n_e
     n_elem = 1e10
-    for c, n_e_fixed in ((1e6, 0.0), (1e12, 0.0), (1e6, 3e7), (1e-20, 0.0)):
+    # the 1e-130 case has its root at 1e-65, far below the first lower bracket of the bisection
+    for c, n_e_fixed in ((1e6, 0.0), (1e12, 0.0), (1e6, 3e7), (1e-20, 0.0), (1e-130, 0.0)):
         b = -(n_e_fixed - c)
         a_c = -c * (n_elem + n_e_fixed)
         n_e_expected = 0.5 * (-b + math.sqrt(b * b - 4 * a_c))
-        n_e = ionbalance.solve_charge_neutral_n_e(n_e_fixed, [(n_elem, (1, 2), [c])])
+        n_e = pynonthermal.ionbalance.solve_charge_neutral_n_e(n_e_fixed, [(n_elem, (1, 2), [c])])
         assert math.isclose(n_e, n_e_expected, rel_tol=1e-10)
         # the populations at the result are charge neutral
-        fractions = ionbalance.get_ion_fractions([c], n_e)
+        fractions = pynonthermal.ionbalance.get_ion_fractions([c], n_e)
         assert math.isclose(n_e, n_e_fixed + n_elem * fractions[1], rel_tol=1e-10)
 
     # a chain that starts above the neutral stage has an exact lower bound: with zero ratios, every ion
     # sits in the lowest stage
-    assert math.isclose(ionbalance.solve_charge_neutral_n_e(0.0, [(n_elem, (2, 3), [0.0])]), n_elem, rel_tol=1e-12)
+    assert math.isclose(
+        pynonthermal.ionbalance.solve_charge_neutral_n_e(0.0, [(n_elem, (2, 3), [0.0])]), n_elem, rel_tol=1e-12
+    )
 
     # zero ratios and no fixed ionised ion give no free electrons
     with pytest.raises(ValueError, match="free electron density is zero"):
-        ionbalance.solve_charge_neutral_n_e(0.0, [(n_elem, (1, 2), [0.0])])
+        pynonthermal.ionbalance.solve_charge_neutral_n_e(0.0, [(n_elem, (1, 2), [0.0])])
     # but a fixed ionised ion carries the result
-    assert math.isclose(ionbalance.solve_charge_neutral_n_e(5.0, [(n_elem, (1, 2), [0.0])]), 5.0, rel_tol=1e-12)
+    assert math.isclose(
+        pynonthermal.ionbalance.solve_charge_neutral_n_e(5.0, [(n_elem, (1, 2), [0.0])]), 5.0, rel_tol=1e-12
+    )
 
     with pytest.raises(ValueError, match="ratio coefficients"):
-        ionbalance.solve_charge_neutral_n_e(0.0, [(n_elem, (1, 2, 3), [1.0])])
+        pynonthermal.ionbalance.solve_charge_neutral_n_e(0.0, [(n_elem, (1, 2, 3), [1.0])])
     with pytest.raises(ValueError, match="n_elem"):
-        ionbalance.solve_charge_neutral_n_e(0.0, [(0.0, (1, 2), [1.0])])
+        pynonthermal.ionbalance.solve_charge_neutral_n_e(0.0, [(0.0, (1, 2), [1.0])])
 
 
 def test_charge_neutral_n_e_two_elements() -> None:
     # the result is charge neutral for two elements together with fixed ions
     elements = [(1e10, (1, 2, 3), [1e9, 1e6]), (2e9, (2, 3), [3e8])]
     n_e_fixed = 4e8
-    n_e = ionbalance.solve_charge_neutral_n_e(n_e_fixed, elements)
+    n_e = pynonthermal.ionbalance.solve_charge_neutral_n_e(n_e_fixed, elements)
     charge = n_e_fixed
     for n_elem, ion_stages, ratio_coeffs in elements:
-        fractions = ionbalance.get_ion_fractions(ratio_coeffs, n_e)
+        fractions = pynonthermal.ionbalance.get_ion_fractions(ratio_coeffs, n_e)
         charge += n_elem * sum((ion_stage - 1) * frac for ion_stage, frac in zip(ion_stages, fractions, strict=True))
     assert math.isclose(n_e, charge, rel_tol=1e-10)
 
@@ -244,7 +248,9 @@ def test_saha_populations() -> None:
         assert math.isclose(n_e, sf.ionpopdict[(8, 2)] + 2 * sf.ionpopdict[(8, 3)], rel_tol=1e-12)
         for lower in (1, 2):
             partfuncs = [at_get_lte_partfunc(adata, 8, ion_stage, temperature) for ion_stage in (lower, lower + 1)]
-            saha_factor = ionbalance.get_saha_factor(temperature, ionpots[(8, lower)], partfuncs[0], partfuncs[1])
+            saha_factor = pynonthermal.ionbalance.get_saha_factor(
+                temperature, ionpots[(8, lower)], partfuncs[0], partfuncs[1]
+            )
             ratio = sf.ionpopdict[(8, lower + 1)] * n_e / sf.ionpopdict[(8, lower)]
             assert math.isclose(ratio, saha_factor, rel_tol=1e-9)
 
@@ -260,7 +266,7 @@ def test_saha_populations() -> None:
         sf.add_element_saha(2, 1e8, 30000.0, [1, 2, 3], partfuncs={1: 1.0, 2: 2.0})
         sf.solve(depositionratedensity_ev=1e8)
         n_e = sf.get_n_e()
-        saha_factor = ionbalance.get_saha_factor(30000.0, ionpots[(2, 2)], 2.0, 1.0)
+        saha_factor = pynonthermal.ionbalance.get_saha_factor(30000.0, ionpots[(2, 2)], 2.0, 1.0)
         assert math.isclose(sf.ionpopdict[(2, 3)] * n_e / sf.ionpopdict[(2, 2)], saha_factor, rel_tol=1e-9)
 
 

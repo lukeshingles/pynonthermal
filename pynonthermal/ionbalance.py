@@ -25,8 +25,9 @@ SAHA_CONST: float = (2.0 * math.pi * ME * (K_B * EV) / H**2) ** 1.5
 # bracket of 60 decades down to a relative width far below the double precision limit.
 _N_BISECTION_STEPS: int = 100
 
-# the lower bracket of the bisection when no exact lower bound exists, as a fraction of the
-# upper bracket. The populations are smooth in ln(n_e), so a wide bracket costs only steps.
+# the first lower bracket of the bisection when no exact lower bound exists, as a fraction of the
+# upper bracket, and the factor by which it falls until the residual is positive there. The
+# populations are smooth in ln(n_e), so a wide bracket costs only steps.
 _N_E_LOWER_BRACKET_FRACTION: float = 1e-60
 
 
@@ -142,21 +143,31 @@ def solve_charge_neutral_n_e(
         msg = "no element has an ionised stage, so the free electron density is zero"
         raise ValueError(msg)
 
-    if n_e_lower <= 0.0:
-        # a chain that starts at a neutral stage gives no exact positive lower bound, so use a
-        # bracket wide enough for any ratio coefficient that can arise
-        n_e_lower = n_e_upper * _N_E_LOWER_BRACKET_FRACTION
-
     def residual(n_e: float) -> float:
         return n_e_fixed + _charge_density(elements, n_e) - n_e
 
-    # the residual falls with n_e. It is positive at the lower bracket (or zero if every ratio
-    # coefficient is zero) and at most zero at the upper bracket.
-    if residual(n_e_lower) <= 0.0:
-        if n_e_fixed + _charge_density(elements, n_e_lower) <= 0.0:
-            msg = "every ratio coefficient is zero and no fixed ion is ionised, so the free electron density is zero"
-            raise ValueError(msg)
-        return n_e_lower
+    # the residual falls with n_e, and it is at most zero at the upper bracket
+    if n_e_lower > 0.0:
+        # the lower bracket is exact: every element has at least the charge of its lowest stage, so
+        # the residual there is at least zero. Zero means that every ratio coefficient is zero, and
+        # then the lower bracket is the solution.
+        if residual(n_e_lower) <= 0.0:
+            return n_e_lower
+    else:
+        # a chain that starts at a neutral stage gives no exact positive lower bound. As n_e falls,
+        # every ratio c_i / n_e grows and the charge density tends to a positive constant, so the
+        # residual turns positive at a small enough n_e unless every ratio coefficient is zero.
+        n_e_lower = n_e_upper * _N_E_LOWER_BRACKET_FRACTION
+        while residual(n_e_lower) <= 0.0:
+            if _charge_density(elements, n_e_lower) <= 0.0:
+                msg = (
+                    "every ratio coefficient is zero and no fixed ion is ionised, so the free electron density is zero"
+                )
+                raise ValueError(msg)
+            n_e_lower *= _N_E_LOWER_BRACKET_FRACTION
+            if n_e_lower == 0.0:
+                msg = "the charge-neutral free electron density is below the range of a double precision number"
+                raise ValueError(msg)
 
     ln_lower = math.log(n_e_lower)
     ln_upper = math.log(n_e_upper)

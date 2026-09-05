@@ -1421,7 +1421,6 @@ class SpencerFanoSolver:
 
             if not recomb_elements:
                 # the Saha ratios do not depend on the solution, so one pass is the answer
-                max_residual = 0.0
                 break
 
             # the residual compares the ratios that the new solution gives with the ratios that gave the
