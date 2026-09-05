@@ -215,8 +215,10 @@ Points to note:
 ### Saha equation
 
 ```python
+sf = pynonthermal.SpencerFanoSolver(emin_ev=0.1, emax_ev=3000, npts=4096)
 sf.set_temperature(12000)
 sf.add_element_saha(Z=8, n_elem=1.0e10, ion_stages=[1, 2, 3])
+sf.solve(depositionratedensity_ev=2.95e8)
 ```
 
 No recombination rate coefficients are needed. For each pair of adjacent stages, `n_{i+1} n_e / n_i = 2 (U_{i+1} / U_i) (2 pi m_e k_B T / h^2)^(3/2) exp(-chi_i / (k_B T))`, with the solver temperature `T` from `set_temperature()` and the ionisation potentials `chi_i` from the NIST table. The partition functions `U_i` come from the LTE level populations of the built-in level data at that temperature, which covers He, O, and Fe. For other elements, give them with `partfuncs={ion_stage: U, ...}`, or supply a level table via `adata_polars`. The bare nucleus (`ion_stage = Z + 1`) has a partition function of 1. `solve()` finds the free electron density from charge neutrality in one pass.

@@ -152,8 +152,8 @@ def solve_charge_neutral_n_e(n_e_fixed: float, elements: Sequence[tuple[float, i
         # every ratio c_i / n_e grows and the charge density tends to a positive constant, so the
         # residual turns positive at a small enough n_e unless every ratio coefficient is zero.
         n_e_lower = n_e_upper * _N_E_LOWER_BRACKET_FRACTION
-        while residual(n_e_lower) <= 0.0:
-            if _charge_density(elements, n_e_lower) <= 0.0:
+        while (charge_density := _charge_density(elements, n_e_lower)) <= n_e_lower:
+            if charge_density <= 0.0:
                 msg = (
                     "every ratio coefficient is zero and no fixed ion is ionised, so the free electron density is zero"
                 )

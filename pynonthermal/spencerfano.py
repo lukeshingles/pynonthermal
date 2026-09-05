@@ -60,6 +60,12 @@ class _ExcitationTemplate:
     xs_vec: npt.NDArray[np.float64]
     epsilon_trans_ev: float
 
+    def at_population(self, n_ion: float) -> ExcitationTransition:
+        # the transition that the solver holds when the ion has the population n_ion [cm^-3]
+        return ExcitationTransition(
+            levelnumberdensity=n_ion * self.popfrac, xs_vec=self.xs_vec, epsilon_trans_ev=self.epsilon_trans_ev
+        )
+
 
 @dataclasses.dataclass(slots=True, eq=False)
 class _BalancedElement:
@@ -598,6 +604,7 @@ class SpencerFanoSolver:
         Z: int,
         ion_stage: int,
         n_ion: float | None = None,
+        *,
         adata_polars: pl.DataFrame | None = None,
         use_collstrengths: bool = True,
         maxnlevelslower: int | None = 5,
@@ -831,14 +838,20 @@ class SpencerFanoSolver:
 
         templates = []
         for transition in dftransitions.iter_rows(named=True):
-            xs_vec = pynonthermal.excitation.get_xs_excitation_vector(
-                self.engrid, transition, use_collstrengths=use_collstrengths
+            transitionkey = (transition["lower"], transition["upper"])
+            # get_xs_on_grid() checks the cross section (finite, non-negative, on the grid) and returns a
+            # read-only copy, so custom atomic data fails here on both the fixed and the balanced path,
+            # and the array that ExcitationTransition later holds cannot change
+            xs_vec = get_xs_on_grid(
+                pynonthermal.excitation.get_xs_excitation_vector(
+                    self.engrid, transition, use_collstrengths=use_collstrengths
+                ),
+                self.engrid,
+                f"The cross section of transition {transitionkey} of Z={Z} ion_stage {ion_stage}",
             )
-            # the balanced path hands this array to ExcitationTransition, so it must not change later
-            xs_vec.flags.writeable = False
             templates.append(
                 (
-                    (transition["lower"], transition["upper"]),
+                    transitionkey,
                     _ExcitationTemplate(
                         popfrac=float(transition["lower_popfrac"]),
                         xs_vec=xs_vec,
@@ -871,11 +884,7 @@ class SpencerFanoSolver:
         transitions = self.excitationlists.setdefault((Z, ion_stage), {})
         for transitionkey, template in templates:
             stored[transitionkey] = template
-            transitions[transitionkey] = ExcitationTransition(
-                levelnumberdensity=n_ion * template.popfrac,
-                xs_vec=template.xs_vec,
-                epsilon_trans_ev=template.epsilon_trans_ev,
-            )
+            transitions[transitionkey] = template.at_population(n_ion)
             vec, k, frac = self._excitation_band_vectors(template.popfrac, template.xs_vec, template.epsilon_trans_ev)
             self._sum_excitation_bands(new_bands, vec, k, frac)
 
@@ -1332,12 +1341,7 @@ class SpencerFanoSolver:
             templates = element.excitation_templates.get(ion_stage)
             if templates:
                 self.excitationlists[(Z, ion_stage)] = {
-                    transitionkey: ExcitationTransition(
-                        levelnumberdensity=n_new * template.popfrac,
-                        xs_vec=template.xs_vec,
-                        epsilon_trans_ev=template.epsilon_trans_ev,
-                    )
-                    for transitionkey, template in templates.items()
+                    transitionkey: template.at_population(n_new) for transitionkey, template in templates.items()
                 }
         self._n_e = None
 
@@ -1598,7 +1602,8 @@ class SpencerFanoSolver:
                 f" compared with the total ionisation rate of the element ({rate_total:.2e} /s/cm3), so about"
                 f" {rates[top] / rate_total:.1%} of the element belongs in a higher stage. Extend the chain with a"
                 f" recombination rate coefficient for ion stage {top + 1}.",
-                stacklevel=3,
+                # the user's call of solve(): warn() -> _warn_top_stage_leak() -> _solve_ion_balance() -> solve()
+                stacklevel=4,
             )
 
     def calculate_nt_frac_excitation_ion(self, Z: int, ion_stage: int) -> float:
@@ -1848,7 +1853,6 @@ class SpencerFanoSolver:
                 print(f"     n_ion/n_ion_tot: {X_ion:.5f}")
 
             self._frac_ionisation_ion[(Z, ion_stage)] = 0.0
-            eta_over_ionpot_sum = 0.0
             for channel in channels:
                 ar_xs_array = channel.xs_grid
 
@@ -1877,15 +1881,20 @@ class SpencerFanoSolver:
                     )
 
                 self._frac_ionisation_ion[(Z, ion_stage)] += frac_ionisation_shell
-                eta_over_ionpot_sum += frac_ionisation_shell / channel.ionpot_ev
 
             self._frac_ionisation_tot += self._frac_ionisation_ion[(Z, ion_stage)]
 
-            # the ion's effective ionisation potential (Kozma & Fransson 1992 equation 12,
-            # modified to a sum over the ion's shells): the shell ionisation rates add, and
-            # each is inversely proportional to its potential, so the ion's rate follows from
-            # X_ion / eff_ionpot = eta_shell_a / ionpot_a + eta_shell_b / ionpot_b + ...
-            eff_ionpot = float(X_ion / eta_over_ionpot_sum) if eta_over_ionpot_sum else float("inf")
+            # the ion's effective ionisation potential (Kozma & Fransson 1992 equation 12, modified to
+            # a sum over the ion's shells): the shell ionisation rates add, and each is inversely
+            # proportional to its potential, so X_ion / eff_ionpot = eta_shell_a / ionpot_a + ... .
+            # The population cancels from that ratio, so the potential is taken from the ionisation
+            # rate coefficient, which stays finite for a stage with zero population.
+            ratecoeff = self._calculate_ionisation_ratecoeff(Z, ion_stage)
+            eff_ionpot = (
+                self.depositionratedensity_ev / n_ion_tot / ratecoeff
+                if ratecoeff > 0.0 and n_ion_tot > 0.0
+                else float("inf")
+            )
             self._eff_ionpot[(Z, ion_stage)] = eff_ionpot
 
             # eff_ionpot_usevalence = (
@@ -1917,7 +1926,7 @@ class SpencerFanoSolver:
             # density per ion in place of their gamma-ray energy absorption rate 4 pi J_gamma
             # sigma_gamma, divided by the effective potential. That equals the direct integral
             # of y(E) sigma(E) dE summed over the shells, which stays finite for a zero population.
-            self._nt_ionisation_ratecoeff[(Z, ion_stage)] = self._calculate_ionisation_ratecoeff(Z, ion_stage)
+            self._nt_ionisation_ratecoeff[(Z, ion_stage)] = ratecoeff
             if self.verbose and ionpot_valence is not None:
                 workfn_ev = get_workfn_ev(
                     Z,

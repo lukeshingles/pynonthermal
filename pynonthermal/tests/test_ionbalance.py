@@ -337,7 +337,10 @@ def test_zero_population_stage_has_a_rate_coefficient() -> None:
         assert sf.ionpopdict[(8, 4)] == 0.0
         assert sf.get_ionisation_ratecoeff(8, 3) > 0.0
         assert sf.get_ionisation_ratecoeff(8, 4) > 0.0
-        assert sf.get_eff_ionpot(8, 4) == math.inf
+        # the effective potential follows from the rate coefficient, so it is finite for an empty stage too
+        assert math.isclose(
+            sf.get_eff_ionpot(8, 4), 1e8 / sf.get_n_ion_tot() / sf.get_ionisation_ratecoeff(8, 4), rel_tol=1e-12
+        )
 
 
 def test_balance_not_converged(monkeypatch: pytest.MonkeyPatch) -> None:
