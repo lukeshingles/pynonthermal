@@ -91,20 +91,16 @@ def get_ion_fractions(ratio_coeffs: Sequence[float], n_e: float) -> list[float]:
     return [value / total for value in relative]
 
 
-def _charge_density(elements: Sequence[tuple[float, Sequence[int], Sequence[float]]], n_e: float) -> float:
+def _charge_density(elements: Sequence[tuple[float, int, Sequence[float]]], n_e: float) -> float:
     # the free electron density that the ion charges of the balanced elements give at n_e
     charge_density = 0.0
-    for n_elem, ion_stages, ratio_coeffs in elements:
+    for n_elem, lowest_stage, ratio_coeffs in elements:
         fractions = get_ion_fractions(ratio_coeffs, n_e)
-        charge_density += n_elem * sum(
-            (ion_stage - 1) * frac for ion_stage, frac in zip(ion_stages, fractions, strict=True)
-        )
+        charge_density += n_elem * sum((lowest_stage - 1 + index) * frac for index, frac in enumerate(fractions))
     return charge_density
 
 
-def solve_charge_neutral_n_e(
-    n_e_fixed: float, elements: Sequence[tuple[float, Sequence[int], Sequence[float]]]
-) -> float:
+def solve_charge_neutral_n_e(n_e_fixed: float, elements: Sequence[tuple[float, int, Sequence[float]]]) -> float:
     """Get the free electron density [cm^-3] that makes the plasma charge neutral.
 
     The result n_e satisfies n_e = n_e_fixed + the electrons from the ion charges of every
@@ -115,9 +111,10 @@ def solve_charge_neutral_n_e(
     n_e_fixed:
         the free electron density [cm^-3] from ions whose populations are fixed
     elements:
-        one tuple (n_elem, ion_stages, ratio_coeffs) per element: the element number density
-        [cm^-3], the contiguous ion stages of its chain, and the ratio coefficients
-        n_{i+1} n_e / n_i [cm^-3] of each pair of adjacent stages
+        one tuple (n_elem, lowest_stage, ratio_coeffs) per element: the element number density
+        [cm^-3], the lowest ion stage of its chain, and the ratio coefficients
+        n_{i+1} n_e / n_i [cm^-3] of each pair of adjacent stages. The chain has one stage more
+        than ratio coefficients.
     """
     if not 0.0 <= n_e_fixed < math.inf:
         msg = f"n_e_fixed must be non-negative and finite but is {n_e_fixed}"
@@ -125,19 +122,16 @@ def solve_charge_neutral_n_e(
 
     n_e_lower = n_e_fixed
     n_e_upper = n_e_fixed
-    for n_elem, ion_stages, ratio_coeffs in elements:
+    for n_elem, lowest_stage, ratio_coeffs in elements:
         if not 0.0 < n_elem < math.inf:
             msg = f"n_elem must be greater than zero and finite but is {n_elem}"
             raise ValueError(msg)
-        if len(ion_stages) != len(ratio_coeffs) + 1:
-            msg = (
-                f"{len(ion_stages)} ion stages need {len(ion_stages) - 1} ratio coefficients"
-                f" but {len(ratio_coeffs)} were given"
-            )
+        if lowest_stage < 1:
+            msg = f"the lowest ion stage must be at least 1 but is {lowest_stage}"
             raise ValueError(msg)
         # every stage is at least as charged as the lowest one and at most as the highest one
-        n_e_lower += (min(ion_stages) - 1) * n_elem
-        n_e_upper += (max(ion_stages) - 1) * n_elem
+        n_e_lower += (lowest_stage - 1) * n_elem
+        n_e_upper += (lowest_stage - 1 + len(ratio_coeffs)) * n_elem
 
     if n_e_upper <= 0.0:
         msg = "no element has an ionised stage, so the free electron density is zero"

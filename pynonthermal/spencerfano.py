@@ -4,6 +4,7 @@ import dataclasses
 import math
 import typing as t
 import warnings
+from collections.abc import Mapping
 from pathlib import Path
 
 import artistools as at
@@ -28,7 +29,6 @@ from pynonthermal.ionbalance import get_saha_factor
 from pynonthermal.ionbalance import solve_charge_neutral_n_e
 
 if t.TYPE_CHECKING:
-    from collections.abc import Mapping
     from collections.abc import Sequence
 
 # The weight of the new value when the ionisation balance mixes the ratio coefficients in log space.
@@ -38,6 +38,15 @@ if t.TYPE_CHECKING:
 # 2/3 gives a contraction ratio of at most 1/3 over that range. The unmixed iteration alternates with
 # a ratio of up to 1/2.
 BALANCE_MIXING_WEIGHT: float = 2.0 / 3.0
+
+# The maximum number of iterations of the ionisation balance in solve(). With the contraction ratio
+# above, a case that needs more than a few tens of iterations has a problem that more iterations
+# would not fix, so solve() raises a RuntimeError instead.
+BALANCE_MAXITER: int = 100
+
+# The default excitation temperature [K] of add_ion_ltepopexcitation() for an ion that does not
+# belong to a Saha element
+DEFAULT_EXCITATION_TEMPERATURE: float = 3000.0
 
 # The top stage of a balanced element is a sink: its ionisation is an energy loss in the matrix, but
 # the ions it makes have no stage to go to. In a longer chain those ions would sit in the next stage,
@@ -68,6 +77,9 @@ class _BalancedElement:
     # the Saha ratio coefficients n_{i+1} n_e / n_i [cm^-3] of each pair of adjacent stages, or None
     # for the recombination mode
     saha_factors: tuple[float, ...] | None
+    # the temperature [K] of the Saha mode, or None for the recombination mode. It is the default
+    # excitation temperature of the element's ions.
+    temperature: float | None
     # key is the ion stage, value is {transitionkey: template}
     excitation_templates: dict[int, dict[t.Any, _ExcitationTemplate]] = dataclasses.field(default_factory=dict)
     # key is the ion stage, value is {band width k: (vec, fracvec)} for a unit ion population, the
@@ -558,7 +570,7 @@ class SpencerFanoSolver:
         Z: int,
         ion_stage: int,
         n_ion: float | None = None,
-        temperature: float = 3000,
+        temperature: float | None = None,
         adata_polars: pl.DataFrame | None = None,
         use_collstrengths: bool = True,
         maxnlevelslower: int | None = 5,
@@ -571,7 +583,8 @@ class SpencerFanoSolver:
 
         If the ion belongs to an element added with add_element_ionbalance() or add_element_saha(),
         n_ion must be None. The level populations then follow the ion population that solve()
-        finds. For every other ion, n_ion is required.
+        finds. For every other ion, n_ion is required. add_element_ltepopexcitation() calls this
+        method for every stage of a balanced element that has level data.
 
         Transitions whose energy lies outside the solver's energy grid are dropped: above emax_ev no
         electron the solver represents can drive them, and below emin_ev Kozma & Fransson 1992 take every
@@ -583,7 +596,9 @@ class SpencerFanoSolver:
         n_ion:
             the ion number density in cm^-3, or None for an ion of a balanced element
         temperature:
-            the excitation temperature in K for the LTE Boltzmann level populations
+            the excitation temperature in K for the LTE Boltzmann level populations. None means the
+            temperature of the element's add_element_saha() call for an ion of a Saha element, and
+            3000 K for every other ion.
         adata_polars:
             a levels/transitions table to use instead of the internal database (the CMFGEN-derived
             ARTIS atomic data), in the format returned by artistools.atomic.get_levels() with
@@ -599,6 +614,11 @@ class SpencerFanoSolver:
             upper level index is below maxnlevelsupper; None disables that cutoff
         """
         self._require_not_solved("add excitation")
+        # the Boltzmann factors divide by the temperature, so a zero would fail deep inside polars and a
+        # negative value would invert the level populations without an error
+        if temperature is not None and not 0.0 < temperature < math.inf:
+            msg = f"temperature must be greater than zero and finite but is {temperature}"
+            raise ValueError(msg)
         if n_ion is None:
             element = self._balanced_elements.get(Z)
             if element is None or ion_stage not in element.ion_stages:
@@ -607,6 +627,8 @@ class SpencerFanoSolver:
                     " element added with add_element_ionbalance() or add_element_saha()."
                 )
                 raise ValueError(msg)
+            if temperature is None:
+                temperature = element.temperature if element.temperature is not None else DEFAULT_EXCITATION_TEMPERATURE
             templates = self._build_ltepop_excitation_templates(
                 Z, ion_stage, temperature, adata_polars, use_collstrengths, maxnlevelslower, maxnlevelsupper
             )
@@ -618,6 +640,8 @@ class SpencerFanoSolver:
         if not 0.0 <= n_ion < math.inf:
             msg = f"n_ion must be non-negative and finite but is {n_ion}"
             raise ValueError(msg)
+        if temperature is None:
+            temperature = DEFAULT_EXCITATION_TEMPERATURE
 
         templates = self._build_ltepop_excitation_templates(
             Z, ion_stage, temperature, adata_polars, use_collstrengths, maxnlevelslower, maxnlevelsupper
@@ -649,6 +673,52 @@ class SpencerFanoSolver:
             # error, matching the old behaviour of adding each transition atomically.
             for k, (bandvec, bandfracvec) in sorted(bands.items()):
                 self._add_excitation_band(bandvec, bandfracvec, k)
+
+    def add_element_ltepopexcitation(
+        self,
+        Z: int,
+        temperature: float | None = None,
+        adata_polars: pl.DataFrame | None = None,
+        use_collstrengths: bool = True,
+        maxnlevelslower: int | None = 5,
+        maxnlevelsupper: int | None = 250,
+    ) -> None:
+        """Add LTE bound-bound excitations to every stage of a balanced element that has level data.
+
+        This calls add_ion_ltepopexcitation() with n_ion=None for each stage of the chain of an
+        element added with add_element_ionbalance() or add_element_saha(). Stages without level data
+        (in the internal database or adata_polars) get no excitations; a ValueError reports an
+        element with no such stage. Call add_ion_ltepopexcitation() instead to choose the stages or
+        to give each stage its own options. The parameters are those of add_ion_ltepopexcitation().
+        """
+        element = self._balanced_elements.get(Z)
+        if element is None:
+            msg = f"Z={Z} is not a balanced element. Call add_element_ionbalance() or add_element_saha() first."
+            raise ValueError(msg)
+
+        stages_with_levels = [
+            ion_stage
+            for ion_stage in element.ion_stages
+            if ion_stage <= Z and self._get_ion_levels(Z, ion_stage, adata_polars) is not None
+        ]
+        if not stages_with_levels:
+            msg = (
+                f"No excitation data for any ion stage {element.ion_stages[0]}-{element.ion_stages[-1]} of Z={Z}."
+                " Supply a custom level/transition table via adata_polars."
+            )
+            raise ValueError(msg)
+
+        for ion_stage in stages_with_levels:
+            self.add_ion_ltepopexcitation(
+                Z,
+                ion_stage,
+                n_ion=None,
+                temperature=temperature,
+                adata_polars=adata_polars,
+                use_collstrengths=use_collstrengths,
+                maxnlevelslower=maxnlevelslower,
+                maxnlevelsupper=maxnlevelsupper,
+            )
 
     def _get_adata_polars(self, adata_polars: pl.DataFrame | None) -> pl.DataFrame:
         # the levels/transitions table: the one given now, else the one kept from an earlier call,
@@ -1039,9 +1109,20 @@ class SpencerFanoSolver:
             recombines (the upper stage of each pair). The keys must be contiguous and lie between
             2 and Z + 1.
         """
+        # a sequence would be iterated as keys, which gives a misleading message about the ion stages
+        if not isinstance(recomb_ratecoeffs, Mapping):
+            msg = (
+                "recomb_ratecoeffs must be a mapping from the recombining ion stage to the rate coefficient"
+                f" in cm^3 s^-1, for example {{2: 3e-13, 3: 3e-12}}, but is {type(recomb_ratecoeffs).__name__}"
+            )
+            raise TypeError(msg)
         if not recomb_ratecoeffs:
             msg = f"Z={Z} needs at least one recombination rate coefficient"
             raise ValueError(msg)
+        for ion_stage in recomb_ratecoeffs:
+            if not isinstance(ion_stage, int) or isinstance(ion_stage, bool):
+                msg = f"the keys of recomb_ratecoeffs must be ion stages (integers) but one is {ion_stage!r}"
+                raise TypeError(msg)
 
         upper_stages = sorted(recomb_ratecoeffs)
         ion_stages = tuple(range(upper_stages[0] - 1, upper_stages[-1] + 1))
@@ -1068,6 +1149,7 @@ class SpencerFanoSolver:
                 ion_stages=ion_stages,
                 recomb_ratecoeffs={int(ion_stage): float(alpha) for ion_stage, alpha in recomb_ratecoeffs.items()},
                 saha_factors=None,
+                temperature=None,
             )
         )
 
@@ -1113,6 +1195,14 @@ class SpencerFanoSolver:
         if not 0.0 < temperature < math.inf:
             msg = f"temperature must be greater than zero and finite but is {temperature}"
             raise ValueError(msg)
+        if partfuncs is not None:
+            # a partition function for a stage outside the chain is most likely a mistake in the keys
+            stages_outside_chain = sorted(ion_stage for ion_stage in partfuncs if ion_stage not in stages)
+            if stages_outside_chain:
+                msg = (
+                    f"partfuncs has ion stages {stages_outside_chain} that are not in the chain {list(stages)} of Z={Z}"
+                )
+                raise ValueError(msg)
 
         partfunc_of_stage: dict[int, float] = {}
         for ion_stage in stages:
@@ -1149,7 +1239,12 @@ class SpencerFanoSolver:
 
         self._add_balanced_element(
             _BalancedElement(
-                Z=Z, n_elem=n_elem, ion_stages=stages, recomb_ratecoeffs=None, saha_factors=tuple(saha_factors)
+                Z=Z,
+                n_elem=n_elem,
+                ion_stages=stages,
+                recomb_ratecoeffs=None,
+                saha_factors=tuple(saha_factors),
+                temperature=float(temperature),
             )
         )
 
@@ -1269,7 +1364,6 @@ class SpencerFanoSolver:
         override_n_e: float | None = None,
         *,
         balance_tol: float = 1e-4,
-        balance_maxiter: int = 100,
     ) -> None:
         """Solve the Spencer-Fano equation for the deposition rate density [eV s^-1 cm^-3].
 
@@ -1279,11 +1373,10 @@ class SpencerFanoSolver:
         balance_tol:
             the relative tolerance of the ratio n_{i+1} n_e / n_i of every pair of adjacent stages
             of an element added with add_element_ionbalance(). The iteration stops when the ratios
-            from the solution agree with the ratios that gave the populations to this tolerance.
-        balance_maxiter:
-            the maximum number of iterations of the ionisation balance. A RuntimeError reports a
-            balance that did not converge. After solve(), balance_iterations holds the number of
-            iterations that the balance took (zero without balanced elements).
+            from the solution agree with the ratios that gave the populations to this tolerance. A
+            RuntimeError reports a balance that did not converge within BALANCE_MAXITER iterations.
+            After solve(), balance_iterations holds the number of iterations that the balance took
+            (zero without balanced elements).
         """
         self._solved = False
         self.reset_solution_analysis()
@@ -1305,16 +1398,13 @@ class SpencerFanoSolver:
         if not 0.0 < balance_tol < 1.0:
             msg = f"balance_tol must be between zero and one but is {balance_tol}"
             raise ValueError(msg)
-        if balance_maxiter < 1:
-            msg = f"balance_maxiter must be at least 1 but is {balance_maxiter}"
-            raise ValueError(msg)
 
         # None clears any previously-set override, so that n_e is calculated on demand from ion populations
         self._n_e_override = override_n_e
         self._n_e = None
 
         if self._balanced_elements:
-            self._solve_ion_balance(balance_tol, balance_maxiter)
+            self._solve_ion_balance(balance_tol)
         else:
             self.balance_iterations = 0
             self._solve_matrix()
@@ -1360,7 +1450,7 @@ class SpencerFanoSolver:
         yvec_reference = solve_upper_triangular(self.sfmatrix, self.rhsvec, diag_add=lossvec)
         self.yvec = np.array(yvec_reference * self.depositionratedensity_ev / self.E_init_ev, dtype=np.float64)
 
-    def _solve_ion_balance(self, balance_tol: float, balance_maxiter: int) -> None:
+    def _solve_ion_balance(self, balance_tol: float) -> None:
         # find the populations of the balanced elements and the free electron density, and solve the
         # matrix equation at them. On return, yvec, ionpopdict, and the matrix agree with each other.
         elements = list(self._balanced_elements.values())
@@ -1390,7 +1480,7 @@ class SpencerFanoSolver:
             return element.saha_factors if element.saha_factors is not None else ratio_coeffs[element.Z]
 
         max_residual = math.inf
-        for iteration in range(1, balance_maxiter + 1):
+        for iteration in range(1, BALANCE_MAXITER + 1):
             self.balance_iterations = iteration
             n_e_fixed = sum(
                 (ion_stage - 1) * n_ion
@@ -1402,7 +1492,10 @@ class SpencerFanoSolver:
                 if self._n_e_override is not None
                 else solve_charge_neutral_n_e(
                     n_e_fixed,
-                    [(element.n_elem, element.ion_stages, get_element_ratio_coeffs(element)) for element in elements],
+                    [
+                        (element.n_elem, element.ion_stages[0], get_element_ratio_coeffs(element))
+                        for element in elements
+                    ],
                 )
             )
             for element in elements:
@@ -1466,7 +1559,7 @@ class SpencerFanoSolver:
                     )
         else:
             msg = (
-                f"the ionisation balance did not converge in {balance_maxiter} iterations: the largest relative"
+                f"the ionisation balance did not converge in {BALANCE_MAXITER} iterations: the largest relative"
                 f" change of a population ratio is {max_residual:.2e} (balance_tol {balance_tol})"
             )
             raise RuntimeError(msg)

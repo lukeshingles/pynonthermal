@@ -135,7 +135,7 @@ sf.solve(depositionratedensity_ev=1.0e8)
 
 - `depositionratedensity_ev`: the rate of energy deposition per volume in eV s^-1 cm^-3 (must be positive and finite). The energy *fractions* are independent of this value; the *rate coefficients* scale linearly with it.
 - `override_n_e`: optionally override the free electron density (cm^-3) instead of deriving it from the ion populations.
-- `balance_tol`, `balance_maxiter`: the tolerance and the iteration limit of the [ionisation balance](#ion-populations-from-an-ionisation-balance) (defaults `1e-4` and `100`). They have no effect without a balanced element.
+- `balance_tol`: the relative tolerance of the [ionisation balance](#ion-populations-from-an-ionisation-balance) (default `1e-4`). It has no effect without a balanced element.
 
 The solution spectrum is stored as `sf.yvec` over `sf.engrid` (see [Method background](#method-background) for the numerical scheme).
 
@@ -187,9 +187,8 @@ sf = pynonthermal.SpencerFanoSolver(emin_ev=0.1, emax_ev=3000, npts=4096)
 # recombination rate coefficients in cm^3 s^-1, keyed by the ion stage that recombines
 sf.add_element_ionbalance(Z=8, n_elem=1.0e10, recomb_ratecoeffs={2: 3.0e-13, 3: 3.0e-12, 4: 1.0e-11})
 
-# LTE excitations of a balanced ion: n_ion=None takes the population from the balance
-for ion_stage in (1, 2, 3):
-    sf.add_ion_ltepopexcitation(Z=8, ion_stage=ion_stage, n_ion=None, temperature=6000)
+# LTE excitations of every stage of the element that has level data. The populations follow the balance.
+sf.add_element_ltepopexcitation(Z=8, temperature=6000)
 
 sf.solve(depositionratedensity_ev=2.95e8)
 
@@ -199,13 +198,14 @@ print(sf.get_n_e())  # the charge-neutral free electron density [cm^-3]
 
 For each pair of adjacent ion stages `i` and `i+1`, the balance is `n_i Gamma_i = n_{i+1} n_e alpha_{i+1}`. `Gamma_i` is the non-thermal ionisation rate coefficient of stage `i` from the Spencer-Fano solution (`get_ionisation_ratecoeff()`), and `alpha_{i+1}` is the recombination rate coefficient that you give for stage `i+1`. The chain of stages runs from one below the lowest key of `recomb_ratecoeffs` to the highest key. In the example, the chain is O I to O IV.
 
-The Spencer-Fano solution depends on the ion densities, so `solve()` iterates: it solves the equation, updates the ion densities from the balance and the free electron density from charge neutrality, and repeats until the population ratios agree to `balance_tol`. A `RuntimeError` reports a balance that did not converge within `balance_maxiter` iterations. Typical cases converge in about 5 to 10 iterations.
+The Spencer-Fano solution depends on the ion densities, so `solve()` iterates: it solves the equation, updates the ion densities from the balance and the free electron density from charge neutrality, and repeats until the population ratios agree to `balance_tol`. A `RuntimeError` reports a balance that did not converge within 100 iterations. Typical cases converge in about 5 to 10 iterations.
 
 Points to note:
 
 - The balance includes only non-thermal ionisation and the recombination that you give. It does not include thermal collisional ionisation, photoionisation, or charge exchange. The ion fractions therefore depend on `depositionratedensity_ev`, unlike the fixed-population case.
 - The top stage of the chain is a sink. Its ionisation is an energy loss in the matrix, but the ions it makes have no stage to go to. `solve()` warns if the ionisation rate out of the top stage exceeds 1 % of the total ionisation rate of the element, because about that fraction of the element then belongs in a higher stage. Then extend the chain with a rate coefficient for the next stage.
 - Every stage of the chain gets the built-in ionisation channels of `add_ionisation()`. You cannot call `add_ionisation()`, `add_ionisation_channel()`, or `add_excitation()` for an ion of a balanced element.
+- To choose the stages that get excitations, or to give each stage its own options, call `add_ion_ltepopexcitation(Z, ion_stage, n_ion=None, ...)` per stage instead of `add_element_ltepopexcitation()`. For an ion of a Saha element, `temperature=None` (the default) means the Saha temperature.
 - Until `solve()` runs, `sf.ionpopdict`, `sf.get_n_e()`, and `sf.get_n_ion_tot()` hold a provisional population of equal fractions for the stages of the chain.
 - A second call to `solve()` starts from the converged rates of the first call.
 
