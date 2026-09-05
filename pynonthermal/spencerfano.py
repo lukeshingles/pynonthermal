@@ -280,8 +280,8 @@ class SpencerFanoSolver:
         self._balanced_elements = {}
         self.balance_iterations = 0
 
-        # the one temperature [K] of the solver, for the LTE level populations and the Saha equation.
-        # The first call that gives a temperature sets it (see _resolve_temperature()).
+        # the one temperature [K] of the solver for the LTE level populations and the Saha equation,
+        # set by set_temperature(). None until then.
         self.temperature = None
 
         self.verbose = verbose
@@ -363,31 +363,31 @@ class SpencerFanoSolver:
         # excitation channels (in the order their first excitation was added)
         return list(dict.fromkeys([*self.ionpopdict, *self.excitationlists]))
 
-    def _resolve_temperature(self, temperature: float | None) -> float:
-        # the solver has one temperature. A call that gives one must agree with the value that an
-        # earlier call gave, and a call that gives None takes the value that is set. The caller stores
-        # the result in self.temperature when every other check of the call has passed, so that a
-        # rejected call leaves the solver unchanged.
-        if temperature is None:
-            if self.temperature is None:
-                msg = (
-                    "temperature is required, because no earlier call on this solver gave one. Give the"
-                    " temperature in K here, or first in add_element_saha() or add_ion_ltepopexcitation()."
-                )
-                raise ValueError(msg)
-            return self.temperature
+    def set_temperature(self, temperature: float) -> None:
+        """Set the temperature in K for the LTE level populations and the Saha equation.
 
+        The solver has one temperature. Call this method before add_ion_ltepopexcitation(),
+        add_element_ltepopexcitation(), or add_element_saha(). A second call with a different value
+        raises a ValueError, because the level populations already in the matrix use the first value.
+        """
+        self._require_not_solved("set the temperature")
+        # the chained comparison also rejects nan
         if not 0.0 < temperature < math.inf:
             msg = f"temperature must be greater than zero and finite but is {temperature}"
             raise ValueError(msg)
         if self.temperature is not None and not math.isclose(self.temperature, temperature, rel_tol=1e-9):
             msg = (
-                f"the solver has one temperature, and an earlier call set it to {self.temperature} K, so"
-                f" {temperature} K cannot be used. Leave temperature as None to use the value that is set."
+                f"the solver has one temperature, and it is set to {self.temperature} K, so it cannot change"
+                f" to {temperature} K"
             )
             raise ValueError(msg)
+        self.temperature = float(temperature)
 
-        return float(temperature)
+    def _get_temperature(self) -> float:
+        if self.temperature is None:
+            msg = "the temperature is not set. Call set_temperature() first."
+            raise ValueError(msg)
+        return self.temperature
 
     def _check_not_balanced(self, Z: int) -> None:
         # the populations of a balanced element come from solve(), so a caller cannot give one
@@ -594,13 +594,14 @@ class SpencerFanoSolver:
         Z: int,
         ion_stage: int,
         n_ion: float | None = None,
-        temperature: float | None = None,
         adata_polars: pl.DataFrame | None = None,
         use_collstrengths: bool = True,
         maxnlevelslower: int | None = 5,
         maxnlevelsupper: int | None = 250,
     ) -> None:
         """Add bound-bound excitations of one ion, with LTE level populations at the solver temperature.
+
+        Call set_temperature() first.
 
         Each added transition is keyed by (lower level index, upper level index), the key to pass to
         get_excitation_ratecoeff() after solving.
@@ -619,11 +620,6 @@ class SpencerFanoSolver:
 
         n_ion:
             the ion number density in cm^-3, or None for an ion of a balanced element
-        temperature:
-            the temperature in K for the LTE Boltzmann level populations. The solver has one
-            temperature: the first call that gives one (this method, add_element_ltepopexcitation(),
-            or add_element_saha()) sets it, and later calls can give None to use it. A different
-            value raises a ValueError.
         adata_polars:
             a levels/transitions table to use instead of the internal database (the CMFGEN-derived
             ARTIS atomic data), in the format returned by artistools.atomic.get_levels() with
@@ -639,7 +635,7 @@ class SpencerFanoSolver:
             upper level index is below maxnlevelsupper; None disables that cutoff
         """
         self._require_not_solved("add excitation")
-        temperature = self._resolve_temperature(temperature)
+        temperature = self._get_temperature()
         if n_ion is None:
             element = self._balanced_elements.get(Z)
             if element is None or ion_stage not in element.ion_stages:
@@ -652,7 +648,6 @@ class SpencerFanoSolver:
                 Z, ion_stage, temperature, adata_polars, use_collstrengths, maxnlevelslower, maxnlevelsupper
             )
             self._add_balanced_excitation_templates(element, ion_stage, templates)
-            self.temperature = temperature
             return
 
         # the population check runs before the atomic data is read, so a bad n_ion fails fast
@@ -691,12 +686,10 @@ class SpencerFanoSolver:
             # error, matching the old behaviour of adding each transition atomically.
             for k, (bandvec, bandfracvec) in sorted(bands.items()):
                 self._add_excitation_band(bandvec, bandfracvec, k)
-        self.temperature = temperature
 
     def add_element_ltepopexcitation(
         self,
         Z: int,
-        temperature: float | None = None,
         adata_polars: pl.DataFrame | None = None,
         use_collstrengths: bool = True,
         maxnlevelslower: int | None = 5,
@@ -714,7 +707,7 @@ class SpencerFanoSolver:
         if element is None:
             msg = f"Z={Z} is not a balanced element. Call add_element_ionbalance() or add_element_saha() first."
             raise ValueError(msg)
-        temperature = self._resolve_temperature(temperature)
+        self._get_temperature()
 
         stages_with_levels = [
             ion_stage
@@ -733,7 +726,6 @@ class SpencerFanoSolver:
                 Z,
                 ion_stage,
                 n_ion=None,
-                temperature=temperature,
                 adata_polars=adata_polars,
                 use_collstrengths=use_collstrengths,
                 maxnlevelslower=maxnlevelslower,
@@ -1176,7 +1168,6 @@ class SpencerFanoSolver:
         self,
         Z: int,
         n_elem: float,
-        temperature: float | None,
         ion_stages: Sequence[int],
         partfuncs: Mapping[int, float] | None = None,
         adata_polars: pl.DataFrame | None = None,
@@ -1197,9 +1188,6 @@ class SpencerFanoSolver:
 
         n_elem:
             the number density of the element in cm^-3, summed over the stages of the chain
-        temperature:
-            the temperature in K. The solver has one temperature: the first call that gives one sets
-            it, and later calls can give None to use it. A different value raises a ValueError.
         ion_stages:
             at least two contiguous ion stages between 1 and Z + 1
         partfuncs:
@@ -1212,7 +1200,7 @@ class SpencerFanoSolver:
         """
         stages = tuple(int(ion_stage) for ion_stage in ion_stages)
         self._check_new_balanced_element(Z, n_elem, stages)
-        temperature = self._resolve_temperature(temperature)
+        temperature = self._get_temperature()
         if partfuncs is not None:
             # a partition function for a stage outside the chain is most likely a mistake in the keys
             stages_outside_chain = sorted(ion_stage for ion_stage in partfuncs if ion_stage not in stages)
@@ -1264,7 +1252,6 @@ class SpencerFanoSolver:
                 saha_factors=tuple(saha_factors),
             )
         )
-        self.temperature = temperature
 
     def _check_new_balanced_element(self, Z: int, n_elem: float, ion_stages: tuple[int, ...]) -> None:
         # the checks of both add_element methods that need no atomic data

@@ -185,11 +185,12 @@ def test_override_n_e_not_confused_with_cache() -> None:
 def test_n_e_cache_invalidated_by_later_adds() -> None:
     # reading n_e between add_* calls must not freeze it at the earlier value
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=200) as sf:
+        sf.set_temperature(3000)
         sf.add_ionisation(8, 2, n_ion=1e8)
         assert sf.get_n_e() == 1e8
         sf.add_ionisation(8, 3, n_ion=1e8)
         assert sf.get_n_e() == 3e8
-        sf.add_ion_ltepopexcitation(26, 3, n_ion=5e7, temperature=3000, use_collstrengths=False)
+        sf.add_ion_ltepopexcitation(26, 3, n_ion=5e7, use_collstrengths=False)
         assert sf.get_n_e() == 4e8
 
 
@@ -407,8 +408,9 @@ def test_excitation_xs_zero_above_grid() -> None:
     # no cross section anywhere may be negative for real atomic data on a grid far below the
     # highest transition energy
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=5.0, npts=300) as sf:
+        sf.set_temperature(3000)
         sf.add_ionisation(26, 3, n_ion=0.7)
-        sf.add_ion_ltepopexcitation(26, 3, n_ion=0.7, temperature=3000)
+        sf.add_ion_ltepopexcitation(26, 3, n_ion=0.7)
         for transitions in sf.excitationlists.values():
             for trans in transitions.values():
                 assert trans.epsilon_trans_ev <= sf.engrid[-1]
@@ -434,6 +436,7 @@ def test_excitation_only_ion_counted() -> None:
     # an ion given an excitation channel but no ionisation channel still spends deposited energy,
     # so its excitation fraction has to appear in the totals
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=500) as sf:
+        sf.set_temperature(3000)
         sf.add_ionisation(8, 2, n_ion=1e8)
         xs_vec = np.where(sf.engrid >= 20.0, 1e-16, 0.0)
         sf.add_excitation(26, 2, levelnumberdensity=1e8, xs_vec=xs_vec, epsilon_trans_ev=20.0)
@@ -447,8 +450,9 @@ def test_ltepopexcitation_registers_population() -> None:
     # add_ion_ltepopexcitation() without add_ionisation() must still contribute the ion's free
     # electrons and nuclei, and must not invent an ionisation channel for it
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=600) as sf:
+        sf.set_temperature(3000)
         sf.add_ionisation(8, 2, n_ion=1e8)
-        sf.add_ion_ltepopexcitation(26, 3, n_ion=5e7, temperature=3000, use_collstrengths=False)
+        sf.add_ion_ltepopexcitation(26, 3, n_ion=5e7, use_collstrengths=False)
 
         assert sf.ionpopdict[(26, 3)] == 5e7
         assert sf.get_n_e() == 1e8 * 1 + 5e7 * 2
@@ -461,11 +465,10 @@ def test_ltepopexcitation_registers_population() -> None:
         assert math.isclose(sf.get_frac_sum(), 1.0, abs_tol=0.01)
 
     # a negative population is rejected on the excitation path too
-    with (
-        pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=200) as sf,
-        pytest.raises(ValueError, match="non-negative"),
-    ):
-        sf.add_ion_ltepopexcitation(26, 3, n_ion=-1.0, temperature=3000, use_collstrengths=False)
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=200) as sf:
+        sf.set_temperature(3000)
+        with pytest.raises(ValueError, match="non-negative"):
+            sf.add_ion_ltepopexcitation(26, 3, n_ion=-1.0, use_collstrengths=False)
 
 
 def test_conservation_warning_on_coarse_grid() -> None:
@@ -473,9 +476,10 @@ def test_conservation_warning_on_coarse_grid() -> None:
     # which must trigger the conservation diagnostic
     x_e = 1e-4
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=100) as sf:
+        sf.set_temperature(3000)
         for Z, ion_stage, n_ion in ((2, 1, 1.0 - x_e), (2, 2, x_e)):
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
-            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion, temperature=3000, use_collstrengths=False)
+            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
         sf.solve(depositionratedensity_ev=100)
 
         with pytest.warns(UserWarning, match="energy fractions sum to"):
@@ -648,7 +652,8 @@ def test_ltepop_excitation_grouped_fill() -> None:
     # agree to within summation-order rounding.
     npts = 400
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=npts) as sf:
-        sf.add_ion_ltepopexcitation(2, 1, n_ion=1.0, temperature=3000, use_collstrengths=False)
+        sf.set_temperature(3000)
+        sf.add_ion_ltepopexcitation(2, 1, n_ion=1.0, use_collstrengths=False)
         assert len(sf.excitationlists[(2, 1)]) > 100  # the grouping must actually see many transitions
         expected = np.zeros((npts, npts))
         for trans in sf.excitationlists[(2, 1)].values():

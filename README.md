@@ -111,15 +111,17 @@ If you do not know the ion densities, the solver can find them for you from an i
 
 ### 3. Add excitation channels (optional)
 
-For bound-bound excitation using the built-in atomic database (levels and transitions from the CMFGEN compilation), with LTE level populations at a chosen temperature:
+For bound-bound excitation using the built-in atomic database (levels and transitions from the CMFGEN compilation), with LTE level populations at the solver temperature:
 
 ```python
-sf.add_ion_ltepopexcitation(Z=8, ion_stage=1, n_ion=1.0e10, temperature=6000)
+sf.set_temperature(6000)  # K, once per solver
+sf.add_ion_ltepopexcitation(Z=8, ion_stage=1, n_ion=1.0e10)
 ```
+
+The solver has one temperature (`sf.temperature`), which the LTE level populations and the [Saha equation](#saha-equation) use. Call `set_temperature()` before the first method that needs it; a second call with a different value raises a `ValueError`.
 
 Optional parameters:
 
-- `temperature`: temperature in K for the LTE Boltzmann level populations. A solver has one temperature: the first call that gives one (`add_ion_ltepopexcitation()`, `add_element_ltepopexcitation()`, or `add_element_saha()`) sets `sf.temperature`, later calls can leave it as `None` to use that value, and a different value raises a `ValueError`.
 - `maxnlevelslower`, `maxnlevelsupper`: only include transitions from the lowest `maxnlevelslower` levels up to the lowest `maxnlevelsupper` levels (defaults 5 and 250, matching ARTIS). Pass `None` to include all.
 - `use_collstrengths`: use tabulated collision strengths where available (default `True`); otherwise cross sections come from the oscillator strength via the van Regemorter approximation.
 
@@ -188,7 +190,8 @@ sf = pynonthermal.SpencerFanoSolver(emin_ev=0.1, emax_ev=3000, npts=4096)
 sf.add_element_ionbalance(Z=8, n_elem=1.0e10, recomb_ratecoeffs={2: 3.0e-13, 3: 3.0e-12, 4: 1.0e-11})
 
 # LTE excitations of every stage of the element that has level data. The populations follow the balance.
-sf.add_element_ltepopexcitation(Z=8, temperature=6000)
+sf.set_temperature(6000)
+sf.add_element_ltepopexcitation(Z=8)
 
 sf.solve(depositionratedensity_ev=2.95e8)
 
@@ -205,17 +208,18 @@ Points to note:
 - The balance includes only non-thermal ionisation and the recombination that you give. It does not include thermal collisional ionisation, photoionisation, or charge exchange. The ion fractions therefore depend on `depositionratedensity_ev`, unlike the fixed-population case.
 - The top stage of the chain is a sink. Its ionisation is an energy loss in the matrix, but the ions it makes have no stage to go to. `solve()` warns if the ionisation rate out of the top stage exceeds 1 % of the total ionisation rate of the element, because about that fraction of the element then belongs in a higher stage. Then extend the chain with a rate coefficient for the next stage.
 - Every stage of the chain gets the built-in ionisation channels of `add_ionisation()`. You cannot call `add_ionisation()`, `add_ionisation_channel()`, or `add_excitation()` for an ion of a balanced element.
-- To choose the stages that get excitations, or to give each stage its own options, call `add_ion_ltepopexcitation(Z, ion_stage, n_ion=None, ...)` per stage instead of `add_element_ltepopexcitation()`. After `add_element_saha()`, the solver temperature is set, so the excitation calls can omit it.
+- To choose the stages that get excitations, or to give each stage its own options, call `add_ion_ltepopexcitation(Z, ion_stage, n_ion=None, ...)` per stage instead of `add_element_ltepopexcitation()`.
 - Until `solve()` runs, `sf.ionpopdict`, `sf.get_n_e()`, and `sf.get_n_ion_tot()` hold a provisional population of equal fractions for the stages of the chain.
 - A second call to `solve()` starts from the converged rates of the first call.
 
 ### Saha equation
 
 ```python
-sf.add_element_saha(Z=8, n_elem=1.0e10, temperature=12000, ion_stages=[1, 2, 3])
+sf.set_temperature(12000)
+sf.add_element_saha(Z=8, n_elem=1.0e10, ion_stages=[1, 2, 3])
 ```
 
-No recombination rate coefficients are needed. For each pair of adjacent stages, `n_{i+1} n_e / n_i = 2 (U_{i+1} / U_i) (2 pi m_e k_B T / h^2)^(3/2) exp(-chi_i / (k_B T))`, with the ionisation potentials `chi_i` from the NIST table. The partition functions `U_i` come from the LTE level populations of the built-in level data at `temperature`, which covers He, O, and Fe. For other elements, give them with `partfuncs={ion_stage: U, ...}`, or supply a level table via `adata_polars`. The bare nucleus (`ion_stage = Z + 1`) has a partition function of 1. `solve()` finds the free electron density from charge neutrality in one pass.
+No recombination rate coefficients are needed. For each pair of adjacent stages, `n_{i+1} n_e / n_i = 2 (U_{i+1} / U_i) (2 pi m_e k_B T / h^2)^(3/2) exp(-chi_i / (k_B T))`, with the solver temperature `T` from `set_temperature()` and the ionisation potentials `chi_i` from the NIST table. The partition functions `U_i` come from the LTE level populations of the built-in level data at that temperature, which covers He, O, and Fe. For other elements, give them with `partfuncs={ion_stage: U, ...}`, or supply a level table via `adata_polars`. The bare nucleus (`ion_stage = Z + 1`) has a partition function of 1. `solve()` finds the free electron density from charge neutrality in one pass.
 
 Both kinds of balanced element can be in one solver together with ions that have fixed number densities. The free electron density then sums the charges of all of them. With `override_n_e`, the balance uses that density instead.
 
@@ -242,9 +246,10 @@ ions = [
 
 # emin_ev=1 matches the low-energy cutoff E_0 of Kozma & Fransson (1992)
 sf = pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=4096, verbose=True)
+sf.set_temperature(6000)
 for Z, ion_stage, n_ion in ions:
     sf.add_ionisation(Z, ion_stage, n_ion)
-    sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion, temperature=6000)
+    sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion)
 
 # with fixed ion densities, any positive deposition rate works here: the energy fractions
 # are independent of it (with a balanced element they would not be)
