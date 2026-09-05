@@ -410,9 +410,9 @@ def test_balanced_element_input_validation() -> None:
         bad_ratecoeffs: t.Any = [3e-13, 3e-12]
         with pytest.raises(TypeError, match="must be a mapping"):
             sf.add_element_ionbalance(8, 1e10, bad_ratecoeffs)
-        bad_ratecoeffs = {2.0: 3e-13}
+        float_keyed_ratecoeffs: t.Any = {2.0: 3e-13}
         with pytest.raises(TypeError, match="must be ion stages"):
-            sf.add_element_ionbalance(8, 1e10, bad_ratecoeffs)
+            sf.add_element_ionbalance(8, 1e10, float_keyed_ratecoeffs)
         with pytest.raises(ValueError, match="not in the chain"):
             sf.add_element_saha(8, 1e10, 5000.0, [1, 2], partfuncs={3: 1.0})
         for bad_temperature in (0.0, -100.0, math.nan):
