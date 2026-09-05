@@ -312,7 +312,7 @@ def test_override_n_e_with_balance() -> None:
 def test_heating_only_approximation_with_balance() -> None:
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300, heating_only_approximation=True) as sf:
         sf.add_element_ionbalance(2, 1e8, HELIUM_ALPHAS)
-        sf.add_ion_ltepopexcitation(2, 1, n_ion=None, use_collstrengths=False)
+        sf.add_ion_ltepopexcitation(2, 1, n_ion=None, temperature=3000, use_collstrengths=False)
         assert not sf.sfmatrix.any()
         sf.solve(depositionratedensity_ev=1e8)
         assert not sf.sfmatrix.any()
@@ -365,41 +365,61 @@ def test_element_ltepopexcitation() -> None:
         assert np.array_equal(sf_element.sfmatrix, sf_stages.sfmatrix)
 
         with pytest.raises(ValueError, match="not a balanced element"):
-            sf_element.add_element_ltepopexcitation(8)
+            sf_element.add_element_ltepopexcitation(8, temperature=5000)
         # an element without any level data is rejected
         sf_element.add_element_saha(56, 1e8, 5000.0, [1, 2], partfuncs={1: 1.0, 2: 2.0})
         with pytest.raises(ValueError, match="No excitation data for any ion stage 1-2 of Z=56"):
-            sf_element.add_element_ltepopexcitation(56)
+            sf_element.add_element_ltepopexcitation(56, temperature=5000)
 
 
-def test_saha_element_supplies_excitation_temperature() -> None:
-    # with temperature=None, an ion of a Saha element uses the Saha temperature, and every other ion 3000 K
+def test_solver_has_one_temperature() -> None:
+    # the first call that gives a temperature sets it for the solver, later calls can leave it None,
+    # and a different value is rejected
     temperature = 12000.0
     with (
-        pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300) as sf_default,
+        pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300) as sf_saha_first,
         pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300) as sf_explicit,
-        pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300) as sf_3000,
     ):
-        for sf in (sf_default, sf_explicit, sf_3000):
-            sf.add_element_saha(8, 1e10, temperature, [1, 2, 3])
-            sf.add_element_ionbalance(2, 1e8, HELIUM_ALPHAS)
-        sf_default.add_ion_ltepopexcitation(8, 1, n_ion=None, use_collstrengths=False)
-        sf_default.add_ion_ltepopexcitation(2, 1, n_ion=None, use_collstrengths=False)
+        # set by add_element_saha(), then used by the excitation calls of both elements
+        assert sf_saha_first.temperature is None
+        sf_saha_first.add_element_saha(8, 1e10, temperature, [1, 2, 3])
+        assert sf_saha_first.temperature == temperature
+        sf_saha_first.add_element_ionbalance(2, 1e8, HELIUM_ALPHAS)
+        sf_saha_first.add_ion_ltepopexcitation(8, 1, n_ion=None, use_collstrengths=False)
+        sf_saha_first.add_element_ltepopexcitation(2, use_collstrengths=False)
+
+        sf_explicit.add_element_saha(8, 1e10, temperature, [1, 2, 3])
+        sf_explicit.add_element_ionbalance(2, 1e8, HELIUM_ALPHAS)
         sf_explicit.add_ion_ltepopexcitation(8, 1, n_ion=None, temperature=temperature, use_collstrengths=False)
-        sf_explicit.add_ion_ltepopexcitation(2, 1, n_ion=None, temperature=3000, use_collstrengths=False)
-        sf_3000.add_ion_ltepopexcitation(8, 1, n_ion=None, temperature=3000, use_collstrengths=False)
-        sf_3000.add_ion_ltepopexcitation(2, 1, n_ion=None, temperature=3000, use_collstrengths=False)
+        sf_explicit.add_element_ltepopexcitation(2, temperature=temperature, use_collstrengths=False)
 
-        def excited_level_population(sf: pynonthermal.SpencerFanoSolver, Z: int) -> float:
-            # the population of the lower level of the first transition that starts above the ground level
-            return next(
-                trans.levelnumberdensity for (lower, _), trans in sf.excitationlists[(Z, 1)].items() if lower > 0
-            )
+        for key, transitions in sf_saha_first.excitationlists.items():
+            for transitionkey, trans in transitions.items():
+                assert trans.levelnumberdensity == sf_explicit.excitationlists[key][transitionkey].levelnumberdensity
 
-        assert excited_level_population(sf_default, 8) == excited_level_population(sf_explicit, 8)
-        assert excited_level_population(sf_default, 8) != excited_level_population(sf_3000, 8)
-        # the recombination-balance element has no temperature, so its ion takes the 3000 K default
-        assert excited_level_population(sf_default, 2) == excited_level_population(sf_3000, 2)
+        # a different temperature conflicts with the one that is set
+        with pytest.raises(ValueError, match="the solver has one temperature"):
+            sf_saha_first.add_ion_ltepopexcitation(8, 2, n_ion=None, temperature=5000, use_collstrengths=False)
+        with pytest.raises(ValueError, match="the solver has one temperature"):
+            sf_saha_first.add_element_saha(26, 1e6, 5000.0, [1, 2])
+        # the same value again is fine
+        sf_saha_first.add_ion_ltepopexcitation(8, 2, n_ion=None, temperature=temperature, use_collstrengths=False)
+
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=300) as sf:
+        # without any earlier temperature, None is rejected with a message that says where to give one
+        sf.add_element_ionbalance(2, 1e8, HELIUM_ALPHAS)
+        with pytest.raises(ValueError, match="temperature is required"):
+            sf.add_ion_ltepopexcitation(2, 1, n_ion=None, use_collstrengths=False)
+        with pytest.raises(ValueError, match="temperature is required"):
+            sf.add_element_ltepopexcitation(2)
+        with pytest.raises(ValueError, match="temperature is required"):
+            sf.add_element_saha(8, 1e10, None, [1, 2])
+        # the first excitation call sets the temperature, and add_element_saha() can then leave it None
+        sf.add_ion_ltepopexcitation(2, 1, n_ion=None, temperature=4000, use_collstrengths=False)
+        assert sf.temperature == 4000
+        sf.add_element_saha(8, 1e10, None, [1, 2])
+        sf.add_element_ltepopexcitation(8)
+        assert (8, 1) in sf.excitationlists
 
 
 def test_balanced_element_input_validation() -> None:
@@ -464,16 +484,16 @@ def test_balanced_element_input_validation() -> None:
         with pytest.raises(ValueError, match="come from the ionisation balance"):
             sf.add_excitation(2, 1, 1e8, np.where(sf.engrid > 21.0, 1e-17, 0.0), 21.0)
         with pytest.raises(ValueError, match="come from the ionisation balance"):
-            sf.add_ion_ltepopexcitation(2, 1, n_ion=1e8, use_collstrengths=False)
+            sf.add_ion_ltepopexcitation(2, 1, n_ion=1e8, temperature=3000, use_collstrengths=False)
 
         # n_ion=None needs a balanced ion
         with pytest.raises(ValueError, match="n_ion is required"):
-            sf.add_ion_ltepopexcitation(8, 1, n_ion=None, use_collstrengths=False)
+            sf.add_ion_ltepopexcitation(8, 1, n_ion=None, temperature=3000, use_collstrengths=False)
         with pytest.raises(ValueError, match="n_ion is required"):
-            sf.add_ion_ltepopexcitation(26, 2, use_collstrengths=False)
+            sf.add_ion_ltepopexcitation(26, 2, temperature=3000, use_collstrengths=False)
 
         # the excitations of a balanced ion can be added once
-        sf.add_ion_ltepopexcitation(2, 1, n_ion=None, use_collstrengths=False)
+        sf.add_ion_ltepopexcitation(2, 1, n_ion=None, temperature=3000, use_collstrengths=False)
         with pytest.raises(ValueError, match="already added"):
-            sf.add_ion_ltepopexcitation(2, 1, n_ion=None, use_collstrengths=False)
+            sf.add_ion_ltepopexcitation(2, 1, n_ion=None, temperature=3000, use_collstrengths=False)
         assert len(sf.excitationlists[(2, 1)]) > 0
