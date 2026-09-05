@@ -6,10 +6,12 @@ A balance of non-thermal ionisation against recombination gives c_i = Gamma_i / 
 with Gamma_i [s^-1] the ionisation rate coefficient of stage i and alpha_{i+1} [cm^3 s^-1] the
 recombination rate coefficient of stage i+1. In both cases n_{i+1} / n_i = c_i / n_e, so the same
 two functions give the ion fractions (get_ion_fractions()) and the charge-neutral free electron
-density (solve_charge_neutral_n_e()).
+density (solve_charge_neutral_n_e_ratios()). solve_charge_neutral_n_e() is the general root find
+behind it, for any population model whose charge density does not increase with n_e.
 """
 
 import math
+from collections.abc import Callable
 from collections.abc import Sequence
 
 from pynonthermal.constants import EV
@@ -91,72 +93,66 @@ def get_ion_fractions(ratio_coeffs: Sequence[float], n_e: float) -> list[float]:
     return [value / total for value in relative]
 
 
-def _charge_density(elements: Sequence[tuple[float, int, Sequence[float]]], n_e: float) -> float:
-    # the free electron density that the ion charges of the balanced elements give at n_e
-    charge_density = 0.0
-    for n_elem, lowest_stage, ratio_coeffs in elements:
-        fractions = get_ion_fractions(ratio_coeffs, n_e)
-        charge_density += n_elem * sum((lowest_stage - 1 + index) * frac for index, frac in enumerate(fractions))
-    return charge_density
-
-
-def solve_charge_neutral_n_e(n_e_fixed: float, elements: Sequence[tuple[float, int, Sequence[float]]]) -> float:
+def solve_charge_neutral_n_e(
+    n_e_fixed: float, charge_density: Callable[[float], float], charge_density_min: float, charge_density_max: float
+) -> float:
     """Get the free electron density [cm^-3] that makes the plasma charge neutral.
 
-    The result n_e satisfies n_e = n_e_fixed + the electrons from the ion charges of every
-    element, with the ion fractions of each element from get_ion_fractions() at n_e. The mean
-    charge of every element decreases with n_e, so the solution is unique. A bisection in
-    ln(n_e) finds it.
+    The result n_e satisfies n_e = n_e_fixed + charge_density(n_e). A bisection in ln(n_e) finds
+    it. The function works for any population model whose charge density does not increase with
+    the free electron density, for example the ratio coefficients of solve_charge_neutral_n_e_ratios()
+    or a collisional-radiative model.
 
     n_e_fixed:
         the free electron density [cm^-3] from ions whose populations are fixed
-    elements:
-        one tuple (n_elem, lowest_stage, ratio_coeffs) per element: the element number density
-        [cm^-3], the lowest ion stage of its chain, and the ratio coefficients
-        n_{i+1} n_e / n_i [cm^-3] of each pair of adjacent stages. The chain has one stage more
-        than ratio coefficients.
+    charge_density:
+        a function of the free electron density n_e [cm^-3] that gives the electrons [cm^-3] from
+        the ion charges of the modelled populations at that n_e. It must not increase with n_e, so
+        that the solution is unique.
+    charge_density_min:
+        a lower bound of charge_density(n_e) at every n_e, for example the charge of the lowest ion
+        stage of every element. Zero if no positive bound exists.
+    charge_density_max:
+        an upper bound of charge_density(n_e) at every n_e, for example the charge of the highest
+        ion stage of every element
     """
     if not 0.0 <= n_e_fixed < math.inf:
         msg = f"n_e_fixed must be non-negative and finite but is {n_e_fixed}"
         raise ValueError(msg)
+    if not 0.0 <= charge_density_min <= charge_density_max < math.inf:
+        msg = (
+            "the bounds of the charge density must satisfy 0 <= charge_density_min <= charge_density_max and be"
+            f" finite but are {charge_density_min} and {charge_density_max}"
+        )
+        raise ValueError(msg)
 
-    n_e_lower = n_e_fixed
-    n_e_upper = n_e_fixed
-    for n_elem, lowest_stage, ratio_coeffs in elements:
-        if not 0.0 < n_elem < math.inf:
-            msg = f"n_elem must be greater than zero and finite but is {n_elem}"
-            raise ValueError(msg)
-        if lowest_stage < 1:
-            msg = f"the lowest ion stage must be at least 1 but is {lowest_stage}"
-            raise ValueError(msg)
-        # every stage is at least as charged as the lowest one and at most as the highest one
-        n_e_lower += (lowest_stage - 1) * n_elem
-        n_e_upper += (lowest_stage - 1 + len(ratio_coeffs)) * n_elem
-
+    n_e_lower = n_e_fixed + charge_density_min
+    n_e_upper = n_e_fixed + charge_density_max
     if n_e_upper <= 0.0:
-        msg = "no element has an ionised stage, so the free electron density is zero"
+        msg = (
+            "no modelled population has an ionised stage and no fixed ion is ionised, so the free electron"
+            " density is zero"
+        )
         raise ValueError(msg)
 
     def residual(n_e: float) -> float:
-        return n_e_fixed + _charge_density(elements, n_e) - n_e
+        return n_e_fixed + charge_density(n_e) - n_e
 
     # the residual falls with n_e, and it is at most zero at the upper bracket
     if n_e_lower > 0.0:
-        # the lower bracket is exact: every element has at least the charge of its lowest stage, so
-        # the residual there is at least zero. Zero means that every ratio coefficient is zero, and
-        # then the lower bracket is the solution.
+        # the lower bracket is exact: the charge density is at least charge_density_min, so the residual
+        # there is at least zero. Zero means that the populations sit at the bound, and then the lower
+        # bracket is the solution.
         if residual(n_e_lower) <= 0.0:
             return n_e_lower
     else:
-        # a chain that starts at a neutral stage gives no exact positive lower bound. As n_e falls,
-        # every ratio c_i / n_e grows and the charge density tends to a positive constant, so the
-        # residual turns positive at a small enough n_e unless every ratio coefficient is zero.
+        # no exact positive lower bound. As n_e falls, the charge density tends to a positive constant
+        # (every population that can be ionised is), so the residual turns positive at a small enough
+        # n_e unless the charge density is zero everywhere.
         n_e_lower = n_e_upper * _N_E_LOWER_BRACKET_FRACTION
-        while (charge_density := _charge_density(elements, n_e_lower)) <= n_e_lower:
-            if charge_density <= 0.0:
-                msg = (
-                    "every ratio coefficient is zero and no fixed ion is ionised, so the free electron density is zero"
-                )
+        while (charge_density_lower := charge_density(n_e_lower)) <= n_e_lower:
+            if charge_density_lower <= 0.0:
+                msg = "the charge density is zero and no fixed ion is ionised, so the free electron density is zero"
                 raise ValueError(msg)
             n_e_lower *= _N_E_LOWER_BRACKET_FRACTION
             if n_e_lower == 0.0:
@@ -175,3 +171,42 @@ def solve_charge_neutral_n_e(n_e_fixed: float, elements: Sequence[tuple[float, i
             break
 
     return math.exp(0.5 * (ln_lower + ln_upper))
+
+
+def solve_charge_neutral_n_e_ratios(n_e_fixed: float, elements: Sequence[tuple[float, int, Sequence[float]]]) -> float:
+    """Get the charge-neutral free electron density [cm^-3] for elements with ratio coefficients.
+
+    This calls solve_charge_neutral_n_e() with the ion fractions of each element from
+    get_ion_fractions() at n_e. The mean charge of every element decreases with n_e, so the
+    solution is unique.
+
+    n_e_fixed:
+        the free electron density [cm^-3] from ions whose populations are fixed
+    elements:
+        one tuple (n_elem, lowest_stage, ratio_coeffs) per element: the element number density
+        [cm^-3], the lowest ion stage of its chain, and the ratio coefficients
+        n_{i+1} n_e / n_i [cm^-3] of each pair of adjacent stages. The chain has one stage more
+        than ratio coefficients.
+    """
+    charge_density_min = 0.0
+    charge_density_max = 0.0
+    for n_elem, lowest_stage, ratio_coeffs in elements:
+        if not 0.0 < n_elem < math.inf:
+            msg = f"n_elem must be greater than zero and finite but is {n_elem}"
+            raise ValueError(msg)
+        if lowest_stage < 1:
+            msg = f"the lowest ion stage must be at least 1 but is {lowest_stage}"
+            raise ValueError(msg)
+        # every stage is at least as charged as the lowest one and at most as the highest one
+        charge_density_min += (lowest_stage - 1) * n_elem
+        charge_density_max += (lowest_stage - 1 + len(ratio_coeffs)) * n_elem
+
+    def charge_density(n_e: float) -> float:
+        # the free electron density that the ion charges of the elements give at n_e
+        total = 0.0
+        for n_elem, lowest_stage, ratio_coeffs in elements:
+            fractions = get_ion_fractions(ratio_coeffs, n_e)
+            total += n_elem * sum((lowest_stage - 1 + index) * frac for index, frac in enumerate(fractions))
+        return total
+
+    return solve_charge_neutral_n_e(n_e_fixed, charge_density, charge_density_min, charge_density_max)

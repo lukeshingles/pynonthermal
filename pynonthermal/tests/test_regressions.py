@@ -190,7 +190,7 @@ def test_n_e_cache_invalidated_by_later_adds() -> None:
         assert sf.get_n_e() == 1e8
         sf.add_ionisation(8, 3, n_ion=1e8)
         assert sf.get_n_e() == 3e8
-        sf.add_ion_ltepopexcitation(26, 3, n_ion=5e7, use_collstrengths=False)
+        sf.add_ion_excitation(26, 3, n_ion=5e7, use_collstrengths=False)
         assert sf.get_n_e() == 4e8
 
 
@@ -410,7 +410,7 @@ def test_excitation_xs_zero_above_grid() -> None:
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=5.0, npts=300) as sf:
         sf.set_temperature(3000)
         sf.add_ionisation(26, 3, n_ion=0.7)
-        sf.add_ion_ltepopexcitation(26, 3, n_ion=0.7)
+        sf.add_ion_excitation(26, 3, n_ion=0.7)
         for transitions in sf.excitationlists.values():
             for trans in transitions.values():
                 assert trans.epsilon_trans_ev <= sf.engrid[-1]
@@ -447,12 +447,12 @@ def test_excitation_only_ion_counted() -> None:
 
 
 def test_ltepopexcitation_registers_population() -> None:
-    # add_ion_ltepopexcitation() without add_ionisation() must still contribute the ion's free
+    # add_ion_excitation() without add_ionisation() must still contribute the ion's free
     # electrons and nuclei, and must not invent an ionisation channel for it
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=600) as sf:
         sf.set_temperature(3000)
         sf.add_ionisation(8, 2, n_ion=1e8)
-        sf.add_ion_ltepopexcitation(26, 3, n_ion=5e7, use_collstrengths=False)
+        sf.add_ion_excitation(26, 3, n_ion=5e7, use_collstrengths=False)
 
         assert sf.ionpopdict[(26, 3)] == 5e7
         assert sf.get_n_e() == 1e8 * 1 + 5e7 * 2
@@ -468,7 +468,7 @@ def test_ltepopexcitation_registers_population() -> None:
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=200) as sf:
         sf.set_temperature(3000)
         with pytest.raises(ValueError, match="non-negative"):
-            sf.add_ion_ltepopexcitation(26, 3, n_ion=-1.0, use_collstrengths=False)
+            sf.add_ion_excitation(26, 3, n_ion=-1.0, use_collstrengths=False)
 
 
 def test_population_mismatch_checked_before_atomic_data() -> None:
@@ -478,7 +478,7 @@ def test_population_mismatch_checked_before_atomic_data() -> None:
         sf.set_temperature(3000)
         sf.add_ionisation(8, 2, n_ion=1e8)
         with pytest.raises(ValueError, match="different populations"):
-            sf.add_ion_ltepopexcitation(8, 2, n_ion=5e7, use_collstrengths=False)
+            sf.add_ion_excitation(8, 2, n_ion=5e7, use_collstrengths=False)
         assert sf.adata_polars is None
         assert sf.ionpopdict == {(8, 2): 1e8}
         assert not sf.excitationlists
@@ -492,7 +492,7 @@ def test_conservation_warning_on_coarse_grid() -> None:
         sf.set_temperature(3000)
         for Z, ion_stage, n_ion in ((2, 1, 1.0 - x_e), (2, 2, x_e)):
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
-            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
+            sf.add_ion_excitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
         sf.solve(depositionratedensity_ev=100)
 
         with pytest.warns(UserWarning, match="energy fractions sum to"):
@@ -660,13 +660,13 @@ def _reference_ionisation_fill(
 
 
 def test_ltepop_excitation_grouped_fill() -> None:
-    # add_ion_ltepopexcitation writes the matrix once per distinct band width, with the vectors
+    # add_ion_excitation writes the matrix once per distinct band width, with the vectors
     # of same-width transitions pre-summed. Rebuilding from the stored per-transition data must
     # agree to within summation-order rounding.
     npts = 400
     with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=npts) as sf:
         sf.set_temperature(3000)
-        sf.add_ion_ltepopexcitation(2, 1, n_ion=1.0, use_collstrengths=False)
+        sf.add_ion_excitation(2, 1, n_ion=1.0, use_collstrengths=False)
         assert len(sf.excitationlists[(2, 1)]) > 100  # the grouping must actually see many transitions
         expected = np.zeros((npts, npts))
         for trans in sf.excitationlists[(2, 1)].values():

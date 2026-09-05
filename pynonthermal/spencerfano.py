@@ -26,7 +26,7 @@ from pynonthermal.constants import K_B
 from pynonthermal.excitation import ExcitationTransition
 from pynonthermal.ionbalance import get_ion_fractions
 from pynonthermal.ionbalance import get_saha_factor
-from pynonthermal.ionbalance import solve_charge_neutral_n_e
+from pynonthermal.ionbalance import solve_charge_neutral_n_e_ratios
 
 if t.TYPE_CHECKING:
     from collections.abc import Sequence
@@ -180,7 +180,7 @@ class SpencerFanoSolver:
       (KF92 equations 1 and 2), applied along the matrix diagonal in solve()
     - the excitation term, for each transition the level population times the integral of
       y(E') sigma(E') dE' over E' in [E, E + epsilon_trans]: add_excitation() and
-      add_ion_ltepopexcitation(), with cross sections from pynonthermal.excitation
+      add_ion_excitation(), with cross sections from pynonthermal.excitation
       (Li et al. 2012 equation 11 from a collision strength, or the van Regemorter 1962
       approximation with the Mewe 1972 g-bar factor)
     - the ionisation term, integrals of y(E') sigma_ic(E') P(E', epsilon - I) with the channel's
@@ -372,8 +372,8 @@ class SpencerFanoSolver:
     def set_temperature(self, temperature: float) -> None:
         """Set the temperature in K for the LTE level populations and the Saha equation.
 
-        The solver has one temperature. Call this method before add_ion_ltepopexcitation(),
-        add_element_ltepopexcitation(), or add_element_saha(). A second call with a different value
+        The solver has one temperature. Call this method before add_ion_excitation(),
+        add_element_excitation(), or add_element_saha(). A second call with a different value
         raises a ValueError, because the level populations already in the matrix use the first value.
         """
         self._require_not_solved("set the temperature")
@@ -401,7 +401,7 @@ class SpencerFanoSolver:
             msg = (
                 f"The ion populations of Z={Z} come from the ionisation balance, so a population cannot be"
                 " given for its ions. To add LTE excitations of a balanced ion, call"
-                " add_ion_ltepopexcitation() with n_ion=None."
+                " add_ion_excitation() with n_ion=None."
             )
             raise ValueError(msg)
 
@@ -599,7 +599,7 @@ class SpencerFanoSolver:
         for i in range(bandstop, npts):
             self.sfmatrix[i, i:] += vec[i:]
 
-    def add_ion_ltepopexcitation(
+    def add_ion_excitation(
         self,
         Z: int,
         ion_stage: int,
@@ -610,16 +610,18 @@ class SpencerFanoSolver:
         maxnlevelslower: int | None = 5,
         maxnlevelsupper: int | None = 250,
     ) -> None:
-        """Add bound-bound excitations of one ion, with LTE level populations at the solver temperature.
+        """Add bound-bound excitations of one ion, with level populations from the solver's population model.
 
-        Call set_temperature() first.
+        The population model is LTE at the solver temperature, so call set_temperature() first. The
+        transitions and cross sections come from the level data; the model gives the population of
+        each lower level as a fraction of the ion population.
 
         Each added transition is keyed by (lower level index, upper level index), the key to pass to
         get_excitation_ratecoeff() after solving.
 
         If the ion belongs to an element added with add_element_ionbalance() or add_element_saha(),
         n_ion must be None. The level populations then follow the ion population that solve()
-        finds. For every other ion, n_ion is required. add_element_ltepopexcitation() calls this
+        finds. For every other ion, n_ion is required. add_element_excitation() calls this
         method for every stage of a balanced element that has level data.
 
         Transitions whose energy lies outside the solver's energy grid are dropped: above emax_ev no
@@ -697,7 +699,16 @@ class SpencerFanoSolver:
             for k, (bandvec, bandfracvec) in sorted(bands.items()):
                 self._add_excitation_band(bandvec, bandfracvec, k)
 
-    def add_element_ltepopexcitation(
+    def add_ion_ltepopexcitation(self, *args: t.Any, **kwargs: t.Any) -> None:
+        """Call add_ion_excitation(). This name is deprecated and a later release removes it."""
+        warnings.warn(
+            "add_ion_ltepopexcitation() is deprecated. Call set_temperature() and then add_ion_excitation().",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.add_ion_excitation(*args, **kwargs)
+
+    def add_element_excitation(
         self,
         Z: int,
         adata_polars: pl.DataFrame | None = None,
@@ -707,11 +718,11 @@ class SpencerFanoSolver:
     ) -> None:
         """Add LTE bound-bound excitations to every stage of a balanced element that has level data.
 
-        This calls add_ion_ltepopexcitation() with n_ion=None for each stage of the chain of an
+        This calls add_ion_excitation() with n_ion=None for each stage of the chain of an
         element added with add_element_ionbalance() or add_element_saha(). Stages without level data
         (in the internal database or adata_polars) get no excitations; a ValueError reports an
-        element with no such stage. Call add_ion_ltepopexcitation() instead to choose the stages or
-        to give each stage its own options. The parameters are those of add_ion_ltepopexcitation().
+        element with no such stage. Call add_ion_excitation() instead to choose the stages or
+        to give each stage its own options. The parameters are those of add_ion_excitation().
         """
         element = self._balanced_elements.get(Z)
         if element is None:
@@ -732,7 +743,7 @@ class SpencerFanoSolver:
             raise ValueError(msg)
 
         for ion_stage in stages_with_levels:
-            self.add_ion_ltepopexcitation(
+            self.add_ion_excitation(
                 Z,
                 ion_stage,
                 n_ion=None,
@@ -773,7 +784,7 @@ class SpencerFanoSolver:
         maxnlevelslower: int | None,
         maxnlevelsupper: int | None,
     ) -> list[tuple[t.Any, _ExcitationTemplate]]:
-        # the part of add_ion_ltepopexcitation() that does not depend on the ion population: for each
+        # the part of add_ion_excitation() that does not depend on the ion population: for each
         # transition on the energy grid, the key (lower, upper), the LTE population fraction of the
         # lower level, the cross section on the grid, and the transition energy
         ion = self._get_ion_levels(Z, ion_stage, adata_polars)
@@ -1121,7 +1132,7 @@ class SpencerFanoSolver:
         stage is a sink: its ionisation is an energy loss in the matrix, but the ions it makes have
         no stage to go to. Extend the chain to a stage whose ionisation is negligible, or solve()
         warns. Every stage gets the built-in ionisation channels of add_ionisation(). To add LTE
-        excitations of a stage, call add_ion_ltepopexcitation() with n_ion=None.
+        excitations of a stage, call add_ion_excitation() with n_ion=None.
 
         Until solve() runs, ionpopdict holds a provisional population of equal fractions for the
         stages, and get_n_e() and get_n_ion_tot() include it.
@@ -1193,7 +1204,7 @@ class SpencerFanoSolver:
 
         Every stage gets the built-in ionisation channels of add_ionisation(), so the ionisation
         of the top stage is an energy loss in the matrix. To add LTE excitations of a stage, call
-        add_ion_ltepopexcitation() with n_ion=None.
+        add_ion_excitation() with n_ion=None.
 
         Until solve() runs, ionpopdict holds a provisional population of equal fractions for the
         stages, and get_n_e() and get_n_ion_tot() include it.
@@ -1207,7 +1218,7 @@ class SpencerFanoSolver:
             partition function at the temperature from the level data (the internal database or
             adata_polars), or 1 for the bare nucleus. A ValueError names a stage that has neither.
         adata_polars:
-            a levels table in the format of add_ion_ltepopexcitation(). Once given, it is kept
+            a levels table in the format of add_ion_excitation(). Once given, it is kept
             for later calls on this solver.
         """
         stages = tuple(int(ion_stage) for ion_stage in ion_stages)
@@ -1502,7 +1513,7 @@ class SpencerFanoSolver:
             n_e = (
                 self._n_e_override
                 if self._n_e_override is not None
-                else solve_charge_neutral_n_e(
+                else solve_charge_neutral_n_e_ratios(
                     n_e_fixed,
                     [
                         (element.n_elem, element.ion_stages[0], get_element_ratio_coeffs(element))
@@ -2049,7 +2060,7 @@ class SpencerFanoSolver:
         convention of get_ionisation_ratecoeff(). It scales with depositionratedensity_ev.
 
         transitionkey is the key given to add_excitation(); for transitions added by
-        add_ion_ltepopexcitation() it is (lower level index, upper level index).
+        add_ion_excitation() it is (lower level index, upper level index).
         """
         self._require_solved()
         trans = self.excitationlists[(Z, ion_stage)][transitionkey]

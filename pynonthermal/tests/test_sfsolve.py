@@ -67,7 +67,7 @@ def test_api_guards() -> None:
 
         # excitation data must exist for the requested ion
         with pytest.raises(ValueError, match="No excitation data"):
-            sf.add_ion_ltepopexcitation(3, 1, n_ion=1.0, adata_polars=pl.DataFrame({"Z": [2], "ion_stage": [1]}))
+            sf.add_ion_excitation(3, 1, n_ion=1.0, adata_polars=pl.DataFrame({"Z": [2], "ion_stage": [1]}))
 
         # a zero-population ion is a no-op and a negative population is rejected
         sf.add_ionisation(8, 3, n_ion=0.0)
@@ -130,11 +130,11 @@ def test_helium() -> None:
         sf.set_temperature(3000)
         for Z, ion_stage, n_ion in ions:
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
-            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
+            sf.add_ion_excitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
 
         # re-adding an ion's excitations with a different population is not allowed
         with pytest.raises(ValueError, match="different populations"):
-            sf.add_ion_ltepopexcitation(2, 1, n_ion=99.9, use_collstrengths=False)
+            sf.add_ion_excitation(2, 1, n_ion=99.9, use_collstrengths=False)
 
         # call solve twice to test that it can be called multiple times without error
         sf.solve(depositionratedensity_ev=1000)
@@ -175,7 +175,7 @@ def test_heating_only_approximation() -> None:
         sf.set_temperature(3000)
         for Z, ion_stage, n_ion in ions:
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
-            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
+            sf.add_ion_excitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
         return sf
 
     with (
@@ -219,7 +219,7 @@ def test_iron() -> None:
         sf.set_temperature(3000)
         for Z, ion_stage, n_ion in ions:
             sf.add_ionisation(Z, ion_stage, n_ion=n_ion)
-            sf.add_ion_ltepopexcitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
+            sf.add_ion_excitation(Z, ion_stage, n_ion=n_ion, use_collstrengths=False)
 
         sf.solve(depositionratedensity_ev=100)
 
