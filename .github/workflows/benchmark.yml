@@ -1,7 +1,5 @@
 ---
 name: Benchmark with CodSpeed
-permissions:
-    contents: read
 on:
     push:
         branches:
@@ -16,7 +14,9 @@ jobs:
     codspeed-benchmarks:
         timeout-minutes: 1440
         runs-on: ubuntu-24.04
-
+        permissions:
+            contents: read # required for actions/checkout
+            id-token: write # required for OIDC authentication with CodSpeed
         name: codspeed benchmarks
         steps:
             - name: Checkout Code
@@ -37,5 +37,4 @@ jobs:
               uses: CodSpeedHQ/action@v5
               with:
                   mode: simulation
-                  token: ${{ secrets.CODSPEED_TOKEN }}
                   run: uv run --frozen -- python3 -m pytest --codspeed

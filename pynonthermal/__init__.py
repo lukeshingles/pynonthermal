@@ -5,6 +5,7 @@ from pynonthermal import base as base
 from pynonthermal import collion as collion
 from pynonthermal import constants as constants
 from pynonthermal import excitation as excitation
+from pynonthermal import ionbalance as ionbalance
 from pynonthermal.base import CrossSectionFunc as CrossSectionFunc
 from pynonthermal.base import DATADIR as DATADIR
 from pynonthermal.base import electronlossfunction as electronlossfunction
