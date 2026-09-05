@@ -415,6 +415,21 @@ def test_excitation_xs_zero_above_grid() -> None:
                 assert (trans.xs_vec >= 0.0).all()
 
 
+def test_ionisation_ratecoeff_matches_eff_ionpot_form() -> None:
+    # the rate coefficient is the direct integral of y(E) sigma(E) dE over the shells. For a
+    # populated ion that equals Kozma & Fransson 1992 equation 13 with the effective potential.
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=400) as sf:
+        sf.add_ionisation(8, 1, n_ion=9e8)
+        sf.add_ionisation(8, 2, n_ion=1e8)
+        sf.add_ionisation(26, 2, n_ion=2e7)
+        sf.solve(depositionratedensity_ev=1e9)
+        n_ion_tot = sf.get_n_ion_tot()
+        for Z, ion_stage in sf.ionpopdict:
+            ratecoeff = sf.get_ionisation_ratecoeff(Z, ion_stage)
+            assert ratecoeff > 0.0
+            assert math.isclose(ratecoeff, 1e9 / n_ion_tot / sf.get_eff_ionpot(Z, ion_stage), rel_tol=1e-12)
+
+
 def test_excitation_only_ion_counted() -> None:
     # an ion given an excitation channel but no ionisation channel still spends deposited energy,
     # so its excitation fraction has to appear in the totals
