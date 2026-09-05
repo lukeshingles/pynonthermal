@@ -400,7 +400,15 @@ class SpencerFanoSolver:
             raise ValueError(msg)
 
     def _register_ion_population(self, Z: int, ion_stage: int, n_ion: float) -> None:
-        # an ion's number density must agree between its ionisation and excitation calls
+        # record an ion's number density after _check_ion_population() has accepted it
+        self._check_ion_population(Z, ion_stage, n_ion)
+        self.ionpopdict[(Z, ion_stage)] = n_ion
+        # the free electron density derived from the ion populations is no longer current
+        self._n_e = None
+
+    def _check_ion_population(self, Z: int, ion_stage: int, n_ion: float) -> None:
+        # every check of a population that a caller gives, with no change to the solver. An ion's
+        # number density must agree between its ionisation and excitation calls.
         self._check_not_balanced(Z)
         if Z < 1:
             msg = f"Z must be at least 1 but is {Z}"
@@ -420,10 +428,6 @@ class SpencerFanoSolver:
         if n_ion_existing is not None and not math.isclose(n_ion_existing, n_ion, rel_tol=1e-6):
             msg = f"Can't add Z={Z} ion_stage {ion_stage} twice with different populations"
             raise ValueError(msg)
-
-        self.ionpopdict[(Z, ion_stage)] = n_ion
-        # the free electron density derived from the ion populations is no longer current
-        self._n_e = None
 
     def _check_ionpot_above_emin(self, Z: int, ion_stage: int, ionpots_ev: list[float]) -> None:
         # Kozma & Fransson 1992 assume that every threshold lies above the low-energy cutoff E_0, so that
@@ -650,18 +654,17 @@ class SpencerFanoSolver:
             self._add_balanced_excitation_templates(element, ion_stage, templates)
             return
 
-        # the population check runs before the atomic data is read, so a bad n_ion fails fast
-        self._check_not_balanced(Z)
-        if not 0.0 <= n_ion < math.inf:
-            msg = f"n_ion must be non-negative and finite but is {n_ion}"
-            raise ValueError(msg)
+        # every check of the population runs before the atomic data is read, so a bad or conflicting
+        # n_ion fails without reading or caching a level table
+        self._check_ion_population(Z, ion_stage, n_ion)
 
         templates = self._build_ltepop_excitation_templates(
             Z, ion_stage, temperature, adata_polars, use_collstrengths, maxnlevelslower, maxnlevelsupper
         )
 
         # register the population so that this ion counts towards n_e and n_ion_tot even when
-        # add_ionisation() was never called for it
+        # add_ionisation() was never called for it. The registration comes after the templates, so
+        # a failed atomic-data lookup leaves the solver unchanged.
         self._register_ion_population(Z, ion_stage, n_ion)
 
         bands: dict[int, tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]] = {}

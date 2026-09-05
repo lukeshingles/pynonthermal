@@ -471,6 +471,19 @@ def test_ltepopexcitation_registers_population() -> None:
             sf.add_ion_ltepopexcitation(26, 3, n_ion=-1.0, use_collstrengths=False)
 
 
+def test_population_mismatch_checked_before_atomic_data() -> None:
+    # a population that conflicts with an earlier registration is rejected before the level data is
+    # read, so the failed call neither caches a level table nor changes the populations
+    with pynonthermal.SpencerFanoSolver(emin_ev=1, emax_ev=3000, npts=200) as sf:
+        sf.set_temperature(3000)
+        sf.add_ionisation(8, 2, n_ion=1e8)
+        with pytest.raises(ValueError, match="different populations"):
+            sf.add_ion_ltepopexcitation(8, 2, n_ion=5e7, use_collstrengths=False)
+        assert sf.adata_polars is None
+        assert sf.ionpopdict == {(8, 2): 1e8}
+        assert not sf.excitationlists
+
+
 def test_conservation_warning_on_coarse_grid() -> None:
     # the energy fractions of a helium plasma are ~6.5% off unity at npts=100,
     # which must trigger the conservation diagnostic
