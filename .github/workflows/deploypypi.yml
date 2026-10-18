@@ -50,7 +50,7 @@ jobs:
     testdeploy:
         name: Test upload to TestPyPI
         needs: [build]
-        runs-on: ubuntu-26.04-arm
+        runs-on: ubuntu-26.04
         environment: test
         permissions:
             id-token: write
@@ -72,7 +72,7 @@ jobs:
     deploy:
         name: Upload to PyPI
         needs: [build]
-        runs-on: ubuntu-26.04-arm
+        runs-on: ubuntu-26.04
         environment: release
         permissions:
             id-token: write
